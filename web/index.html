@@ -1251,17 +1251,14 @@
             for (let i = 0; i < item.fido2Credentials.length; i++) {
                 const fc = item.fido2Credentials[i];
                 const idx = item.fido2Credentials.length > 1 ? `_${i}` : '';
+                // KeePassXC 标准 Passkey 字段（兼容 KeePassXC / KeePassPasskey）
                 if (fc.credentialId) fields[`KPEX_PASSKEY_CREDENTIAL_ID${idx}`] = fc.credentialId;
-                if (fc.keyValue) fields[`KPEX_PASSKEY_KEY_VALUE${idx}`] = fc.keyValue;
-                if (fc.rpId) fields[`KPEX_PASSKEY_RP_ID${idx}`] = fc.rpId;
-                if (fc.rpName) fields[`KPEX_PASSKEY_RP_NAME${idx}`] = fc.rpName;
+                if (fc.keyValue) fields[`KPEX_PASSKEY_PRIVATE_KEY_PEM${idx}`] = fc.keyValue;
+                if (fc.rpId) fields[`KPEX_PASSKEY_RELYING_PARTY${idx}`] = fc.rpId;
                 if (fc.userHandle) fields[`KPEX_PASSKEY_USER_HANDLE${idx}`] = fc.userHandle;
-                if (fc.userName) fields[`KPEX_PASSKEY_USER_NAME${idx}`] = fc.userName;
-                if (fc.keyAlgorithm) fields[`KPEX_PASSKEY_ALGORITHM${idx}`] = fc.keyAlgorithm;
-                if (fc.keyCurve) fields[`KPEX_PASSKEY_CURVE${idx}`] = fc.keyCurve;
-                if (fc.counter) fields[`KPEX_PASSKEY_COUNTER${idx}`] = fc.counter;
-                if (fc.discoverable) fields[`KPEX_PASSKEY_DISCOVERABLE${idx}`] = fc.discoverable;
-                if (fc.creationDate) fields[`KPEX_PASSKEY_CREATION${idx}`] = fc.creationDate;
+                if (fc.userName) fields[`KPEX_PASSKEY_USERNAME${idx}`] = fc.userName;
+                fields[`KPEX_PASSKEY_FLAG_BE${idx}`] = '1';
+                fields[`KPEX_PASSKEY_FLAG_BS${idx}`] = '1';
             }
             if (item.creationDate) fields['CreationDate'] = item.creationDate;
             if (item.revisionDate) fields['RevisionDate'] = item.revisionDate;
