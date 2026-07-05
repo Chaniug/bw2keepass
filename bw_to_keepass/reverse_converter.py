@@ -232,7 +232,7 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     # 提取自定义字段（排除内部字段和 passkey 字段）
     skip_prefixes = (
         'BitwardenType', 'BitwardenID', 'TOTP Seed', 'TOTP Settings',
-        'otpauth', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
+        'otp', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
         '_TAGS', 'CardBrand', 'CardNumber', 'CardExpiry',
         'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
         'IdentityTitle', 'IdentityFirstName', 'IdentityLastName',

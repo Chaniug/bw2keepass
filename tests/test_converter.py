@@ -154,8 +154,6 @@ class TestConverter(unittest.TestCase):
         item = next(i for i in self.items if i.name == "GitHub")
         notes = get_entry_notes(item)
         self.assertIn("My GitHub account", notes)
-        self.assertIn("TOTP", notes)
-        self.assertIn("otpauth://totp/GitHub", notes)
         self.assertIn("其他 URI", notes)
         self.assertIn("密码历史", notes)
 

@@ -150,7 +150,7 @@ def export_kdbx_to_csv(
 
         # 非内部自定义字段（JSON）
         skip_keys = {
-            'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otpauth',
+            'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otp',
             'CreationDate', 'RevisionDate', 'BitwardenID',
             'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
             'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
@@ -265,7 +265,7 @@ def export_kdbx_to_csv_string(
             passkey_count += 1
 
         skip_keys = {
-            'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otpauth',
+            'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otp',
             'CreationDate', 'RevisionDate', 'BitwardenID',
             'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
             'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',

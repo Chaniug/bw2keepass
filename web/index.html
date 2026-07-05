@@ -1838,7 +1838,7 @@
                 }
                 fields['TOTP Seed'] = totpRaw;
                 fields['TOTP Settings'] = '30;6';
-                fields['otpauth'] = otpauthUrl;
+                fields['otp'] = otpauthUrl;
             }
             if (item.login?.uris?.length > 1) {
                 // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC）

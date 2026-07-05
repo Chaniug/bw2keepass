@@ -126,10 +126,6 @@ def get_entry_notes(item: VaultItem) -> str:
             uri_lines.append(f"URI {i}: {u.uri}")
         parts.append("\n".join(uri_lines))
 
-    # TOTP
-    if item.totp:
-        parts.append(f"\n[TOTP]\notpauth://totp/{item.name}?secret={item.totp}")
-
     # 密码历史
     if item.password_history:
         hist_lines = ["\n[密码历史]"]
