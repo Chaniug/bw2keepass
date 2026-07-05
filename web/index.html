@@ -825,7 +825,21 @@
                     password: ph.password || '',
                     lastUsedDate: ph.lastUsedDate || ''
                 })),
-                fido2Credentials: [],
+                fido2Credentials: (item.login?.fido2Credentials || []).map(fc => ({
+                    credentialId: fc.credentialId || '',
+                    keyType: fc.keyType || '',
+                    keyAlgorithm: fc.keyAlgorithm || '',
+                    keyCurve: fc.keyCurve || '',
+                    keyValue: fc.keyValue || '',
+                    rpId: fc.rpId || '',
+                    rpName: fc.rpName || '',
+                    userHandle: fc.userHandle || '',
+                    userName: fc.userName || '',
+                    userDisplayName: fc.userDisplayName || '',
+                    counter: fc.counter || '',
+                    discoverable: fc.discoverable || '',
+                    creationDate: fc.creationDate || '',
+                })),
             };
 
             return bwItem;
