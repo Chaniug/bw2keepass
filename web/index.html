@@ -326,7 +326,11 @@
         <div class="card password-section" id="passwordCard">
             <div class="card-title" id="passwordTitle">🔑 设置数据库密码</div>
             <div class="card-desc" id="passwordDesc">此密码将用于加密数据库</div>
-            
+
+            <div class="input-group" style="margin-bottom: 0.75rem;">
+                <input type="text" id="dbName" placeholder="数据库名称（可选）" value="My Vault" autocomplete="off">
+            </div>
+
             <div class="input-group">
                 <input type="password" id="dbPassword" placeholder="输入数据库密码" autocomplete="new-password">
                 <button class="toggle-password" id="togglePassword" title="显示/隐藏密码">👁️</button>
@@ -465,6 +469,7 @@
         const progressCard = document.getElementById('progressCard');
         const successCard = document.getElementById('successCard');
         const dbPassword = document.getElementById('dbPassword');
+        const dbName = document.getElementById('dbName');
         const togglePassword = document.getElementById('togglePassword');
         const passwordStrengthBar = document.getElementById('passwordStrengthBar');
         const strengthLabel = document.getElementById('strengthLabel');
@@ -602,6 +607,9 @@
             fileInfo.classList.add('show');
             uploadZone.style.display = 'none';
             nextStepBtn.disabled = false;
+            // 从文件名自动填充数据库名称
+            const baseName = file.name.replace(/\.(json|zip|csv|1pux)$/i, '');
+            dbName.value = baseName || 'My Vault';
         }
 
         // ============ Step Navigation ============
@@ -790,7 +798,7 @@
             progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 KDBX...`;
 
             const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
-            const db = Kdbx.create(credentials, 'Imported Vault');
+            const db = Kdbx.create(credentials, dbName.value.trim() || 'My Vault');
             db.setKdf(Consts.KdfId.Aes);
             db.upgrade();
 
