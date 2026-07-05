@@ -514,6 +514,7 @@
         let selectedFile = null;
         let parsedData = null;
         let generatedData = null;
+        let generatedKdbxInfo = '';
         let generatedPasskeyData = null; // { passkeys: [...], zipBlob: Blob }
         let outputFileName = 'output.kdbx';
         const TYPE_NAMES = { 1: 'Login', 2: 'SecureNote', 3: 'Card', 4: 'Identity', 5: 'SSHKey' };
@@ -874,6 +875,14 @@
             progressStats.textContent = '正在加密并生成 KDBX 文件...';
             generatedData = await db.save();
 
+            // 从二进制头读取实际 KDBX 版本
+            const _dv = new DataView(generatedData);
+            const _ver = _dv.getUint32(8, true);
+            const _kdbxMajor = (_ver >> 16) & 0xFFFF;
+            const _kdbxMinor = _ver & 0xFFFF;
+            const _kdfName = argon2Ready ? 'Argon2d' : 'AES-KDF';
+            generatedKdbxInfo = `KDBX ${_kdbxMajor}.${_kdbxMinor} · ${_kdfName} · AES-256`;
+
             // Generate .passkey files only if user opted in
             const separatePasskey = document.getElementById('separatePasskey');
             generatedPasskeyData = null;
@@ -896,6 +905,7 @@
             outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
             const passkeyInfo = passkeys.length > 0 ? ` · 包含 ${passkeys.length} 个 Passkey` : '';
             successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹${passkeyInfo}`;
+            successDetails.textContent += `\n📦 ${generatedKdbxInfo}`;
             downloadBtn.textContent = '💾 下载 KDBX 文件';
             if (generatedPasskeyData) showPasskeyDownloadBtn();
             buildSummaryTable(vault);
