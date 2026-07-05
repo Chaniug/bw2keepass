@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pass2KDBX - 密码管理器 → KeePass 转换器</title>
+    <title>Pass2KDBX - 密码管理器格式互转</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔐</text></svg>">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -20,6 +20,8 @@
             --accent-glow: rgba(108, 92, 231, 0.3);
             --success: #00cec9;
             --danger: #ff6b6b;
+            --warning: #f0a500;
+            --bw-blue: #175ddc;
             --radius: 12px;
             --radius-sm: 8px;
         }
@@ -35,14 +37,11 @@
             padding: 2rem 1rem;
         }
 
-        /* 背景动画 */
         body::before {
             content: '';
             position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
             background: 
                 radial-gradient(ellipse at 20% 50%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
                 radial-gradient(ellipse at 80% 20%, rgba(0, 206, 201, 0.06) 0%, transparent 50%),
@@ -57,526 +56,171 @@
             66% { transform: translate(-1%, 2%); }
         }
 
-        .container {
-            width: 100%;
-            max-width: 720px;
-        }
+        .container { width: 100%; max-width: 720px; }
 
         /* Header */
-        .header {
-            text-align: center;
-            margin-bottom: 2.5rem;
-        }
-
+        .header { text-align: center; margin-bottom: 2rem; }
         .logo {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.6rem;
-            font-size: 1.8rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 0.5rem;
+            display: inline-flex; align-items: center; gap: 0.6rem;
+            font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.5rem;
         }
-
-        .logo-icon {
-            font-size: 2.2rem;
-        }
-
+        .logo-icon { font-size: 2.2rem; }
         .logo-accent {
             background: linear-gradient(135deg, var(--accent), var(--success));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
+        .subtitle { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5; }
 
-        .subtitle {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-            line-height: 1.5;
+        /* Direction Switcher */
+        .direction-switch {
+            display: flex; justify-content: center; gap: 0; margin-bottom: 1.5rem;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 2rem;
+            padding: 0.3rem; width: fit-content; margin-left: auto; margin-right: auto;
         }
+        .dir-btn {
+            padding: 0.6rem 1.4rem; border-radius: 1.8rem; font-size: 0.85rem; font-weight: 600;
+            font-family: inherit; border: none; cursor: pointer; transition: all 0.3s;
+            background: transparent; color: var(--text-secondary); white-space: nowrap;
+        }
+        .dir-btn.active {
+            background: var(--accent); color: #fff; box-shadow: 0 2px 12px var(--accent-glow);
+        }
+        .dir-btn:hover:not(.active) { color: var(--text); }
+        .dir-arrow { display: flex; align-items: center; color: var(--text-secondary); font-size: 0.9rem; padding: 0 0.2rem; }
 
         /* Steps */
-        .steps {
-            display: flex;
-            justify-content: center;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .step {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            transition: color 0.3s;
-        }
-
+        .steps { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; }
+        .step { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); transition: color 0.3s; }
         .step.active { color: var(--text); }
         .step.done { color: var(--success); }
-
         .step-num {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 700;
-            border: 2px solid var(--border);
-            transition: all 0.3s;
+            width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 0.75rem; font-weight: 700; border: 2px solid var(--border); transition: all 0.3s;
         }
-
-        .step.active .step-num {
-            border-color: var(--accent);
-            background: var(--accent-glow);
-        }
-
-        .step.done .step-num {
-            border-color: var(--success);
-            background: rgba(0, 206, 201, 0.15);
-        }
-
-        .step-arrow {
-            color: var(--border);
-            margin: 0 0.25rem;
-        }
+        .step.active .step-num { border-color: var(--accent); background: var(--accent-glow); }
+        .step.done .step-num { border-color: var(--success); background: rgba(0, 206, 201, 0.15); }
+        .step-arrow { color: var(--border); margin: 0 0.25rem; }
 
         /* Card */
         .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem;
-            margin-bottom: 1.5rem;
-            transition: border-color 0.3s;
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 2rem; margin-bottom: 1.5rem; transition: border-color 0.3s;
         }
-
-        .card:hover {
-            border-color: rgba(108, 92, 231, 0.25);
-        }
-
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 0.3rem;
-        }
-
-        .card-desc {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-bottom: 1.25rem;
-        }
+        .card:hover { border-color: rgba(108, 92, 231, 0.25); }
+        .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.3rem; }
+        .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem; }
 
         /* Upload Zone */
         .upload-zone {
-            border: 2px dashed var(--border);
-            border-radius: var(--radius);
-            padding: 3rem 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s;
-            position: relative;
+            border: 2px dashed var(--border); border-radius: var(--radius); padding: 2.5rem 2rem;
+            text-align: center; cursor: pointer; transition: all 0.3s;
         }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: rgba(108, 92, 231, 0.04); }
+        .upload-zone.drag-over { border-style: solid; box-shadow: 0 0 30px var(--accent-glow); }
+        .upload-icon { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; }
+        .upload-text { font-size: 1rem; font-weight: 500; margin-bottom: 0.35rem; }
+        .upload-hint { font-size: 0.8rem; color: var(--text-secondary); }
+        .file-input { display: none; }
 
-        .upload-zone:hover, .upload-zone.drag-over {
-            border-color: var(--accent);
-            background: rgba(108, 92, 231, 0.04);
-        }
-
-        .upload-zone.drag-over {
-            border-style: solid;
-            box-shadow: 0 0 30px var(--accent-glow);
-        }
-
-        .upload-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            display: block;
-        }
-
-        .upload-text {
-            font-size: 1rem;
-            font-weight: 500;
-            margin-bottom: 0.35rem;
-        }
-
-        .upload-hint {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        /* Format Badges */
         .fmt-badge {
-            display: inline-block;
-            font-size: 0.7rem;
-            padding: 0.2rem 0.55rem;
-            border-radius: 1rem;
-            background: var(--surface-hover);
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            white-space: nowrap;
+            display: inline-block; font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 1rem;
+            background: var(--surface-hover); border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap;
         }
 
         /* File Info */
-        .file-info {
-            display: none;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            background: var(--surface-hover);
-            border-radius: var(--radius-sm);
-            margin-top: 1rem;
-        }
-
+        .file-info { display: none; align-items: center; gap: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-sm); margin-top: 1rem; }
         .file-info.show { display: flex; }
-
-        .file-icon {
-            font-size: 2rem;
-            flex-shrink: 0;
-        }
-
-        .file-details {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .file-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .file-meta {
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-            margin-top: 0.15rem;
-        }
-
+        .file-icon { font-size: 2rem; flex-shrink: 0; }
+        .file-details { flex: 1; min-width: 0; }
+        .file-name { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem; }
         .file-remove {
-            background: none;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-            flex-shrink: 0;
+            background: none; border: 1px solid var(--border); color: var(--text-secondary);
+            width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
         }
+        .file-remove:hover { border-color: var(--danger); color: var(--danger); }
 
-        .file-remove:hover {
-            border-color: var(--danger);
-            color: var(--danger);
-        }
-
-        /* Password Input */
-        .password-section {
-            display: none;
-        }
-
+        /* Password */
+        .password-section { display: none; }
         .password-section.show { display: block; }
-
-        .input-group {
-            position: relative;
-        }
-
+        .input-group { position: relative; }
         .input-group input {
-            width: 100%;
-            padding: 0.85rem 1rem;
-            padding-right: 3rem;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
-            font-size: 0.95rem;
-            font-family: inherit;
-            transition: border-color 0.3s;
-            outline: none;
+            width: 100%; padding: 0.85rem 1rem; padding-right: 3rem;
+            background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+            color: var(--text); font-size: 0.95rem; font-family: inherit; transition: border-color 0.3s; outline: none;
         }
-
-        .input-group input:focus {
-            border-color: var(--accent);
-        }
-
-        .input-group input::placeholder {
-            color: var(--text-secondary);
-            opacity: 0.6;
-        }
-
+        .input-group input:focus { border-color: var(--accent); }
+        .input-group input::placeholder { color: var(--text-secondary); opacity: 0.6; }
         .toggle-password {
-            position: absolute;
-            right: 0.75rem;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 1.1rem;
-            padding: 0.25rem;
+            position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem; padding: 0.25rem;
         }
-
-        .password-strength {
-            height: 4px;
-            border-radius: 2px;
-            margin-top: 0.6rem;
-            background: var(--border);
-            overflow: hidden;
-        }
-
-        .password-strength-bar {
-            height: 100%;
-            border-radius: 2px;
-            transition: width 0.3s, background 0.3s;
-            width: 0;
-        }
-
-        .password-options {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-top: 0.75rem;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-
-        .password-options button {
-            background: none;
-            border: none;
-            color: var(--accent);
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-family: inherit;
-            text-decoration: underline;
-            text-underline-offset: 2px;
-        }
-
-        .password-options button:hover {
-            color: var(--accent-hover);
-        }
+        .password-strength { height: 4px; border-radius: 2px; margin-top: 0.6rem; background: var(--border); overflow: hidden; }
+        .password-strength-bar { height: 100%; border-radius: 2px; transition: width 0.3s, background 0.3s; width: 0; }
+        .password-options { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-secondary); }
+        .password-options button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
+        .password-options button:hover { color: var(--accent-hover); }
 
         /* Progress */
-        .progress-section {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-
+        .progress-section { display: none; text-align: center; padding: 2rem; }
         .progress-section.show { display: block; }
-
         .spinner {
-            width: 48px;
-            height: 48px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin: 0 auto 1rem;
+            width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .progress-text {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .progress-stats {
-            margin-top: 0.5rem;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .progress-text { color: var(--text-secondary); font-size: 0.9rem; }
+        .progress-stats { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
 
         /* Success */
-        .success-section {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-
+        .success-section { display: none; text-align: center; padding: 2rem; }
         .success-section.show { display: block; }
-
-        .success-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            display: block;
-            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes popIn {
-            0% { transform: scale(0); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .success-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 0.35rem;
-        }
-
-        .success-details {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
-        }
+        .success-icon { font-size: 4rem; margin-bottom: 1rem; display: block; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .success-title { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.35rem; }
+        .success-details { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
 
         /* Buttons */
         .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.75rem;
-            border-radius: var(--radius-sm);
-            font-size: 0.95rem;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-            text-decoration: none;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+            padding: 0.75rem 1.75rem; border-radius: var(--radius-sm); font-size: 0.95rem;
+            font-weight: 600; font-family: inherit; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none;
         }
-
-        .btn-primary {
-            background: var(--accent);
-            color: #fff;
-        }
-
-        .btn-primary:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 4px 20px var(--accent-glow);
-            transform: translateY(-1px);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-        }
-
-        .btn-outline:hover {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: #000;
-        }
-
-        .btn-success:hover {
-            box-shadow: 0 4px 20px rgba(0, 206, 201, 0.3);
-            transform: translateY(-1px);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 0.75rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 20px var(--accent-glow); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-success { background: var(--success); color: #000; }
+        .btn-success:hover { box-shadow: 0 4px 20px rgba(0, 206, 201, 0.3); transform: translateY(-1px); }
+        .btn-group { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
 
         /* Summary Table */
-        .summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-            font-size: 0.85rem;
-        }
-
-        .summary-table th,
-        .summary-table td {
-            padding: 0.6rem 0.75rem;
-            text-align: left;
-        }
-
-        .summary-table th {
-            color: var(--text-secondary);
-            font-weight: 500;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .summary-table td {
-            border-bottom: 1px solid rgba(42, 45, 55, 0.5);
-        }
-
-        .summary-table .num {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
+        .summary-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+        .summary-table th, .summary-table td { padding: 0.6rem 0.75rem; text-align: left; }
+        .summary-table th { color: var(--text-secondary); font-weight: 500; border-bottom: 1px solid var(--border); }
+        .summary-table td { border-bottom: 1px solid rgba(42, 45, 55, 0.5); }
+        .summary-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
         /* Toast */
         .toast {
-            position: fixed;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 0.75rem 1.5rem;
-            border-radius: 2rem;
-            font-size: 0.85rem;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 100;
+            position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px);
+            background: var(--surface); border: 1px solid var(--border); padding: 0.75rem 1.5rem;
+            border-radius: 2rem; font-size: 0.85rem; box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100;
         }
-
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .toast.error {
-            border-color: var(--danger);
-        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.error { border-color: var(--danger); }
 
         /* Footer */
-        .footer {
-            text-align: center;
-            margin-top: 2rem;
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-        }
-
-        .footer a {
-            color: var(--accent);
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
+        .footer { text-align: center; margin-top: 2rem; font-size: 0.78rem; color: var(--text-secondary); }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
         .privacy-note {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            justify-content: center;
-            margin-top: 0.75rem;
-            padding: 0.6rem 1rem;
-            background: rgba(0, 206, 201, 0.06);
-            border-radius: 2rem;
-            font-size: 0.75rem;
+            display: flex; align-items: center; gap: 0.4rem; justify-content: center;
+            margin-top: 0.75rem; padding: 0.6rem 1rem; background: rgba(0, 206, 201, 0.06);
+            border-radius: 2rem; font-size: 0.75rem;
         }
 
         /* Responsive */
@@ -586,6 +230,8 @@
             .btn-group { flex-direction: column; }
             .btn { width: 100%; }
             .steps { flex-wrap: wrap; }
+            .direction-switch { width: 100%; }
+            .dir-btn { flex: 1; text-align: center; font-size: 0.78rem; padding: 0.5rem 0.8rem; }
         }
     </style>
 </head>
@@ -597,39 +243,39 @@
                 <span class="logo-icon">🔐</span>
                 <span>Pass<span class="logo-accent">2</span>KDBX</span>
             </div>
-            <p class="subtitle">将多种密码管理器导出文件转换为 KeePass KDBX 数据库<br>所有处理均在浏览器本地完成，数据不会上传到任何服务器</p>
+            <p class="subtitle">密码管理器格式双向互转<br>所有处理均在浏览器本地完成，数据不会上传到任何服务器</p>
         </header>
+
+        <!-- Direction Switcher -->
+        <div class="direction-switch" id="directionSwitch">
+            <button class="dir-btn active" data-dir="to-kdbx">📥 → KDBX</button>
+            <button class="dir-btn" data-dir="to-bitwarden">📤 → Bitwarden</button>
+        </div>
 
         <!-- Steps -->
         <div class="steps">
-            <div class="step active" id="step1">
-                <span class="step-num">1</span> 上传文件
-            </div>
+            <div class="step active" id="step1"><span class="step-num">1</span> 上传文件</div>
             <span class="step-arrow">→</span>
-            <div class="step" id="step2">
-                <span class="step-num">2</span> 设置密码
-            </div>
+            <div class="step" id="step2"><span class="step-num">2</span> 密码</div>
             <span class="step-arrow">→</span>
-            <div class="step" id="step3">
-                <span class="step-num">3</span> 下载
-            </div>
+            <div class="step" id="step3"><span class="step-num">3</span> 下载</div>
         </div>
 
-        <!-- Step 1: Upload -->
+        <!-- Upload Card -->
         <div class="card" id="uploadCard">
-            <div class="card-title">📁 上传密码管理器导出文件</div>
-            <div class="card-desc">自动识别文件格式，支持多种密码管理器导出</div>
+            <div class="card-title" id="uploadTitle">📁 上传密码管理器导出文件</div>
+            <div class="card-desc" id="uploadDesc">自动识别文件格式，支持多种密码管理器导出</div>
             <div class="upload-zone" id="uploadZone">
                 <span class="upload-icon">⬆️</span>
                 <div class="upload-text">点击上传或拖拽文件到此处</div>
-                <div class="upload-hint">.json / .csv / .zip / .1pux · 最大 100MB</div>
+                <div class="upload-hint" id="uploadHint">.json / .csv / .zip / .1pux · 最大 100MB</div>
             </div>
-            <input type="file" class="file-input" id="fileInput" accept=".json,.csv,.zip,.1pux">
-            <div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;">
+            <input type="file" class="file-input" id="fileInput">
+            <div id="uploadBadges" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;">
                 <span class="fmt-badge">🔐 Bitwarden JSON/ZIP</span>
                 <span class="fmt-badge">🔑 1Password 1PUX</span>
                 <span class="fmt-badge">📊 CSV 通用</span>
-                <span class="fmt-badge">🌐 Chrome 密码 CSV</span>
+                <span class="fmt-badge">🌐 Chrome CSV</span>
                 <span class="fmt-badge">🦊 Firefox CSV</span>
             </div>
             
@@ -643,22 +289,20 @@
             </div>
 
             <div class="btn-group" style="margin-top: 1.25rem;">
-                <button class="btn btn-primary" id="nextStepBtn" disabled>下一步：设置密码 →</button>
+                <button class="btn btn-primary" id="nextStepBtn" disabled>下一步 →</button>
             </div>
         </div>
 
-        <!-- Step 2: Password -->
+        <!-- Password Card -->
         <div class="card password-section" id="passwordCard">
-            <div class="card-title">🔑 设置 KeePass 数据库密码</div>
-            <div class="card-desc">此密码将用于加密您的 KeePass 数据库</div>
+            <div class="card-title" id="passwordTitle">🔑 设置数据库密码</div>
+            <div class="card-desc" id="passwordDesc">此密码将用于加密数据库</div>
             
             <div class="input-group">
-                <input type="password" id="dbPassword" placeholder="输入数据库主密码" autocomplete="new-password">
+                <input type="password" id="dbPassword" placeholder="输入数据库密码" autocomplete="new-password">
                 <button class="toggle-password" id="togglePassword" title="显示/隐藏密码">👁️</button>
             </div>
-            <div class="password-strength">
-                <div class="password-strength-bar" id="passwordStrengthBar"></div>
-            </div>
+            <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
             <div class="password-options">
                 <span id="strengthLabel">输入密码</span>
                 <button id="generatePassword">🎲 生成随机密码</button>
@@ -685,7 +329,7 @@
             <table class="summary-table" id="summaryTable"></table>
             <div class="btn-group" style="margin-top: 1.25rem;">
                 <button class="btn btn-outline" id="newConvertBtn">🔄 转换新文件</button>
-                <button class="btn btn-success" id="downloadBtn">💾 下载 KDBX 文件</button>
+                <button class="btn btn-success" id="downloadBtn">💾 下载文件</button>
             </div>
         </div>
 
@@ -693,14 +337,11 @@
         <footer class="footer">
             <a href="https://github.com/Chaniug/bw2keepass" target="_blank" rel="noopener">GitHub</a>
             <span style="margin: 0 0.5rem; color: var(--border);">·</span>
-            <span>v1.5</span>
-            <div class="privacy-note">
-                <span>🛡️</span> 所有数据在浏览器本地处理，不会上传到任何服务器
-            </div>
+            <span>v2.0</span>
+            <div class="privacy-note"><span>🛡️</span> 所有数据在浏览器本地处理，不会上传到任何服务器</div>
         </footer>
     </div>
 
-    <!-- Toast -->
     <div class="toast" id="toast"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
@@ -715,39 +356,96 @@
         const fileMeta = document.getElementById('fileMeta');
         const fileRemove = document.getElementById('fileRemove');
         const nextStepBtn = document.getElementById('nextStepBtn');
-
         const uploadCard = document.getElementById('uploadCard');
         const passwordCard = document.getElementById('passwordCard');
         const progressCard = document.getElementById('progressCard');
         const successCard = document.getElementById('successCard');
-
         const dbPassword = document.getElementById('dbPassword');
         const togglePassword = document.getElementById('togglePassword');
         const passwordStrengthBar = document.getElementById('passwordStrengthBar');
         const strengthLabel = document.getElementById('strengthLabel');
-        const generatePassword = document.getElementById('generatePassword');
+        const generatePasswordBtn = document.getElementById('generatePassword');
         const convertBtn = document.getElementById('convertBtn');
         const backBtn = document.getElementById('backBtn');
         const downloadBtn = document.getElementById('downloadBtn');
         const newConvertBtn = document.getElementById('newConvertBtn');
-
         const progressStats = document.getElementById('progressStats');
         const successDetails = document.getElementById('successDetails');
         const summaryTable = document.getElementById('summaryTable');
         const toast = document.getElementById('toast');
-
         const step1 = document.getElementById('step1');
         const step2 = document.getElementById('step2');
         const step3 = document.getElementById('step3');
 
+        // Dynamic labels
+        const uploadTitle = document.getElementById('uploadTitle');
+        const uploadDesc = document.getElementById('uploadDesc');
+        const uploadHint = document.getElementById('uploadHint');
+        const uploadBadges = document.getElementById('uploadBadges');
+        const passwordTitle = document.getElementById('passwordTitle');
+        const passwordDesc = document.getElementById('passwordDesc');
+        const directionSwitch = document.getElementById('directionSwitch');
+
         // ============ State ============
+        let currentDir = 'to-kdbx'; // 'to-kdbx' | 'to-bitwarden'
         let selectedFile = null;
         let parsedData = null;
-        let generatedKdbx = null;
-        let dbFileName = 'vault.kdbx';
-
-        // ============ Type Name Map ============
+        let generatedData = null;
+        let outputFileName = 'output.kdbx';
         const TYPE_NAMES = { 1: 'Login', 2: 'SecureNote', 3: 'Card', 4: 'Identity', 5: 'SSHKey' };
+        const TYPE_NAME_TO_ID = { 'Login': 1, 'SecureNote': 2, 'Card': 3, 'Identity': 4, 'SSHKey': 5 };
+
+        // ============ Direction Switch ============
+        directionSwitch.addEventListener('click', (e) => {
+            const btn = e.target.closest('.dir-btn');
+            if (!btn) return;
+            const dir = btn.dataset.dir;
+            if (dir === currentDir) return;
+
+            currentDir = dir;
+            directionSwitch.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Reset state
+            resetAll();
+
+            // Update UI for direction
+            updateDirectionUI();
+        });
+
+        function updateDirectionUI() {
+            if (currentDir === 'to-kdbx') {
+                uploadTitle.textContent = '📁 上传密码管理器导出文件';
+                uploadDesc.textContent = '自动识别文件格式，支持多种密码管理器导出';
+                uploadHint.textContent = '.json / .csv / .zip / .1pux · 最大 100MB';
+                uploadBadges.style.display = '';
+                uploadBadges.innerHTML = `
+                    <span class="fmt-badge">🔐 Bitwarden JSON/ZIP</span>
+                    <span class="fmt-badge">🔑 1Password 1PUX</span>
+                    <span class="fmt-badge">📊 CSV 通用</span>
+                    <span class="fmt-badge">🌐 Chrome CSV</span>
+                    <span class="fmt-badge">🦊 Firefox CSV</span>
+                `;
+                fileInput.setAttribute('accept', '.json,.csv,.zip,.1pux');
+                passwordTitle.textContent = '🔑 设置 KeePass 数据库密码';
+                passwordDesc.textContent = '此密码将用于加密您的 KeePass 数据库';
+                document.getElementById('step2').childNodes[1].textContent = ' 密码';
+            } else {
+                uploadTitle.textContent = '📁 上传 KeePass KDBX 文件';
+                uploadDesc.textContent = '支持 KDBX3 和 KDBX4 格式的 KeePass 数据库';
+                uploadHint.textContent = '.kdbx · 最大 100MB';
+                uploadBadges.style.display = '';
+                uploadBadges.innerHTML = `
+                    <span class="fmt-badge">🔐 KeePass KDBX</span>
+                    <span class="fmt-badge">🔑 KeePassXC</span>
+                    <span class="fmt-badge">🔒 KDBX3/KDBX4</span>
+                `;
+                fileInput.setAttribute('accept', '.kdbx');
+                passwordTitle.textContent = '🔑 输入 KeePass 数据库密码';
+                passwordDesc.textContent = '用于解密您的 KeePass 数据库';
+                document.getElementById('step2').childNodes[1].textContent = ' 解密';
+            }
+        }
 
         // ============ File Handling ============
         uploadZone.addEventListener('click', () => fileInput.click());
@@ -766,19 +464,23 @@
         });
 
         fileRemove.addEventListener('click', () => {
-            selectedFile = null;
-            parsedData = null;
-            fileInfo.classList.remove('show');
-            uploadZone.style.display = '';
-            nextStepBtn.disabled = true;
-            fileInput.value = '';
+            selectedFile = null; parsedData = null;
+            fileInfo.classList.remove('show'); uploadZone.style.display = '';
+            nextStepBtn.disabled = true; fileInput.value = '';
         });
 
         function handleFile(file) {
             const ext = file.name.split('.').pop().toLowerCase();
-            const supported = ['json', 'zip', 'csv', '1pux'];
+            let supported;
+            if (currentDir === 'to-kdbx') {
+                supported = ['json', 'zip', 'csv', '1pux'];
+            } else {
+                supported = ['kdbx'];
+            }
+
             if (!supported.includes(ext)) {
-                showToast('请选择 .json / .csv / .zip / .1pux 格式的文件', 'error');
+                const hint = currentDir === 'to-kdbx' ? '.json / .csv / .zip / .1pux' : '.kdbx';
+                showToast(`请选择 ${hint} 格式的文件`, 'error');
                 return;
             }
             if (file.size > 100 * 1024 * 1024) {
@@ -847,10 +549,10 @@
 
             passwordStrengthBar.style.background = color;
             strengthLabel.textContent = val ? `密码强度：${label}` : '输入密码';
-            convertBtn.disabled = val.length < 8;
+            convertBtn.disabled = val.length < 1; // For reverse, any length is ok (just need to try)
         }
 
-        generatePassword.addEventListener('click', () => {
+        generatePasswordBtn.addEventListener('click', () => {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
             const arr = new Uint8Array(24);
             crypto.getRandomValues(arr);
@@ -868,7 +570,6 @@
         async function startConversion() {
             if (!selectedFile || !dbPassword.value) return;
 
-            // Show progress
             uploadCard.style.display = 'none';
             passwordCard.classList.remove('show');
             progressCard.classList.add('show');
@@ -876,172 +577,387 @@
             updateSteps(3);
 
             try {
-                // Read file
-                progressStats.textContent = '正在读取文件...';
-                const ext = selectedFile.name.split('.').pop().toLowerCase();
-                let vault;
-
-                if (ext === 'csv') {
-                    const text = await selectedFile.text();
-                    vault = parseCSV(text, selectedFile.name);
-                    progressStats.textContent = `检测到 CSV 格式 · 找到 ${vault.items.length} 个条目`;
-                } else if (ext === '1pux') {
-                    vault = await parse1PUX(selectedFile);
-                    progressStats.textContent = `检测到 1Password 1PUX · 找到 ${vault.items.length} 个条目`;
-                } else if (ext === 'zip') {
-                    const jsonData = await readZipFile(selectedFile);
-                    vault = parseBitwardenJson(jsonData);
-                    progressStats.textContent = `检测到 Bitwarden ZIP · 找到 ${vault.items.length} 个条目`;
+                if (currentDir === 'to-kdbx') {
+                    await convertToKdbx();
                 } else {
-                    // .json - auto-detect format
-                    const text = await selectedFile.text();
-                    const jsonData = JSON.parse(text);
-                    
-                    if (jsonData.encrypted && jsonData.passwordProtected) {
-                        vault = parseBitwardenEncrypted(jsonData);
-                        progressStats.textContent = `检测到 Bitwarden 加密 JSON · 找到 ${vault.items.length} 个条目`;
-                    } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
-                        vault = parse1PUXJSON(jsonData);
-                        progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
-                    } else {
-                        vault = parseBitwardenJson(jsonData);
-                        progressStats.textContent = `检测到 Bitwarden JSON · 找到 ${vault.items.length} 个条目`;
-                    }
+                    await convertToBitwarden();
                 }
-
-                parsedData = vault;
-
-                progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 KDBX 数据库...`;
-
-                // Create KDBX
-                // KDBX4 需要 Argon2 实现，浏览器环境没有原生支持
-                // 降级到 KDBX3（使用 AES-KDF），不需要 Argon2
-                const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
-                const db = Kdbx.create(credentials, 'Bitwarden Import');
-                // 设置 KDF 为 AES（KDBX3 默认），避免 Argon2 依赖
-                db.setKdf(Consts.KdfId.Aes);
-                db.upgrade(); // 确保升级到最新格式后再降级 KDF
-
-                // Create folder groups
-                const folderGroupMap = new Map();
-                folderGroupMap.set(null, db.getDefaultGroup());
-
-                for (const folder of vault.folders) {
-                    const group = db.createGroup(db.getDefaultGroup(), sanitizePath(folder.name));
-                    folderGroupMap.set(folder.id, group);
-                }
-
-                // For CSV imports, folderId may be a folder name string instead of an ID
-                // Create groups on-the-fly
-                const csvFolderNames = new Set();
-                for (const item of vault.items) {
-                    if (item.folderId && typeof item.folderId === 'string' && !folderGroupMap.has(item.folderId)) {
-                        csvFolderNames.add(item.folderId);
-                    }
-                }
-                for (const fname of csvFolderNames) {
-                    const group = db.createGroup(db.getDefaultGroup(), sanitizePath(fname));
-                    folderGroupMap.set(fname, group);
-                    vault.folders.push({ id: fname, name: fname });
-                }
-
-                // Create entries
-                let entryCount = 0;
-                for (const item of vault.items) {
-                    if (item.deleted) continue;
-
-                    const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
-                    const entry = db.createEntry(parentGroup);
-
-                    // Title
-                    entry.fields.Title = item.name || '(无标题)';
-
-                    // Username
-                    if (item.login?.username) {
-                        entry.fields.UserName = item.login.username;
-                    }
-
-                    // Password
-                    if (item.login?.password) {
-                        entry.fields.Password = ProtectedValue.fromString(item.login.password);
-                    }
-
-                    // URL
-                    if (item.login?.uris?.length) {
-                        entry.fields.URL = item.login.uris[0].uri || '';
-                    }
-
-                    // Notes
-                    const notes = buildNotes(item);
-                    if (notes) {
-                        entry.fields.Notes = notes;
-                    }
-
-                    // Custom fields
-                    const customFields = buildCustomFields(item);
-                    for (const [key, value] of Object.entries(customFields)) {
-                        if (key === 'TOTP Seed' || key === 'Password' || key === 'TOTP') {
-                            entry.fields[key] = ProtectedValue.fromString(String(value));
-                        } else {
-                            entry.fields[key] = String(value);
-                        }
-                    }
-
-                    // Tags (KeePass entry tags are space-separated)
-                    const tags = buildTags(item);
-                    if (tags.length) {
-                        // Store as a custom field since kdbxweb entry.tags is limited
-                        entry.fields['_TAGS'] = tags.join(' ');
-                    }
-
-                    entryCount++;
-                    progressStats.textContent = `已处理 ${entryCount}/${vault.items.length} 个条目...`;
-                }
-
-                // Save
-                progressStats.textContent = '正在加密并生成 KDBX 文件...';
-                generatedKdbx = await db.save();
-
-                // Show success
-                progressCard.classList.remove('show');
-                successCard.classList.add('show');
-                updateSteps(3);
-                step3.classList.add('done');
-
-                dbFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
-                successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹`;
-                buildSummaryTable(vault);
-
-                showToast('转换完成！');
-
             } catch (err) {
                 progressCard.classList.remove('show');
                 uploadCard.style.display = '';
                 updateSteps(1);
                 console.error('Conversion error:', err);
-                showToast('转换失败：' + (err.message || '未知错误'), 'error');
+                let msg = err.message || '未知错误';
+                if (err.code === 'InvalidKey') msg = '密码错误，请检查 KeePass 数据库密码';
+                else if (err.code === 'BadSignature') msg = '无效的 KDBX 文件';
+                else if (err.code === 'FileCorrupt') msg = '文件已损坏';
+                showToast('转换失败：' + msg, 'error');
             }
+        }
+
+        // ============ TO KDBX ============
+        async function convertToKdbx() {
+            progressStats.textContent = '正在读取文件...';
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+            let vault;
+
+            if (ext === 'csv') {
+                const text = await selectedFile.text();
+                vault = parseCSV(text, selectedFile.name);
+                progressStats.textContent = `检测到 CSV 格式 · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === '1pux') {
+                vault = await parse1PUX(selectedFile);
+                progressStats.textContent = `检测到 1Password 1PUX · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === 'zip') {
+                const jsonData = await readZipFile(selectedFile);
+                vault = parseBitwardenJson(jsonData);
+                progressStats.textContent = `检测到 Bitwarden ZIP · 找到 ${vault.items.length} 个条目`;
+            } else {
+                const text = await selectedFile.text();
+                const jsonData = JSON.parse(text);
+                if (jsonData.encrypted && jsonData.passwordProtected) {
+                    vault = parseBitwardenEncrypted(jsonData);
+                } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
+                    vault = parse1PUXJSON(jsonData);
+                    progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
+                } else {
+                    vault = parseBitwardenJson(jsonData);
+                    progressStats.textContent = `检测到 Bitwarden JSON · 找到 ${vault.items.length} 个条目`;
+                }
+            }
+
+            parsedData = vault;
+            progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 KDBX...`;
+
+            const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
+            const db = Kdbx.create(credentials, 'Imported Vault');
+            db.setKdf(Consts.KdfId.Aes);
+            db.upgrade();
+
+            const folderGroupMap = new Map();
+            folderGroupMap.set(null, db.getDefaultGroup());
+            for (const folder of vault.folders) {
+                const group = db.createGroup(db.getDefaultGroup(), sanitizePath(folder.name));
+                folderGroupMap.set(folder.id, group);
+            }
+            const csvFolderNames = new Set();
+            for (const item of vault.items) {
+                if (item.folderId && typeof item.folderId === 'string' && !folderGroupMap.has(item.folderId)) {
+                    csvFolderNames.add(item.folderId);
+                }
+            }
+            for (const fname of csvFolderNames) {
+                const group = db.createGroup(db.getDefaultGroup(), sanitizePath(fname));
+                folderGroupMap.set(fname, group);
+                vault.folders.push({ id: fname, name: fname });
+            }
+
+            let entryCount = 0;
+            for (const item of vault.items) {
+                if (item.deleted) continue;
+                const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
+                const entry = db.createEntry(parentGroup);
+                entry.fields.Title = item.name || '(无标题)';
+                if (item.login?.username) entry.fields.UserName = item.login.username;
+                if (item.login?.password) entry.fields.Password = ProtectedValue.fromString(item.login.password);
+                if (item.login?.uris?.length) entry.fields.URL = item.login.uris[0].uri || '';
+                const notes = buildNotes(item);
+                if (notes) entry.fields.Notes = notes;
+                const customFields = buildCustomFields(item);
+                for (const [key, value] of Object.entries(customFields)) {
+                    if (key === 'TOTP Seed' || key === 'Password' || key === 'TOTP') {
+                        entry.fields[key] = ProtectedValue.fromString(String(value));
+                    } else {
+                        entry.fields[key] = String(value);
+                    }
+                }
+                const tags = buildTags(item);
+                if (tags.length) entry.fields['_TAGS'] = tags.join(' ');
+                entryCount++;
+                progressStats.textContent = `已处理 ${entryCount}/${vault.items.length} 个条目...`;
+            }
+
+            progressStats.textContent = '正在加密并生成 KDBX 文件...';
+            generatedData = await db.save();
+
+            progressCard.classList.remove('show');
+            successCard.classList.add('show');
+            updateSteps(3); step3.classList.add('done');
+            outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
+            successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹`;
+            downloadBtn.textContent = '💾 下载 KDBX 文件';
+            buildSummaryTable(vault);
+            showToast('转换完成！');
+        }
+
+        // ============ TO BITWARDEN ============
+        async function convertToBitwarden() {
+            progressStats.textContent = '正在加载 KDBX 数据库...';
+            const buf = await selectedFile.arrayBuffer();
+            const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
+            const db = await Kdbx.load(buf, credentials);
+
+            progressStats.textContent = '正在读取分组和条目...';
+            const rootGroup = db.getDefaultGroup();
+            const allEntries = rootGroup.allEntries();
+
+            // Build folder structure from KeePass groups
+            const allGroups = rootGroup.allGroups();
+            const folderMap = new Map(); // group.uuid -> folder name
+            const folders = [];
+            let folderIdx = 0;
+
+            // Build folder path for each group (skip root and recycle bin)
+            function buildGroupPath(group, parentPath) {
+                if (!group || group === rootGroup) return '';
+                const name = getGroupName(group);
+                if (!name || name === 'Recycle Bin' || name === '回收站') return '';
+                const path = parentPath ? parentPath + '/' + name : name;
+                if (!folderMap.has(group.uuid)) {
+                    folderMap.set(group.uuid, { id: 'folder_' + (++folderIdx), name: path });
+                    folders.push({ id: 'folder_' + folderIdx, name: path });
+                }
+                return path;
+            }
+
+            function getGroupPath(entry) {
+                // Walk up the group hierarchy
+                const group = entry.parentGroup || entry.group;
+                if (!group || group === rootGroup) return null;
+                const path = buildGroupPath(group, '');
+                return path || null;
+            }
+
+            // First pass: build all folder paths
+            for (const group of allGroups) {
+                if (group === rootGroup) continue;
+                const name = getGroupName(group);
+                if (!name || name === 'Recycle Bin' || name === '回收站') continue;
+                // Build path
+                let path = name;
+                let parent = group.parentGroup;
+                while (parent && parent !== rootGroup) {
+                    const pn = getGroupName(parent);
+                    if (pn && pn !== 'Recycle Bin' && pn !== '回收站') {
+                        path = pn + '/' + path;
+                    }
+                    parent = parent.parentGroup;
+                }
+                if (!folderMap.has(group.uuid)) {
+                    folderMap.set(group.uuid, { id: 'folder_' + (++folderIdx), name: path });
+                    folders.push({ id: 'folder_' + folderIdx, name: path });
+                }
+            }
+
+            progressStats.textContent = `找到 ${allEntries.length} 个条目，正在生成 Bitwarden JSON...`;
+
+            const bwItems = [];
+            let idx = 0;
+            for (const entry of allEntries) {
+                const item = convertKdbxEntryToBW(entry, folderMap);
+                if (item) bwItems.push(item);
+                idx++;
+                if (idx % 50 === 0) {
+                    progressStats.textContent = `已处理 ${idx}/${allEntries.length} 个条目...`;
+                }
+            }
+
+            const bwExport = {
+                encrypted: false,
+                folders: folders,
+                items: bwItems
+            };
+
+            generatedData = JSON.stringify(bwExport, null, 2);
+            outputFileName = selectedFile.name.replace(/\.kdbx$/i, '') + '.json';
+
+            progressCard.classList.remove('show');
+            successCard.classList.add('show');
+            updateSteps(3); step3.classList.add('done');
+            downloadBtn.textContent = '💾 下载 Bitwarden JSON';
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${folders.length} 个文件夹`;
+
+            // Summary
+            const typeCount = {};
+            for (const item of bwItems) {
+                const tn = TYPE_NAMES[item.type] || '其他';
+                typeCount[tn] = (typeCount[tn] || 0) + 1;
+            }
+            let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
+            for (const [type, count] of Object.entries(typeCount)) {
+                html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
+            }
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${bwItems.length}</td></tr></tbody>`;
+            summaryTable.innerHTML = html;
+
+            showToast('转换完成！');
+        }
+
+        function getGroupName(group) {
+            if (!group) return '';
+            if (typeof group.name === 'string') return group.name;
+            if (group.name && typeof group.name.getText === 'function') return group.name.getText();
+            return String(group.name || '');
+        }
+
+        function convertKdbxEntryToBW(entry, folderMap) {
+            const fields = entry.fields;
+            const getText = (key) => {
+                const v = fields.get(key);
+                if (!v) return '';
+                if (typeof v === 'string') return v;
+                if (typeof v.getText === 'function') return v.getText();
+                return String(v);
+            };
+
+            const title = getText('Title');
+            const username = getText('UserName');
+            const password = getText('Password');
+            const url = getText('URL');
+            const notes = getText('Notes');
+
+            if (!title && !username && !password && !url && !notes) return null;
+
+            const item = {
+                id: generateUUID(),
+                organizationId: null,
+                folderId: null,
+                type: 1,
+                reprompt: 0,
+                name: title || '(无标题)',
+                notes: notes || null,
+                favorite: false,
+                login: {
+                    username: username || null,
+                    password: password || null,
+                    totp: null,
+                    uris: url ? [{ uri: url, match: null }] : [],
+                },
+                collectionIds: [],
+                fields: [],
+                passwordHistory: [],
+                fido2Credentials: [],
+            };
+
+            // Get folder from group
+            const group = entry.parentGroup || entry.group;
+            if (group && folderMap.has(group.uuid)) {
+                item.folderId = folderMap.get(group.uuid).id;
+            }
+
+            // Detect type from custom fields
+            const bwTypeField = getText('BitwardenType');
+            if (bwTypeField && TYPE_NAME_TO_ID[bwTypeField]) {
+                item.type = TYPE_NAME_TO_ID[bwTypeField];
+            }
+
+            // Extract TOTP
+            const totp = getText('TOTP Seed') || getText('TOTP') || getText('otp');
+            if (totp && item.login) item.login.totp = totp;
+
+            // Extract extra URIs
+            if (item.login) {
+                for (let i = 2; i <= 10; i++) {
+                    const extraUri = getText(`URI_${i}`);
+                    if (extraUri) item.login.uris.push({ uri: extraUri, match: null });
+                }
+            }
+
+            // Extract card info
+            const cardBrand = getText('CardBrand');
+            const cardNumber = getText('CardNumber');
+            const cardExpiry = getText('CardExpiry');
+            if (cardBrand || cardNumber || cardExpiry) {
+                item.type = 3;
+                item.card = { cardholderName: '', brand: cardBrand || '', number: cardNumber || '', expMonth: '', expYear: '', code: '' };
+                if (cardExpiry && cardExpiry.includes('/')) {
+                    const parts = cardExpiry.split('/');
+                    item.card.expMonth = parts[0] || '';
+                    item.card.expYear = parts[1] || '';
+                }
+                item.login = null;
+            }
+
+            // Extract custom fields (skip internal fields)
+            const skipFields = new Set([
+                'Title', 'UserName', 'Password', 'URL', 'Notes',
+                'BitwardenType', 'TOTP Seed', 'TOTP', 'otp',
+                'CardBrand', 'CardNumber', 'CardExpiry',
+                'CreationDate', 'RevisionDate',
+                'SSHFingerprint', '_TAGS'
+            ]);
+            const uriFields = new Set();
+            for (let i = 2; i <= 10; i++) uriFields.add(`URI_${i}`);
+
+            for (const [key, value] of fields) {
+                if (skipFields.has(key)) continue;
+                if (uriFields.has(key)) continue;
+                if (key.startsWith('KPEX_PASSKEY_')) continue;
+
+                const text = typeof value === 'string' ? value : (typeof value.getText === 'function' ? value.getText() : String(value));
+                if (text && key !== '_TAGS') {
+                    item.fields.push({ name: key, value: text, type: 0 });
+                }
+            }
+
+            // Tags
+            const tags = getText('_TAGS');
+            if (tags) {
+                item.fields.push({ name: 'Tags', value: tags, type: 0 });
+            }
+
+            // SSH Key detection
+            if (item.type === 1 && getText('SSHFingerprint')) {
+                item.type = 5;
+                item.sshKey = {
+                    privateKey: getText('SSHPrivateKey') || '',
+                    publicKey: getText('SSHPublicKey') || '',
+                    fingerprint: getText('SSHFingerprint') || '',
+                };
+            }
+
+            // Secure note detection
+            if (bwTypeField === 'SecureNote' || (!item.login?.username && !item.login?.password && !item.login?.uris?.length && notes)) {
+                item.type = 2;
+                item.secureNote = { type: 0 };
+            }
+
+            // Times
+            const creationDate = getText('CreationDate');
+            const revisionDate = getText('RevisionDate');
+            if (creationDate) item.creationDate = creationDate;
+            if (revisionDate) item.revisionDate = revisionDate;
+
+            return item;
+        }
+
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
         }
 
         // ============ Download ============
         downloadBtn.addEventListener('click', () => {
-            if (!generatedKdbx) return;
-            const blob = new Blob([generatedKdbx], { type: 'application/octet-stream' });
+            if (!generatedData) return;
+            const mime = outputFileName.endsWith('.kdbx') ? 'application/octet-stream' : 'application/json';
+            const blob = new Blob([generatedData], { type: mime });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = dbFileName;
+            a.download = outputFileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast('KDBX 文件已下载');
+            showToast('文件已下载');
         });
 
-        newConvertBtn.addEventListener('click', () => {
-            selectedFile = null;
-            parsedData = null;
-            generatedKdbx = null;
+        newConvertBtn.addEventListener('click', resetAll);
+
+        function resetAll() {
+            selectedFile = null; parsedData = null; generatedData = null;
             dbPassword.value = '';
             passwordStrengthBar.style.width = '0';
             strengthLabel.textContent = '输入密码';
@@ -1051,244 +967,143 @@
             uploadZone.style.display = '';
             nextStepBtn.disabled = true;
             successCard.classList.remove('show');
+            passwordCard.classList.remove('show');
+            progressCard.classList.remove('show');
             uploadCard.style.display = '';
             updateSteps(1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
+        }
 
-        // ============ Parsing ============
+        // ============ BW JSON Parser ============
         function parseBitwardenJson(json) {
-            const folders = [];
-            const items = [];
-
+            const folders = [], items = [];
             if (json.folders) {
-                for (const f of json.folders) {
-                    folders.push({ id: f.id, name: f.name });
-                }
+                for (const f of json.folders) folders.push({ id: f.id, name: f.name });
             }
-
             if (json.items) {
                 for (const item of json.items) {
-                    if (item.deletedDate) continue; // Skip deleted
-
+                    if (item.deletedDate) continue;
                     const parsed = {
-                        id: item.id,
-                        name: item.name || '',
-                        type: item.type || 1,
-                        notes: item.notes || '',
-                        favorite: item.favorite || false,
-                        folderId: item.folderId || null,
-                        collectionIds: item.collectionIds || [],
-                        deleted: false,
-                        creationDate: item.creationDate || '',
-                        revisionDate: item.revisionDate || '',
-                        login: null,
-                        card: null,
-                        identity: null,
-                        secureNote: null,
-                        sshKey: null,
-                        fido2Credentials: [],
-                        customFields: [],
-                        passwordHistory: [],
+                        id: item.id, name: item.name || '', type: item.type || 1,
+                        notes: item.notes || '', favorite: item.favorite || false,
+                        folderId: item.folderId || null, collectionIds: item.collectionIds || [],
+                        deleted: false, creationDate: item.creationDate || '', revisionDate: item.revisionDate || '',
+                        login: null, card: null, identity: null, secureNote: null, sshKey: null,
+                        fido2Credentials: [], customFields: [], passwordHistory: [],
                     };
-
-                    // Login
                     if (item.login) {
                         parsed.login = {
-                            username: item.login.username || '',
-                            password: item.login.password || '',
+                            username: item.login.username || '', password: item.login.password || '',
                             totp: item.login.totp || '',
                             uris: (item.login.uris || []).map(u => ({ uri: u.uri || '', match: u.match || null })),
                         };
                     }
-
-                    // Card
                     if (item.card) {
                         parsed.card = {
-                            cardholderName: item.card.cardholderName || '',
-                            brand: item.card.brand || '',
-                            number: item.card.number || '',
-                            expMonth: item.card.expMonth || '',
-                            expYear: item.card.expYear || '',
-                            code: item.card.code || '',
+                            cardholderName: item.card.cardholderName || '', brand: item.card.brand || '',
+                            number: item.card.number || '', expMonth: item.card.expMonth || '',
+                            expYear: item.card.expYear || '', code: item.card.code || '',
                         };
                     }
-
-                    // Identity
-                    if (item.identity) {
-                        parsed.identity = { ...item.identity };
-                    }
-
-                    // Secure Note
-                    if (item.secureNote) {
-                        parsed.secureNote = { type: item.secureNote.type || 0 };
-                    }
-
-                    // SSH Key
+                    if (item.identity) parsed.identity = { ...item.identity };
+                    if (item.secureNote) parsed.secureNote = { type: item.secureNote.type || 0 };
                     if (item.sshKey) {
                         parsed.sshKey = {
-                            privateKey: item.sshKey.privateKey || '',
-                            publicKey: item.sshKey.publicKey || '',
+                            privateKey: item.sshKey.privateKey || '', publicKey: item.sshKey.publicKey || '',
                             fingerprint: item.sshKey.fingerprint || '',
                         };
                     }
-
-                    // FIDO2 Credentials
                     for (const fc of (item.fido2Credentials || [])) {
                         parsed.fido2Credentials.push({
-                            credentialId: fc.credentialId || '',
-                            keyType: fc.keyType || '',
-                            keyAlgorithm: fc.keyAlgorithm || '',
-                            keyCurve: fc.keyCurve || '',
-                            keyValue: fc.keyValue || '',
-                            rpId: fc.rpId || '',
-                            rpName: fc.rpName || '',
-                            userHandle: fc.userHandle || '',
-                            userName: fc.userName || '',
-                            userDisplayName: fc.userDisplayName || '',
-                            counter: String(fc.counter || '0'),
-                            discoverable: String(fc.discoverable || 'false'),
-                            creationDate: fc.creationDate || '',
+                            credentialId: fc.credentialId || '', keyType: fc.keyType || '',
+                            keyAlgorithm: fc.keyAlgorithm || '', keyCurve: fc.keyCurve || '',
+                            keyValue: fc.keyValue || '', rpId: fc.rpId || '', rpName: fc.rpName || '',
+                            userHandle: fc.userHandle || '', userName: fc.userName || '',
+                            userDisplayName: fc.userDisplayName || '', counter: String(fc.counter || '0'),
+                            discoverable: String(fc.discoverable || 'false'), creationDate: fc.creationDate || '',
                         });
                     }
-
-                    // Custom fields
                     for (const cf of (item.fields || [])) {
-                        parsed.customFields.push({
-                            name: cf.name || '',
-                            value: cf.value || '',
-                            type: cf.type || 0,
-                        });
+                        parsed.customFields.push({ name: cf.name || '', value: cf.value || '', type: cf.type || 0 });
                     }
-
-                    // Password history
                     for (const ph of (item.passwordHistory || [])) {
-                        parsed.passwordHistory.push({
-                            password: ph.password || '',
-                            lastUsedDate: ph.lastUsedDate || '',
-                        });
+                        parsed.passwordHistory.push({ password: ph.password || '', lastUsedDate: ph.lastUsedDate || '' });
                     }
-
                     items.push(parsed);
                 }
             }
-
             return { folders, items };
         }
 
         // ============ Notes Builder ============
         function buildNotes(item) {
             const parts = [];
-
-            if (item.notes) {
-                parts.push(item.notes);
-            }
-
-            // Login extras
+            if (item.notes) parts.push(item.notes);
             if (item.login) {
                 const extras = [];
-                if (item.login.totp) {
-                    extras.push(`TOTP: ${item.login.totp}`);
-                }
+                if (item.login.totp) extras.push(`TOTP: ${item.login.totp}`);
                 if (item.login.uris?.length > 1) {
-                    for (let i = 1; i < item.login.uris.length; i++) {
-                        extras.push(`备用URI: ${item.login.uris[i].uri}`);
-                    }
+                    for (let i = 1; i < item.login.uris.length; i++) extras.push(`备用URI: ${item.login.uris[i].uri}`);
                 }
-                if (extras.length) {
-                    parts.push('\n[额外信息]\n' + extras.join('\n'));
-                }
+                if (extras.length) parts.push('\n[额外信息]\n' + extras.join('\n'));
             }
-
-            // Card details
             if (item.card && (item.card.number || item.card.cardholderName)) {
-                const cardLines = ['\n[卡片信息]'];
-                if (item.card.cardholderName) cardLines.push(`持卡人: ${item.card.cardholderName}`);
-                if (item.card.brand) cardLines.push(`品牌: ${item.card.brand}`);
-                if (item.card.number) cardLines.push(`卡号: ${item.card.number}`);
-                if (item.card.expMonth) cardLines.push(`有效期: ${item.card.expMonth}/${item.card.expYear}`);
-                if (item.card.code) cardLines.push(`安全码: ${item.card.code}`);
-                parts.push(cardLines.join('\n'));
+                const lines = ['\n[卡片信息]'];
+                if (item.card.cardholderName) lines.push(`持卡人: ${item.card.cardholderName}`);
+                if (item.card.brand) lines.push(`品牌: ${item.card.brand}`);
+                if (item.card.number) lines.push(`卡号: ${item.card.number}`);
+                if (item.card.expMonth) lines.push(`有效期: ${item.card.expMonth}/${item.card.expYear}`);
+                if (item.card.code) lines.push(`安全码: ${item.card.code}`);
+                parts.push(lines.join('\n'));
             }
-
-            // Password history
             if (item.passwordHistory?.length) {
-                const histLines = ['\n[密码历史]'];
+                const lines = ['\n[密码历史]'];
                 for (const h of item.passwordHistory.slice(0, 10)) {
                     const ds = h.lastUsedDate ? ` (${h.lastUsedDate})` : '';
-                    histLines.push(`- ${h.password}${ds}`);
+                    lines.push(`- ${h.password}${ds}`);
                 }
-                parts.push(histLines.join('\n'));
+                parts.push(lines.join('\n'));
             }
-
-            // FIDO2 / Passkey
             if (item.fido2Credentials?.length) {
-                const fidoLines = ['\n[Passkey / FIDO2 凭据]'];
+                const lines = ['\n[Passkey / FIDO2 凭据]'];
                 for (let i = 0; i < item.fido2Credentials.length; i++) {
                     const fc = item.fido2Credentials[i];
-                    if (item.fido2Credentials.length > 1) {
-                        fidoLines.push(`\n--- Passkey #${i + 1} ---`);
-                    }
-                    if (fc.rpName) fidoLines.push(`服务: ${fc.rpName} (${fc.rpId})`);
-                    else fidoLines.push(`依赖方: ${fc.rpId}`);
-                    if (fc.userName) fidoLines.push(`用户名: ${fc.userName}`);
-                    if (fc.userDisplayName) fidoLines.push(`显示名称: ${fc.userDisplayName}`);
-                    fidoLines.push(`凭据ID: ${fc.credentialId}`);
-                    fidoLines.push(`算法: ${fc.keyAlgorithm} (${fc.keyCurve})`);
-                    fidoLines.push(`类型: ${fc.keyType}`);
-                    fidoLines.push(`可发现: ${fc.discoverable}`);
-                    fidoLines.push(`计数器: ${fc.counter}`);
-                    if (fc.userHandle) fidoLines.push(`用户句柄: ${fc.userHandle}`);
-                    if (fc.keyValue) fidoLines.push(`密钥值: ${fc.keyValue}`);
-                    if (fc.creationDate) fidoLines.push(`创建时间: ${fc.creationDate}`);
+                    if (item.fido2Credentials.length > 1) lines.push(`\n--- Passkey #${i + 1} ---`);
+                    if (fc.rpName) lines.push(`服务: ${fc.rpName} (${fc.rpId})`);
+                    else lines.push(`依赖方: ${fc.rpId}`);
+                    if (fc.userName) lines.push(`用户名: ${fc.userName}`);
+                    if (fc.userDisplayName) lines.push(`显示名称: ${fc.userDisplayName}`);
+                    lines.push(`凭据ID: ${fc.credentialId}`);
+                    lines.push(`算法: ${fc.keyAlgorithm} (${fc.keyCurve})`);
+                    lines.push(`类型: ${fc.keyType}`);
+                    lines.push(`可发现: ${fc.discoverable}`);
+                    lines.push(`计数器: ${fc.counter}`);
+                    if (fc.userHandle) lines.push(`用户句柄: ${fc.userHandle}`);
+                    if (fc.keyValue) lines.push(`密钥值: ${fc.keyValue}`);
+                    if (fc.creationDate) lines.push(`创建时间: ${fc.creationDate}`);
                 }
-                parts.push(fidoLines.join('\n'));
+                parts.push(lines.join('\n'));
             }
-
             return parts.join('\n');
         }
 
         // ============ Custom Fields Builder ============
         function buildCustomFields(item) {
             const fields = {};
-
-            // Type
-            if (item.type) {
-                fields['BitwardenType'] = TYPE_NAMES[item.type] || `Type${item.type}`;
-            }
-
-            // TOTP
-            if (item.login?.totp) {
-                fields['TOTP Seed'] = item.login.totp;
-            }
-
-            // URIs
+            if (item.type) fields['BitwardenType'] = TYPE_NAMES[item.type] || `Type${item.type}`;
+            if (item.login?.totp) fields['TOTP Seed'] = item.login.totp;
             if (item.login?.uris?.length > 1) {
-                for (let i = 1; i < item.login.uris.length; i++) {
-                    fields[`URI_${i + 1}`] = item.login.uris[i].uri || '';
-                }
+                for (let i = 1; i < item.login.uris.length; i++) fields[`URI_${i + 1}`] = item.login.uris[i].uri || '';
             }
-
-            // Card
             if (item.card) {
                 if (item.card.brand) fields['CardBrand'] = item.card.brand;
                 if (item.card.number) fields['CardNumber'] = item.card.number;
                 if (item.card.expMonth) fields['CardExpiry'] = `${item.card.expMonth}/${item.card.expYear}`;
             }
-
-            // SSH
-            if (item.sshKey?.fingerprint) {
-                fields['SSHFingerprint'] = item.sshKey.fingerprint;
-            }
-
-            // Custom fields
+            if (item.sshKey?.fingerprint) fields['SSHFingerprint'] = item.sshKey.fingerprint;
             for (const cf of item.customFields) {
-                if (!fields[cf.name]) {
-                    fields[cf.name] = cf.value;
-                }
+                if (!fields[cf.name]) fields[cf.name] = cf.value;
             }
-
-            // FIDO2 / Passkey
             for (let i = 0; i < item.fido2Credentials.length; i++) {
                 const fc = item.fido2Credentials[i];
                 const idx = item.fido2Credentials.length > 1 ? `_${i}` : '';
@@ -1304,102 +1119,68 @@
                 if (fc.discoverable) fields[`KPEX_PASSKEY_DISCOVERABLE${idx}`] = fc.discoverable;
                 if (fc.creationDate) fields[`KPEX_PASSKEY_CREATION${idx}`] = fc.creationDate;
             }
-
-            // Timestamps
             if (item.creationDate) fields['CreationDate'] = item.creationDate;
             if (item.revisionDate) fields['RevisionDate'] = item.revisionDate;
-
             return fields;
         }
 
-        // ============ Tags Builder ============
         function buildTags(item) {
             const tags = [];
-            const typeName = TYPE_NAMES[item.type];
-            if (typeName) tags.push(typeName);
+            const tn = TYPE_NAMES[item.type];
+            if (tn) tags.push(tn);
             if (item.favorite) tags.push('Favorite');
             if (item.fido2Credentials?.length) tags.push('Passkey');
             return tags;
         }
 
-        // ============ Summary Table ============
         function buildSummaryTable(vault) {
             const typeCount = {};
             for (const item of vault.items) {
-                const tn = TYPE_NAMES[item.type] || `其他`;
+                const tn = TYPE_NAMES[item.type] || '其他';
                 typeCount[tn] = (typeCount[tn] || 0) + 1;
             }
-
             let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
             for (const [type, count] of Object.entries(typeCount)) {
                 html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
             }
-            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${vault.items.length}</td></tr>`;
-            html += '</tbody>';
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${vault.items.length}</td></tr></tbody>`;
             summaryTable.innerHTML = html;
         }
 
         // ============ CSV Parser ============
         function parseCSV(text, fileName) {
-            const items = [];
-            const folders = [];
-
-            // Detect delimiter: comma or tab
+            const items = [], folders = [];
             const firstLine = text.split('\n')[0] || '';
             const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.split(',').length > firstLine.split(';').length ? ',' : ';');
-
             const lines = text.trim().split(/\r?\n/);
             if (lines.length < 2) return { folders, items };
-
-            // Parse header
             const headers = parseCSVLine(lines[0], delimiter);
             const headerMap = {};
             headers.forEach((h, i) => { headerMap[h.trim().toLowerCase()] = i; });
-
-            // Detect CSV format
             const format = detectCSVFormat(headerMap, fileName);
-
-            // Parse data rows
             for (let i = 1; i < lines.length; i++) {
                 const row = parseCSVLine(lines[i], delimiter);
                 if (row.length === 0 || (row.length === 1 && !row[0])) continue;
-
                 const item = format.parseRow(row, headerMap, i);
-                if (item && item.name) {
-                    items.push(item);
-                }
+                if (item && item.name) items.push(item);
             }
-
             return { folders, items };
         }
 
         function parseCSVLine(line, delimiter) {
             const result = [];
-            let current = '';
-            let inQuotes = false;
-
+            let current = '', inQuotes = false;
             for (let i = 0; i < line.length; i++) {
                 const ch = line[i];
                 if (inQuotes) {
                     if (ch === '"') {
-                        if (i + 1 < line.length && line[i + 1] === '"') {
-                            current += '"';
-                            i++;
-                        } else {
-                            inQuotes = false;
-                        }
-                    } else {
-                        current += ch;
-                    }
+                        if (i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
+                        else inQuotes = false;
+                    } else current += ch;
                 } else {
-                    if (ch === '"') {
-                        inQuotes = true;
-                    } else if (ch === delimiter) {
-                        result.push(current.trim());
-                        current = '';
-                    } else {
-                        current += ch;
-                    }
+                    if (ch === '"') inQuotes = true;
+                    else if (ch === delimiter) { result.push(current.trim()); current = ''; }
+                    else current += ch;
                 }
             }
             result.push(current.trim());
@@ -1407,177 +1188,78 @@
         }
 
         function detectCSVFormat(headerMap, fileName) {
-            // Chrome CSV: name, url, username, password
             if (headerMap['name'] !== undefined && headerMap['url'] !== undefined && headerMap['password'] !== undefined) {
-                return {
-                    name: 'Chrome',
-                    parseRow: (row, hm) => ({
-                        name: row[hm['name']] || row[hm['title']] || '',
-                        type: 1,
-                        login: {
-                            username: row[hm['username']] || row[hm['user']] || row[hm['login']] || '',
-                            password: row[hm['password']] || '',
-                            uris: [{ uri: row[hm['url']] || row[hm['website']] || '' }],
-                            totp: '',
-                        },
-                        notes: row[hm['note']] || row[hm['notes']] || '',
-                        folderId: row[hm['folder']] || row[hm['category']] || null,
-                    })
-                };
+                return { name: 'Chrome', parseRow: (row, hm) => ({
+                    name: row[hm['name']] || row[hm['title']] || '', type: 1,
+                    login: { username: row[hm['username']] || row[hm['user']] || row[hm['login']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['url']] || row[hm['website']] || '' }], totp: '' },
+                    notes: row[hm['note']] || row[hm['notes']] || '', folderId: row[hm['folder']] || row[hm['category']] || null,
+                })};
             }
-
-            // 1Password CSV: title, url, username, password, notes, otpauth
             if (headerMap['title'] !== undefined && (headerMap['url'] !== undefined || headerMap['website'] !== undefined)) {
-                return {
-                    name: '1Password',
-                    parseRow: (row, hm) => ({
-                        name: row[hm['title']] || '',
-                        type: 1,
-                        login: {
-                            username: row[hm['username']] || row[hm['user']] || '',
-                            password: row[hm['password']] || '',
-                            uris: [{ uri: row[hm['url']] || row[hm['website']] || row[hm['login url']] || '' }],
-                            totp: row[hm['otpauth']] || row[hm['totp']] || '',
-                        },
-                        notes: row[hm['notes']] || row[hm['note']] || '',
-                        folderId: null,
-                    })
-                };
+                return { name: '1Password', parseRow: (row, hm) => ({
+                    name: row[hm['title']] || '', type: 1,
+                    login: { username: row[hm['username']] || row[hm['user']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['url']] || row[hm['website']] || row[hm['login url']] || '' }], totp: row[hm['otpauth']] || row[hm['totp']] || '' },
+                    notes: row[hm['notes']] || row[hm['note']] || '', folderId: null,
+                })};
             }
-
-            // LastPass CSV: url, username, password, name, extra, grouping, fav
             if (headerMap['url'] !== undefined && headerMap['username'] !== undefined && headerMap['extra'] !== undefined) {
-                return {
-                    name: 'LastPass',
-                    parseRow: (row, hm) => ({
-                        name: row[hm['name']] || row[hm['title']] || row[hm['url']] || '',
-                        type: 1,
-                        login: {
-                            username: row[hm['username']] || '',
-                            password: row[hm['password']] || '',
-                            uris: [{ uri: row[hm['url']] || '' }],
-                            totp: row[hm['totp']] || '',
-                        },
-                        notes: row[hm['extra']] || row[hm['notes']] || '',
-                        folderId: row[hm['grouping']] || row[hm['group']] || row[hm['folder']] || null,
-                    })
-                };
+                return { name: 'LastPass', parseRow: (row, hm) => ({
+                    name: row[hm['name']] || row[hm['title']] || row[hm['url']] || '', type: 1,
+                    login: { username: row[hm['username']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['url']] || '' }], totp: row[hm['totp']] || '' },
+                    notes: row[hm['extra']] || row[hm['notes']] || '', folderId: row[hm['grouping']] || row[hm['group']] || row[hm['folder']] || null,
+                })};
             }
-
-            // Firefox CSV: "url","username","password","httpRealm",...
             if (headerMap['hostname'] !== undefined || headerMap['httpRealm'] !== undefined) {
-                return {
-                    name: 'Firefox',
-                    parseRow: (row, hm) => {
-                        const host = row[hm['hostname']] || row[hm['url']] || '';
-                        const realm = row[hm['httprealm']] || row[hm['realm']] || '';
-                        return {
-                            name: realm ? `${host} (${realm})` : host || '未命名',
-                            type: 1,
-                            login: {
-                                username: row[hm['username']] || row[hm['user']] || '',
-                                password: row[hm['password']] || '',
-                                uris: [{ uri: host.startsWith('http') ? host : 'https://' + host }],
-                                totp: '',
-                            },
-                            notes: '',
-                            folderId: null,
-                        };
-                    }
-                };
-            }
-
-            // Bitwarden CSV: folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
-            if (headerMap['login_username'] !== undefined && headerMap['login_password'] !== undefined) {
-                return {
-                    name: 'Bitwarden',
-                    parseRow: (row, hm) => ({
-                        name: row[hm['name']] || row[hm['title']] || '',
-                        type: (row[hm['type']] || '').toLowerCase() === 'note' ? 2 : 1,
-                        login: {
-                            username: row[hm['login_username']] || '',
-                            password: row[hm['login_password']] || '',
-                            uris: [{ uri: row[hm['login_uri']] || row[hm['login_url']] || '' }],
-                            totp: row[hm['login_totp']] || '',
-                        },
-                        notes: row[hm['notes']] || row[hm['note']] || '',
-                        folderId: row[hm['folder']] || null,
-                        favorite: (row[hm['favorite']] || row[hm['fav']] || '') === '1' || (row[hm['favorite']] || '').toLowerCase() === 'true',
-                    })
-                };
-            }
-
-            // KeePass / Generic CSV: "Account","Login Name","Password","Web Site","Comments"
-            if (headerMap['account'] !== undefined || headerMap['title'] !== undefined || headerMap['website'] !== undefined) {
-                return {
-                    name: 'Generic',
-                    parseRow: (row, hm) => ({
-                        name: row[hm['account']] || row[hm['title']] || row[hm['name']] || '未命名',
-                        type: 1,
-                        login: {
-                            username: row[hm['login name']] || row[hm['username']] || row[hm['login']] || row[hm['user']] || '',
-                            password: row[hm['password']] || '',
-                            uris: [{ uri: row[hm['web site']] || row[hm['website']] || row[hm['url']] || '' }],
-                            totp: '',
-                        },
-                        notes: row[hm['comments']] || row[hm['notes']] || row[hm['note']] || '',
-                        folderId: null,
-                    })
-                };
-            }
-
-            // Generic fallback: try to match columns by content pattern
-            // Look for password-like column, url-like column, etc.
-            return {
-                name: 'Auto-Detect',
-                parseRow: (row, hm) => {
-                    const keys = Object.keys(hm);
-                    const pwCol = keys.find(k => /password|passwd|pwd/i.test(k));
-                    const userCol = keys.find(k => /user|username|login|email/i.test(k));
-                    const urlCol = keys.find(k => /url|website|site|link/i.test(k));
-                    const nameCol = keys.find(k => /name|title|account|site/i.test(k));
-                    const notesCol = keys.find(k => /notes|note|comment|desc/i.test(k));
-
-                    const pw = pwCol ? row[hm[pwCol]] : '';
-                    const user = userCol ? row[hm[userCol]] : '';
-                    const url = urlCol ? row[hm[urlCol]] : '';
-                    const name = nameCol ? row[hm[nameCol]] : (url || '未命名');
-                    const notes = notesCol ? row[hm[notesCol]] : '';
-
+                return { name: 'Firefox', parseRow: (row, hm) => {
+                    const host = row[hm['hostname']] || row[hm['url']] || '';
+                    const realm = row[hm['httprealm']] || row[hm['realm']] || '';
                     return {
-                        name: name,
-                        type: 1,
-                        login: {
-                            username: user,
-                            password: pw,
-                            uris: [{ uri: url }],
-                            totp: '',
-                        },
-                        notes: notes,
-                        folderId: null,
+                        name: realm ? `${host} (${realm})` : host || '未命名', type: 1,
+                        login: { username: row[hm['username']] || row[hm['user']] || '', password: row[hm['password']] || '', uris: [{ uri: host.startsWith('http') ? host : 'https://' + host }], totp: '' },
+                        notes: '', folderId: null,
                     };
-                }
-            };
+                }};
+            }
+            if (headerMap['login_username'] !== undefined && headerMap['login_password'] !== undefined) {
+                return { name: 'Bitwarden', parseRow: (row, hm) => ({
+                    name: row[hm['name']] || row[hm['title']] || '', type: (row[hm['type']] || '').toLowerCase() === 'note' ? 2 : 1,
+                    login: { username: row[hm['login_username']] || '', password: row[hm['login_password']] || '', uris: [{ uri: row[hm['login_uri']] || row[hm['login_url']] || '' }], totp: row[hm['login_totp']] || '' },
+                    notes: row[hm['notes']] || row[hm['note']] || '', folderId: row[hm['folder']] || null,
+                    favorite: (row[hm['favorite']] || row[hm['fav']] || '') === '1' || (row[hm['favorite']] || '').toLowerCase() === 'true',
+                })};
+            }
+            if (headerMap['account'] !== undefined || headerMap['title'] !== undefined || headerMap['website'] !== undefined) {
+                return { name: 'Generic', parseRow: (row, hm) => ({
+                    name: row[hm['account']] || row[hm['title']] || row[hm['name']] || '未命名', type: 1,
+                    login: { username: row[hm['login name']] || row[hm['username']] || row[hm['login']] || row[hm['user']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['web site']] || row[hm['website']] || row[hm['url']] || '' }], totp: '' },
+                    notes: row[hm['comments']] || row[hm['notes']] || row[hm['note']] || '', folderId: null,
+                })};
+            }
+            return { name: 'Auto-Detect', parseRow: (row, hm) => {
+                const keys = Object.keys(hm);
+                const pwCol = keys.find(k => /password|passwd|pwd/i.test(k));
+                const userCol = keys.find(k => /user|username|login|email/i.test(k));
+                const urlCol = keys.find(k => /url|website|site|link/i.test(k));
+                const nameCol = keys.find(k => /name|title|account|site/i.test(k));
+                const notesCol = keys.find(k => /notes|note|comment|desc/i.test(k));
+                return {
+                    name: nameCol ? row[hm[nameCol]] : (urlCol ? row[hm[urlCol]] : '未命名'), type: 1,
+                    login: { username: userCol ? row[hm[userCol]] : '', password: pwCol ? row[hm[pwCol]] : '', uris: [{ uri: urlCol ? row[hm[urlCol]] : '' }], totp: '' },
+                    notes: notesCol ? row[hm[notesCol]] : '', folderId: null,
+                };
+            }};
         }
 
         // ============ 1PUX Parser ============
         async function parse1PUX(file) {
-            // 1PUX is a zip with .1pux extension containing a band/ directory
             const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
             const zip = await JSZip.default.loadAsync(file);
-            const items = [];
-            const folders = [];
-            const vaultMap = new Map();
-
-            // Find export.data in each vault band
+            const items = [], folders = [];
             const dataFiles = Object.keys(zip.files).filter(name => name.match(/\/data\/[^/]+\.json$/) && !name.includes('__MACOSX'));
-            
             for (const dataFile of dataFiles) {
                 try {
                     const content = await zip.files[dataFile].async('string');
                     const data = JSON.parse(content);
-                    
-                    // Items
                     if (data.items) {
                         for (const item of data.items) {
                             if (item.trashed === true || item.trashed === 'Y') continue;
@@ -1585,19 +1267,13 @@
                             if (parsed) items.push(parsed);
                         }
                     }
-                } catch (e) {
-                    console.warn('Failed to parse 1PUX file:', dataFile, e);
-                }
+                } catch (e) { console.warn('Failed to parse 1PUX file:', dataFile, e); }
             }
-
             return { folders, items };
         }
 
         function parse1PUXJSON(json) {
-            // 1PUX exported as single JSON (from 1Password CLI)
-            const items = [];
-            const folders = [];
-
+            const items = [], folders = [];
             if (json.items) {
                 for (const item of json.items) {
                     if (item.trashed === true || item.trashed === 'Y') continue;
@@ -1605,67 +1281,32 @@
                     if (parsed) items.push(parsed);
                 }
             }
-
             return { folders, items };
         }
 
         function convert1PUXItem(item) {
             const overview = item.overview || {};
             const details = item.details || {};
-            
-            const parsed = {
-                name: overview.title || overview.ainfo || '未命名',
-                type: 1,
-                notes: '',
-                folderId: null,
-                favorite: overview.favorite || false,
-            };
-
-            // Determine item category
+            const parsed = { name: overview.title || overview.ainfo || '未命名', type: 1, notes: '', folderId: null, favorite: overview.favorite || false };
             const category = (overview.category || item.category || '').toUpperCase();
-
             if (category === 'LOGIN' || category === 'PASSWORD' || !category) {
                 parsed.type = 1;
-                parsed.login = {
-                    username: '',
-                    password: '',
-                    uris: [],
-                    totp: '',
-                };
-
-                // URLs from overview
-                if (overview.url) {
-                    parsed.login.uris.push({ uri: overview.url });
-                }
+                parsed.login = { username: '', password: '', uris: [], totp: '' };
+                if (overview.url) parsed.login.uris.push({ uri: overview.url });
                 if (overview.urls) {
-                    for (const u of overview.urls) {
-                        if (u.url && u.url !== overview.url) {
-                            parsed.login.uris.push({ uri: u.url });
-                        }
-                    }
+                    for (const u of overview.urls) { if (u.url && u.url !== overview.url) parsed.login.uris.push({ uri: u.url }); }
                 }
-
-                // Fields from details
                 if (details.fields) {
                     for (const field of details.fields) {
                         const design = field.designation || '';
                         const val = field.value || '';
                         if (!val) continue;
-
                         if (design === 'username') parsed.login.username = val;
                         else if (design === 'password') parsed.login.password = val;
-                        else if (design === 'URL' && !parsed.login.uris.find(u => u.uri === val)) {
-                            parsed.login.uris.push({ uri: val });
-                        }
+                        else if (design === 'URL' && !parsed.login.uris.find(u => u.uri === val)) parsed.login.uris.push({ uri: val });
                     }
                 }
-
-                // Notes from details
-                if (details.notesPlain) {
-                    parsed.notes = details.notesPlain;
-                }
-
-                // TOTP from details
+                if (details.notesPlain) parsed.notes = details.notesPlain;
                 if (details.sections) {
                     for (const section of details.sections) {
                         if (section.fields) {
@@ -1677,23 +1318,16 @@
                         }
                     }
                 }
-
-                // Password history
                 if (details.passwordHistory) {
                     parsed.passwordHistory = details.passwordHistory.map(ph => ({
-                        password: ph.value || '',
-                        lastUsedDate: ph.time ? new Date(ph.time * 1000).toISOString() : '',
+                        password: ph.value || '', lastUsedDate: ph.time ? new Date(ph.time * 1000).toISOString() : '',
                     }));
                 }
             } else if (category === 'SECURE_NOTE' || category === 'NOTE') {
-                parsed.type = 2;
-                parsed.login = null;
+                parsed.type = 2; parsed.login = null;
                 if (details.notesPlain) parsed.notes = details.notesPlain;
-                if (overview.title) parsed.name = overview.title;
             } else if (category === 'CREDIT_CARD' || category === 'BANK_ACCOUNT') {
-                parsed.type = 3;
-                parsed.login = null;
-                parsed.card = {};
+                parsed.type = 3; parsed.login = null; parsed.card = {};
                 if (details.sections) {
                     for (const section of details.sections) {
                         if (section.fields) {
@@ -1703,10 +1337,9 @@
                                 if (n.includes('number') || n.includes('ccnum')) parsed.card.number = field.v || '';
                                 if (n.includes('expir') || n.includes('exp')) {
                                     const exp = (field.v || '').split('/');
-                                    parsed.card.expMonth = exp[0] || '';
-                                    parsed.card.expYear = exp[1] || '';
+                                    parsed.card.expMonth = exp[0] || ''; parsed.card.expYear = exp[1] || '';
                                 }
-                                if (n.includes('cvv') || n.includes('cvc') || n.includes('security') || n.includes('verification')) parsed.card.code = field.v || '';
+                                if (n.includes('cvv') || n.includes('cvc') || n.includes('security')) parsed.card.code = field.v || '';
                                 if (n.includes('type') || n.includes('brand')) parsed.card.brand = field.v || '';
                             }
                         }
@@ -1714,9 +1347,7 @@
                 }
                 if (details.notesPlain) parsed.notes = details.notesPlain;
             } else if (category === 'IDENTITY') {
-                parsed.type = 4;
-                parsed.login = null;
-                parsed.identity = {};
+                parsed.type = 4; parsed.login = null; parsed.identity = {};
                 if (details.sections) {
                     for (const section of details.sections) {
                         if (section.fields) {
@@ -1737,18 +1368,10 @@
                     }
                 }
             } else {
-                // Other types: treat as login with custom fields
                 parsed.type = 1;
-                parsed.login = {
-                    username: '',
-                    password: '',
-                    uris: [],
-                    totp: '',
-                };
+                parsed.login = { username: '', password: '', uris: [], totp: '' };
                 if (details.notesPlain) parsed.notes = details.notesPlain;
             }
-
-            // Custom fields (all sections/fields not already captured)
             parsed.customFields = [];
             if (details.sections) {
                 for (const section of details.sections) {
@@ -1763,43 +1386,22 @@
                     }
                 }
             }
-
-            // Tags
-            if (overview.tags && overview.tags.length) {
-                parsed.customFields.push({ name: '_TAGS', value: overview.tags.join(', '), type: 0 });
-            }
-
-            // Dates
-            if (item.created_at || overview.created) {
-                parsed.creationDate = item.created_at || overview.created || '';
-            }
-            if (item.updated_at || overview.updated) {
-                parsed.revisionDate = item.updated_at || overview.updated || '';
-            }
-
+            if (overview.tags && overview.tags.length) parsed.customFields.push({ name: '_TAGS', value: overview.tags.join(', '), type: 0 });
+            if (item.created_at || overview.created) parsed.creationDate = item.created_at || overview.created || '';
+            if (item.updated_at || overview.updated) parsed.revisionDate = item.updated_at || overview.updated || '';
             return parsed;
         }
 
-        // ============ Bitwarden Encrypted JSON Parser ============
         function parseBitwardenEncrypted(json) {
-            // Bitwarden account-encrypted JSON: {"encrypted":true,"passwordProtected":false,"data":"..."}
-            // We cannot decrypt it in browser without the account key, but we can check structure
             if (json.encrypted && json.data) {
-                throw new Error(
-                    '检测到 Bitwarden 加密导出格式。\n\n' +
-                    '请在 Bitwarden 中使用「无加密 JSON (.json)」格式重新导出：\n' +
-                    'Bitwarden → 设置 → 导出保管库 → 文件格式选择 .json（非加密）'
-                );
+                throw new Error('检测到 Bitwarden 加密导出格式。请在 Bitwarden 中使用「无加密 JSON (.json)」格式重新导出。');
             }
             return { folders: [], items: [] };
         }
 
-        // ============ ZIP Support ============
         async function readZipFile(file) {
-            // Dynamic import of JSZip if needed
             const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
             const zip = await JSZip.default.loadAsync(file);
-            // Find the first .json file
             const jsonFile = Object.keys(zip.files).find(name => name.endsWith('.json'));
             if (!jsonFile) throw new Error('ZIP 文件中未找到 JSON 数据');
             const content = await zip.files[jsonFile].async('string');
@@ -1807,24 +1409,18 @@
         }
 
         // ============ Helpers ============
-        function sanitizePath(path) {
-            return path.replace(/[\/\\]/g, '_');
-        }
+        function sanitizePath(path) { return path.replace(/[\/\\]/g, '_'); }
 
         function showToast(msg, type = '') {
             toast.textContent = msg;
             toast.className = 'toast ' + type + ' show';
             clearTimeout(toast._timeout);
-            toast._timeout = setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        // ============ Keyboard shortcuts ============
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && passwordCard.classList.contains('show') && !convertBtn.disabled) {
-                e.preventDefault();
-                startConversion();
+                e.preventDefault(); startConversion();
             }
         });
     </script>
