@@ -310,6 +310,8 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
 
     # SSH Key 字段
     if item.type == 5:
+        if item.ssh_private_key:
+            fields["SSHPrivateKey"] = item.ssh_private_key
         if item.ssh_key_fingerprint:
             fields["SSHFingerprint"] = item.ssh_key_fingerprint
         if item.ssh_public_key:

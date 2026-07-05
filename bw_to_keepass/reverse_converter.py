@@ -175,7 +175,7 @@ def _detect_entry_type(entry, custom_fields: dict) -> int:
     # 通过字段推断
     if custom_fields.get('SSHFingerprint') or custom_fields.get('SSHPublicKey'):
         return 5  # SSH Key
-    if custom_fields.get('CardNumber') or custom_fields.get('CardBrand'):
+    if custom_fields.get('CardNumber') or custom_fields.get('Brand') or custom_fields.get('CardBrand'):
         return 3  # Card
     if any(k.startswith('Identity') for k in custom_fields):
         return 4  # Identity
@@ -287,9 +287,9 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     elif item_type == 2:  # Secure Note
         item['secureNote'] = {'type': 0}
     elif item_type == 3:  # Card
-        brand = custom_fields.get('CardBrand', '')
+        brand = custom_fields.get('Brand', '') or custom_fields.get('CardBrand', '')
         number = custom_fields.get('CardNumber', '')
-        expiry = custom_fields.get('CardExpiry', '')
+        expiry = custom_fields.get('Expiry', '') or custom_fields.get('CardExpiry', '')
         exp_month, exp_year = '', ''
         if '/' in expiry:
             parts = expiry.split('/')

@@ -152,7 +152,7 @@ def export_kdbx_to_csv(
         skip_keys = {
             'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otpauth',
             'CreationDate', 'RevisionDate', 'BitwardenID',
-            'CardBrand', 'CardNumber', 'CardExpiry',
+            'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
             'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
         }
         extra_fields = {k: v for k, v in custom_fields.items()
@@ -267,7 +267,7 @@ def export_kdbx_to_csv_string(
         skip_keys = {
             'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otpauth',
             'CreationDate', 'RevisionDate', 'BitwardenID',
-            'CardBrand', 'CardNumber', 'CardExpiry',
+            'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
             'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
         }
         extra_fields = {k: v for k, v in custom_fields.items()

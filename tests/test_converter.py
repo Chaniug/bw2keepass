@@ -170,6 +170,23 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(get_entry_username(item), "John Doe")
         self.assertEqual(get_entry_password(item), "123")  # CVV
 
+    def test_card_custom_fields_names(self):
+        """验证卡片字段名正确（Brand/Expiry/CardNumber）"""
+        item = next(i for i in self.items if i.name == "Visa Card")
+        fields = build_custom_fields(item)
+        self.assertEqual(fields["CardNumber"], "4111111111111111")
+        self.assertEqual(fields["Expiry"], "12/2026")
+        self.assertEqual(fields["Brand"], "Visa")
+
+    def test_ssh_private_key_field(self):
+        """验证 SSH 私钥正确写入自定义字段（避免反向转换时丢失）"""
+        item = next(i for i in self.items if i.name == "GitHub SSH Key")
+        fields = build_custom_fields(item)
+        self.assertIn("SSHPrivateKey", fields)
+        self.assertTrue(fields["SSHPrivateKey"])
+        self.assertIn("SSHFingerprint", fields)
+        self.assertIn("SSHPublicKey", fields)
+
     def test_custom_fields(self):
         item = next(i for i in self.items if i.name == "GitHub")
         fields = build_custom_fields(item)
@@ -296,6 +313,49 @@ class TestReverseConverter(unittest.TestCase):
         pem = _format_private_key_pem(original_b64)
         restored = _pem_to_b64url(pem)
         self.assertEqual(restored, original_b64)
+
+    def test_detect_entry_type_card_fields(self):
+        """验证 _detect_entry_type 能正确识别卡片类型（兼容 Brand/CardBrand）"""
+        from bw_to_keepass.reverse_converter import _detect_entry_type
+
+        class MockEntry:
+            def __init__(self, fields):
+                self._fields = fields
+            def get_custom_property(self, k):
+                return self._fields.get(k)
+
+        # 用正向转换器写入的 Brand 字段应能识别为 Card (type=3)
+        e1 = MockEntry({'Brand': 'Visa', 'CardNumber': '4539147200333257'})
+        self.assertEqual(_detect_entry_type(e1, {'Brand': 'Visa', 'CardNumber': '4539147200333257'}), 3)
+
+    def test_build_bitwarden_item_card_fields(self):
+        """验证 _build_bitwarden_item 正确读取 Brand/Expiry 字段（修复字段名不匹配）"""
+        from bw_to_keepass.reverse_converter import _build_bitwarden_item
+
+        class MockEntry:
+            def __init__(self):
+                self.title = "Test Card"
+                self.username = "John"
+                self.password = "123"
+                self.url = ""
+                self.notes = ""
+                self._fields = {
+                    'BitwardenType': 'Card',
+                    'CardNumber': '4111111111111111',
+                    'Expiry': '12/2026',
+                    'Brand': 'Visa',
+                }
+                self.custom_properties = list(self._fields.keys())
+            def get_custom_property(self, k):
+                return self._fields.get(k)
+
+        item = _build_bitwarden_item(MockEntry(), None, 0)
+        self.assertIsNotNone(item)
+        self.assertEqual(item['type'], 3)
+        self.assertEqual(item['card']['brand'], 'Visa')
+        self.assertEqual(item['card']['number'], '4111111111111111')
+        self.assertEqual(item['card']['expMonth'], '12')
+        self.assertEqual(item['card']['expYear'], '2026')
 
 
 class TestCSVExporter(unittest.TestCase):

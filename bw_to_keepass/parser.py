@@ -7,6 +7,7 @@ Bitwarden 导出 JSON 解析器
 import json
 import zipfile
 import os
+import uuid
 from typing import Any
 from dataclasses import dataclass, field
 
@@ -160,9 +161,11 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
     folders: list[Folder] = []
     folder_map: dict[str, str] = {}  # id -> name
     for f_data in data.get('folders', []):
-        folder = Folder(id=f_data['id'], name=f_data['name'])
+        f_id = f_data.get('id') or str(uuid.uuid4())
+        f_name = f_data.get('name') or ''
+        folder = Folder(id=f_id, name=f_name)
         folders.append(folder)
-        folder_map[f_data['id']] = f_data['name']
+        folder_map[f_id] = f_name
 
     # 解析密码项
     items: list[VaultItem] = []
@@ -225,8 +228,8 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
                 user_handle=fido_data.get('userHandle', '') or '',
                 user_name=fido_data.get('userName', '') or '',
                 user_display_name=fido_data.get('userDisplayName', '') or '',
-                counter=str(fido_data.get('counter', '0')) or '0',
-                discoverable=str(fido_data.get('discoverable', 'false')) or 'false',
+                counter=str(fido_data.get('counter', '0') or '0'),
+                discoverable=str(fido_data.get('discoverable', 'false') or 'false').lower(),
                 creation_date=fido_data.get('creationDate', '') or '',
             ))
 

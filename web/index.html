@@ -934,7 +934,7 @@
                     password: ph.password || '',
                     lastUsedDate: ph.lastUsedDate || ''
                 })),
-                fido2Credentials: (item.login?.fido2Credentials || []).map(fc => ({
+                fido2Credentials: (item.fido2Credentials || item.login?.fido2Credentials || []).map(fc => ({
                     credentialId: fc.credentialId || '',
                     keyType: fc.keyType || '',
                     keyAlgorithm: fc.keyAlgorithm || '',
@@ -1213,8 +1213,8 @@
                 };
             }
 
-            // Secure note detection
-            if (bwTypeField === 'SecureNote' || (!item.login?.username && !item.login?.password && !item.login?.uris?.length && notes)) {
+            // Secure note detection (避免误判卡片/SSH 等类型)
+            if (bwTypeField === 'SecureNote' || (item.type !== 3 && item.type !== 4 && item.type !== 5 && !item.login?.username && !item.login?.password && !item.login?.uris?.length && notes)) {
                 item.type = 2;
                 item.secureNote = { type: 0 };
             }
@@ -1229,6 +1229,20 @@
         }
 
         function generateUUID() {
+            // 优先使用加密安全的 crypto.randomUUID()
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID();
+            }
+            // 回退方案：基于 crypto.getRandomValues 的 UUIDv4
+            if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+                const buf = new Uint8Array(16);
+                crypto.getRandomValues(buf);
+                buf[6] = (buf[6] & 0x0f) | 0x40;
+                buf[8] = (buf[8] & 0x3f) | 0x80;
+                const hex = [...buf].map(b => b.toString(16).padStart(2, '0')).join('');
+                return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+            }
+            // 最后回退（不推荐用于安全场景）
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
                 const r = Math.random() * 16 | 0;
                 return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
