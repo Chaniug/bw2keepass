@@ -389,21 +389,25 @@
     <div class="toast" id="toast"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/argon2.umd.min.js" onerror="console.warn('hash-wasm 加载失败，回退 AES-KDF')"></script>
         <script>
-        // 加载 hash-wasm 提供 Argon2 支持（KDBX 4 + Argon2d）
+        // hash-wasm 加载完成后注册 Argon2 实现
         let argon2Ready = false;
-        import('https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/+esm').then(async (wasm) => {
+        function initArgon2() {
+            if (typeof hashwasm === 'undefined' || typeof kdbxweb === 'undefined') return;
             try {
-                // 测试 argon2d 是否可用
-                await wasm.argon2d({ password: 't', salt: new Uint8Array([1,2,3,4,5,6,7,8]), memorySize: 64, iterations: 1, parallelism: 1, hashLength: 32, outputType: 'binary' });
-                kdbxweb.CryptoEngine.setArgon2Impl((password, salt, memory, iterations, hashLength, parallelism, type, version) => {
-                    const opts = { password: new Uint8Array(password), salt: new Uint8Array(salt), memorySize: memory, iterations, parallelism, hashLength, outputType: 'binary' };
-                    if (type === 2) return wasm.argon2id(opts);
-                    return wasm.argon2d(opts);
-                });
-                argon2Ready = true;
-            } catch (e) { console.warn('Argon2 WASM 加载失败，回退到 AES-KDF', e); }
-        }).catch(() => {});
+                hashwasm.argon2d({ password: 't', salt: new Uint8Array([1,2,3,4,5,6,7,8]), memorySize: 64, iterations: 1, parallelism: 1, hashLength: 32, outputType: 'binary' }).then(function() {
+                    kdbxweb.CryptoEngine.setArgon2Impl(function(password, salt, memory, iterations, hashLength, parallelism, type, version) {
+                        var opts = { password: new Uint8Array(password), salt: new Uint8Array(salt), memorySize: memory, iterations: iterations, parallelism: parallelism, hashLength: hashLength, outputType: 'binary' };
+                        if (type === 2) return hashwasm.argon2id(opts);
+                        return hashwasm.argon2d(opts);
+                    });
+                    argon2Ready = true;
+                }).catch(function(e) { console.warn('Argon2 不可用，回退 AES-KDF', e); });
+            } catch (e) { console.warn('Argon2 初始化失败', e); }
+        }
+        if (typeof hashwasm !== 'undefined') initArgon2();
+        else window.addEventListener('load', function() { setTimeout(initArgon2, 100); });
         </script>
     <script>
         const { Kdbx, Credentials, ProtectedValue, Consts } = kdbxweb;
