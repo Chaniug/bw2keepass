@@ -1198,8 +1198,8 @@
                 item.type = TYPE_NAME_TO_ID[bwTypeField];
             }
 
-            // Extract TOTP
-            const totp = getText('TOTP Seed') || getText('TOTP') || getText('otp');
+            // Extract TOTP (兼容旧版 otpauth 字段名)
+            const totp = getText('TOTP Seed') || getText('TOTP') || getText('otp') || getText('otpauth');
             if (totp && item.login) item.login.totp = totp;
 
             // Extract extra URIs
@@ -1851,8 +1851,8 @@
                 fields['TOTP Settings'] = '30;6';
                 fields['otp'] = otpauthUrl;
             }
-            if (item.login?.uris?.length > 1) {
-                // androidapp:// URI → KeePassDX AndroidApp 字段
+            // androidapp:// URI → KeePassDX AndroidApp 字段（无论 URI 数量）
+            if (item.login?.uris?.length) {
                 let appIdx = 0;
                 const seenUris = new Set();
                 for (const u of item.login.uris) {
@@ -1868,12 +1868,12 @@
                         }
                     }
                 }
-                // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC），排除 androidapp://
+                // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC），排除 androidapp:// 和主 URL
                 const mainUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')));
                 let urlIdx = 0;
                 for (const u of item.login.uris) {
                     const uri = u.uri || '';
-                    if (!uri || uri.startsWith('androidapp://') || uri === (mainUri && mainUri.uri)) continue;
+                    if (!uri || uri.startsWith('androidapp://') || (mainUri && uri === mainUri.uri)) continue;
                     if (uri.startsWith('http://') || uri.startsWith('https://')) {
                         urlIdx++;
                         const key = urlIdx === 1 ? 'KP2A_URL' : `KP2A_URL_${urlIdx}`;

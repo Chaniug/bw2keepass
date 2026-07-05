@@ -198,8 +198,8 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     custom_fields = _get_all_custom_fields(entry)
     item_type = _detect_entry_type(entry, custom_fields)
 
-    # 提取 TOTP
-    totp = custom_fields.get('TOTP Seed', '') or custom_fields.get('otp', '')
+    # 提取 TOTP（兼容旧版 otpauth 字段名）
+    totp = custom_fields.get('TOTP Seed', '') or custom_fields.get('otp', '') or custom_fields.get('otpauth', '')
     if totp.startswith('otpauth://'):
         # 从 otpauth URL 中提取 secret
         from urllib.parse import urlparse, parse_qs
