@@ -391,6 +391,7 @@
         let selectedFile = null;
         let parsedData = null;
         let generatedData = null;
+        let generatedPasskeyData = null; // { passkeys: [...], zipBlob: Blob }
         let outputFileName = 'output.kdbx';
         const TYPE_NAMES = { 1: 'Login', 2: 'SecureNote', 3: 'Card', 4: 'Identity', 5: 'SSHKey' };
         const TYPE_NAME_TO_ID = { 'Login': 1, 'SecureNote': 2, 'Card': 3, 'Identity': 4, 'SSHKey': 5 };
@@ -665,6 +666,7 @@
             }
 
             let entryCount = 0;
+            const passkeys = []; // Collect passkeys for .passkey file export
             for (const item of vault.items) {
                 if (item.deleted) continue;
                 const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
@@ -685,6 +687,12 @@
                 }
                 const tags = buildTags(item);
                 if (tags.length) entry.fields.set('_TAGS', tags.join(' '));
+                // Collect passkey data for .passkey file export
+                if (item.fido2Credentials?.length) {
+                    for (const fc of item.fido2Credentials) {
+                        passkeys.push({ item, fc });
+                    }
+                }
                 entryCount++;
                 progressStats.textContent = `已处理 ${entryCount}/${vault.items.length} 个条目...`;
             }
@@ -692,12 +700,29 @@
             progressStats.textContent = '正在加密并生成 KDBX 文件...';
             generatedData = await db.save();
 
+            // Generate .passkey ZIP if passkeys exist
+            generatedPasskeyData = null;
+            if (passkeys.length > 0) {
+                const passkeyFiles = [];
+                for (const pk of passkeys) {
+                    const passkeyJson = buildPasskeyFile(pk.fc, pk.item);
+                    const safeName = (pk.item.name || 'passkey').replace(/[<>:"/\\|?*]/g, '_').substring(0, 60);
+                    const fileName = passkeys.length > 1
+                        ? `${safeName}_${passkeyFiles.length + 1}.passkey`
+                        : `${safeName}.passkey`;
+                    passkeyFiles.push({ name: fileName, json: passkeyJson });
+                }
+                generatedPasskeyData = { passkeys: passkeyFiles };
+            }
+
             progressCard.classList.remove('show');
             successCard.classList.add('show');
             updateSteps(3); step3.classList.add('done');
             outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
-            successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹`;
+            const passkeyInfo = passkeys.length > 0 ? ` · 包含 ${passkeys.length} 个 Passkey` : '';
+            successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹${passkeyInfo}`;
             downloadBtn.textContent = '💾 下载 KDBX 文件';
+            if (generatedPasskeyData) showPasskeyDownloadBtn();
             buildSummaryTable(vault);
             showToast('转换完成！');
         }
@@ -1092,6 +1117,56 @@
             });
         }
 
+        // Bitwarden credentialId is a UUID like "e64a25a4-3081-4bc4-baf3-426638381cf6"
+        // KeePassXC converts it to base64 (UUID → hex bytes → base64)
+        function uuidToBase64(uuid) {
+            if (!uuid || uuid.includes('=') || uuid.includes('+') || uuid.includes('/')) {
+                // Already looks like base64, return as-is
+                return uuid;
+            }
+            const hex = uuid.replace(/-/g, '');
+            if (!/^[0-9a-fA-F]+$/.test(hex)) return uuid; // Not a UUID, return as-is
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+            }
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+
+        // Bitwarden keyValue may be URL-encoded base64, KeePassXC expects standard base64 PEM
+        function formatPrivateKeyPEM(keyValue) {
+            if (!keyValue) return '';
+            // If already PEM format, return as-is
+            if (keyValue.includes('-----BEGIN')) return keyValue;
+            // Decode URL encoding (%2B → +, %2F → /, %3D → =, etc.)
+            let decoded = keyValue;
+            try { decoded = decodeURIComponent(keyValue); } catch (e) { /* not URL encoded */ }
+            // Wrap in PEM format
+            const lines = [];
+            lines.push('-----BEGIN PRIVATE KEY-----');
+            for (let i = 0; i < decoded.length; i += 64) {
+                lines.push(decoded.substring(i, i + 64));
+            }
+            lines.push('-----END PRIVATE KEY-----');
+            return lines.join('\n');
+        }
+
+        // Generate .passkey file JSON for KeePassXC import
+        function buildPasskeyFile(fc, item) {
+            const credentialId = uuidToBase64(fc.credentialId || '');
+            const privateKey = formatPrivateKeyPEM(fc.keyValue || '');
+            return {
+                relyingParty: fc.rpId || '',
+                url: (item.login?.uris && item.login.uris.length > 0) ? (item.login.uris[0].uri || '') : '',
+                username: fc.userName || item.login?.username || '',
+                credentialId: credentialId,
+                userHandle: fc.userHandle || '',
+                privateKey: privateKey
+            };
+        }
+
         // ============ Download ============
         downloadBtn.addEventListener('click', () => {
             if (!generatedData) return;
@@ -1110,8 +1185,164 @@
 
         newConvertBtn.addEventListener('click', resetAll);
 
+        function showPasskeyDownloadBtn() {
+            // Remove existing passkey button if any
+            const existing = document.getElementById('passkeyDownloadBtn');
+            if (existing) existing.remove();
+
+            const btn = document.createElement('button');
+            btn.id = 'passkeyDownloadBtn';
+            btn.className = 'btn btn-outline';
+            btn.textContent = '🔑 下载 Passkey 文件 (.passkey)';
+            btn.style.cssText = 'margin-top: 0.75rem; width: 100%;';
+            btn.addEventListener('click', downloadPasskeyFiles);
+            const btnGroup = document.querySelector('#successCard .btn-group');
+            if (btnGroup) btnGroup.parentNode.insertBefore(btn, btnGroup.nextSibling);
+        }
+
+        function downloadPasskeyFiles() {
+            if (!generatedPasskeyData?.passkeys?.length) return;
+
+            const passkeyFiles = generatedPasskeyData.passkeys;
+            if (passkeyFiles.length === 1) {
+                // Single passkey: download directly as .passkey file
+                const pk = passkeyFiles[0];
+                const blob = new Blob([JSON.stringify(pk.json, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = pk.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Passkey 文件已下载');
+            } else {
+                // Multiple passkeys: download as ZIP
+                downloadPasskeysAsZip(passkeyFiles);
+            }
+        }
+
+        async function downloadPasskeysAsZip(passkeyFiles) {
+            // Use a lightweight approach: generate a ZIP manually
+            // Simple ZIP format (no compression, stored method)
+            const encoder = new TextEncoder();
+            const fileEntries = [];
+            let centralDirOffset = 0;
+
+            for (const pf of passkeyFiles) {
+                const content = JSON.stringify(pf.json, null, 2);
+                const data = encoder.encode(content);
+                const nameBytes = encoder.encode(pf.name);
+
+                // Local file header
+                const localHeader = new Uint8Array(30 + nameBytes.length);
+                const lhView = new DataView(localHeader.buffer);
+                lhView.setUint32(0, 0x04034b50, true); // signature
+                lhView.setUint16(4, 20, true);         // version needed
+                lhView.setUint16(6, 0, true);          // flags
+                lhView.setUint16(8, 0, true);          // compression: stored
+                lhView.setUint16(10, 0, true);         // mod time
+                lhView.setUint16(12, 0, true);         // mod date
+                // CRC32: simple implementation
+                const crc = crc32(data);
+                lhView.setUint32(14, crc, true);       // crc32
+                lhView.setUint32(18, data.length, true); // compressed size
+                lhView.setUint32(22, data.length, true); // uncompressed size
+                lhView.setUint16(26, nameBytes.length, true); // filename length
+                lhView.setUint16(28, 0, true);         // extra field length
+                localHeader.set(nameBytes, 30);
+
+                fileEntries.push({
+                    localHeader, data, nameBytes,
+                    crc, offset: centralDirOffset
+                });
+                centralDirOffset += localHeader.length + data.length;
+            }
+
+            // Central directory
+            const cdParts = [];
+            let cdOffset = centralDirOffset;
+            for (const fe of fileEntries) {
+                const cd = new Uint8Array(46 + fe.nameBytes.length);
+                const cdView = new DataView(cd.buffer);
+                cdView.setUint32(0, 0x02014b50, true); // signature
+                cdView.setUint16(4, 20, true);         // version made by
+                cdView.setUint16(6, 20, true);         // version needed
+                cdView.setUint16(8, 0, true);          // flags
+                cdView.setUint16(10, 0, true);         // compression
+                cdView.setUint16(12, 0, true);         // mod time
+                cdView.setUint16(14, 0, true);         // mod date
+                cdView.setUint32(16, fe.crc, true);    // crc32
+                cdView.setUint32(20, fe.data.length, true); // compressed size
+                cdView.setUint32(24, fe.data.length, true); // uncompressed size
+                cdView.setUint16(28, fe.nameBytes.length, true); // filename length
+                cdView.setUint16(30, 0, true);         // extra field length
+                cdView.setUint16(32, 0, true);         // comment length
+                cdView.setUint16(34, 0, true);         // disk number start
+                cdView.setUint16(36, 0, true);         // internal attrs
+                cdView.setUint32(38, 0, true);         // external attrs
+                cdView.setUint32(42, fe.offset, true); // local header offset
+                cd.set(fe.nameBytes, 46);
+                cdParts.push(cd);
+                cdOffset += cd.length;
+            }
+
+            // End of central directory
+            const eocd = new Uint8Array(22);
+            const eocdView = new DataView(eocd.buffer);
+            eocdView.setUint32(0, 0x06054b50, true);  // signature
+            eocdView.setUint16(4, 0, true);           // disk number
+            eocdView.setUint16(6, 0, true);           // disk with CD
+            eocdView.setUint16(8, fileEntries.length, true); // entries on disk
+            eocdView.setUint16(10, fileEntries.length, true); // total entries
+            eocdView.setUint32(12, cdParts.reduce((s, c) => s + c.length, 0), true); // CD size
+            eocdView.setUint32(16, centralDirOffset, true); // CD offset
+            eocdView.setUint16(20, 0, true);          // comment length
+
+            // Assemble ZIP
+            const parts = [];
+            for (const fe of fileEntries) {
+                parts.push(fe.localHeader);
+                parts.push(fe.data);
+            }
+            for (const cd of cdParts) parts.push(cd);
+            parts.push(eocd);
+
+            const totalLen = parts.reduce((s, p) => s + p.length, 0);
+            const zipData = new Uint8Array(totalLen);
+            let offset = 0;
+            for (const p of parts) {
+                zipData.set(p, offset);
+                offset += p.length;
+            }
+
+            const zipBlob = new Blob([zipData], { type: 'application/zip' });
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = outputFileName.replace(/\.kdbx$/i, '_passkeys.zip');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`${passkeyFiles.length} 个 Passkey 文件已打包下载`);
+        }
+
+        // Simple CRC32 for ZIP
+        function crc32(data) {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= data[i];
+                for (let j = 0; j < 8; j++) {
+                    crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+                }
+            }
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        }
+
         function resetAll() {
-            selectedFile = null; parsedData = null; generatedData = null;
+            selectedFile = null; parsedData = null; generatedData = null; generatedPasskeyData = null;
             dbPassword.value = '';
             passwordStrengthBar.style.width = '0';
             strengthLabel.textContent = '输入密码';
@@ -1125,6 +1356,9 @@
             progressCard.classList.remove('show');
             uploadCard.style.display = '';
             updateSteps(1);
+            // Remove passkey download button if exists
+            const pkBtn = document.getElementById('passkeyDownloadBtn');
+            if (pkBtn) pkBtn.remove();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
