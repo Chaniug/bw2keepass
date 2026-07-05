@@ -677,7 +677,7 @@
                 if (notes) entry.fields.set('Notes', notes);
                 const customFields = buildCustomFields(item);
                 for (const [key, value] of Object.entries(customFields)) {
-                    if (key === 'TOTP Seed' || key === 'Password' || key === 'TOTP') {
+                    if (key === 'Password') {
                         entry.fields.set(key, ProtectedValue.fromString(String(value)));
                     } else {
                         entry.fields.set(key, String(value));
@@ -1224,9 +1224,25 @@
         function buildCustomFields(item) {
             const fields = {};
             if (item.type) fields['BitwardenType'] = TYPE_NAMES[item.type] || `Type${item.type}`;
-            if (item.login?.totp) fields['TOTP Seed'] = item.login.totp;
+            if (item.login?.totp) {
+                // 构建 otpauth:// URL 格式，KeePassXC/KeePassDX 等客户端可自动识别
+                const totpRaw = item.login.totp;
+                let otpauthUrl = totpRaw;
+                if (!totpRaw.startsWith('otpauth://')) {
+                    const label = encodeURIComponent(item.name || 'Account');
+                    const issuer = item.login.username ? encodeURIComponent(item.login.username) : label;
+                    otpauthUrl = `otpauth://totp/${issuer}:${label}?secret=${totpRaw}&issuer=${issuer}&digits=6&period=30`;
+                }
+                fields['TOTP Seed'] = totpRaw;
+                fields['TOTP Settings'] = '30;6';
+                fields['otpauth'] = otpauthUrl;
+            }
             if (item.login?.uris?.length > 1) {
-                for (let i = 1; i < item.login.uris.length; i++) fields[`URI_${i + 1}`] = item.login.uris[i].uri || '';
+                // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC）
+                for (let i = 1; i < item.login.uris.length; i++) {
+                    const key = i === 1 ? 'KP2A_URL' : `KP2A_URL_${i - 1}`;
+                    fields[key] = item.login.uris[i].uri || '';
+                }
             }
             if (item.card) {
                 if (item.card.brand) fields['CardBrand'] = item.card.brand;
