@@ -299,6 +299,23 @@ jobs:
               print(f"  {f}: {os.path.getsize(p)} bytes")
           PYEOF
 
+      - name: Restore signing keystore (cache)
+        id: keystore-cache
+        uses: actions/cache@v4
+        with:
+          path: app/build/release.keystore
+          key: release-keystore-v1
+
+      - name: Generate signing keystore (first run only)
+        if: steps.keystore-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p app/build
+          keytool -genkey -v -keystore app/build/release.keystore \
+            -alias release -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass pass2kdbx_release -keypass pass2kdbx_release \
+            -dname "CN=Pass2KDBX, OU=App, O=Valk, L=Unknown, S=Unknown, C=US" \
+            -noprompt
+
       - name: Build APK
         run: |
           BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
@@ -350,18 +367,11 @@ jobs:
           # 6. 对齐（必须在签名之前）
           $BUILD_TOOLS/zipalign -p -f 4 app/build/unsigned.apk app/build/aligned.apk
 
-          # 7. 生成签名密钥
-          keytool -genkey -v -keystore app/build/debug.keystore \
-            -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Pass2KDBX, OU=App, O=Valk, L=Unknown, S=Unknown, C=US" \
-            -noprompt
-
-          # 8. 签名（启用 v1+v2+v3 签名方案，兼容所有 Android 版本）
+          # 7. 签名（使用缓存的固定 keystore，保证签名一致可覆盖安装）
           $BUILD_TOOLS/apksigner sign \
-            --ks app/build/debug.keystore \
-            --ks-pass pass:android \
-            --key-pass pass:android \
+            --ks app/build/release.keystore \
+            --ks-pass pass:pass2kdbx_release \
+            --key-pass pass:pass2kdbx_release \
             --v1-signing-enabled true \
             --v2-signing-enabled true \
             --v3-signing-enabled true \

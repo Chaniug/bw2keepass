@@ -1,101 +1,122 @@
-# bw2keepass
+# Pass2KDBX 🔐
 
-将 Bitwarden 导出的 JSON 数据库转换为 KeePass KDBX 格式。提供 **命令行工具** 和 **网页版** 两种使用方式。
+Bitwarden / KeePass 密码管理器格式互转工具。支持 **Passkey 完整迁移**、双向转换（BW↔KDBX）、CSV 导出。
 
-## 🌐 网页版（推荐）
+纯前端处理，**数据不经过任何服务器**。
 
-无需安装，直接在浏览器中使用：
+## 📥 下载安装
 
-👉 **[打开网页版转换器](https://chaniug.github.io/bw2keepass/)**
+### 方式一：安装原生 App（推荐）
 
-- 拖拽或上传 Bitwarden JSON/ZIP 导出文件
-- 设置 KeePass 数据库密码
-- 一键下载 KDBX 文件
-- 所有处理在浏览器本地完成，**数据不会上传到任何服务器**
+| 平台 | 下载 | 说明 |
+|------|------|------|
+| 🤖 Android | [Pass2KDBX.apk](https://github.com/Chaniug/bw2keepass/releases/latest) | 直接下载安装，无需 Google Play |
+| 🍎 iOS | 用 Safari 打开网页版 → 分享 → 添加到主屏幕 | 作为 PWA 使用 |
+| 💻 Windows / macOS / Linux | 直接打开网页版 | 无需安装 |
 
-## 📦 命令行工具
+**Android 安装方法**：
+1. 点击上方链接下载 `Pass2KDBX.apk`
+2. 手机设置 → 安全 → 允许"未知来源"安装
+3. 点击下载的 APK 文件安装
 
-### 功能
+**iOS 安装方法**（PWA）：
+1. 用 Safari 打开 [key.valk.ccwu.cc](https://key.valk.ccwu.cc)
+2. 点击底部分享按钮 → "添加到主屏幕"
+3. 桌面会出现独立图标，全屏运行，可离线使用
 
-- 支持 Bitwarden JSON 明文导出（`.json`）和带附件的 ZIP 导出
-- 支持所有 Bitwarden 密码项类型：
-  - 登录（用户名/密码/TOTP/URI）
-  - 安全笔记
-  - 卡片（信用卡）
-  - 身份（个人信息）
-  - SSH 密钥
-- 支持 FIDO2/Passkey 凭据保留
-- 保留文件夹结构（映射为 KeePass 分组）
-- 保留自定义字段
-- 保留密码历史
-- 输出 KDBX4 格式数据库
+### 方式二：直接使用网页版
+
+👉 **[打开网页版转换器](https://key.valk.ccwu.cc)**
+
+无需安装，支持所有现代浏览器。手机 Chrome / Edge 可"添加到主屏幕"作为 PWA 使用。
+
+## ✨ 功能特性
+
+- 🔁 **双向转换**：Bitwarden JSON ↔ KeePass KDBX
+- 🔑 **Passkey 完整迁移**：支持 FIDO2/WebAuthn 凭据在 Bitwarden 和 KeePassXC 之间无损迁移
+- 📊 **CSV 导出**：支持通用 / Bitwarden / KeePass 三种 CSV 格式
+- 📁 **保留结构**：文件夹层级、自定义字段、密码历史完整保留
+- 🔐 **本地处理**：所有数据在浏览器本地处理，不上传服务器
+- 📱 **跨平台**：网页版 + Android APK + iOS PWA
+
+### 支持的密码项类型
+
+| 类型 | Bitwarden → KDBX | KDBX → Bitwarden |
+|------|:---:|:---:|
+| 登录（用户名/密码/TOTP/URI） | ✅ | ✅ |
+| 安全笔记 | ✅ | ✅ |
+| 卡片（信用卡） | ✅ | ✅ |
+| 身份（个人信息） | ✅ | ✅ |
+| SSH 密钥 | ✅ | ✅ |
+| Passkey / FIDO2 | ✅ | ✅ |
+
+## 📦 命令行工具（Python）
 
 ### 安装
 
 ```bash
-# 克隆仓库
 git clone https://github.com/Chaniug/bw2keepass.git
 cd bw2keepass
-
-# 创建虚拟环境
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/macOS
-
-# 安装依赖
 pip install -r requirements.txt
 ```
 
 ### 使用方法
 
-**1. 从 Bitwarden 导出数据**
-
-在 Bitwarden 客户端中：**设置 → 导出保管库 → .json 格式**
-
-**2. 转换**
-
 ```bash
-# 基本用法：将 bitwarden.json 转换为 keepass.kdbx
-python -m bw_to_keepass bitwarden_export.json output.kdbx
-
-# 指定主密码（交互式输入更安全）
-python -m bw_to_keepass bitwarden_export.json output.kdbx --password "your_master_password"
+# Bitwarden JSON → KeePass KDBX
+python -m bw_to_keepass bitwarden_export.json output.kdbx --password "your_password"
 
 # 从 ZIP 文件转换（含附件）
 python -m bw_to_keepass bitwarden_export.zip output.kdbx
 
-# 自定义数据库名称
-python -m bw_to_keepass bitwarden_export.json output.kdbx --name "My Vault"
+# KDBX → Bitwarden JSON（反向转换）
+python -m bw_to_keepass --reverse input.kdbx output.json --password "your_password"
+
+# KDBX → CSV 导出
+python -m bw_to_keepass --csv input.kdbx output.csv --password "your_password"
 ```
 
-**3. 在 KeePass 中打开**
+### 命令行参数
 
-使用 KeePass 2.x 或 KeePassXC 打开生成的 `.kdbx` 文件，输入你设置的主密码即可。
+| 参数 | 说明 |
+|------|------|
+| `input` | 输入文件路径 |
+| `output` | 输出文件路径 |
+| `--password` | 数据库密码 |
+| `--name` | 自定义数据库名称 |
+| `--reverse` | 反向转换（KDBX → Bitwarden JSON） |
+| `--csv` | CSV 导出（KDBX → CSV） |
 
-### 项目结构
+## 🛠 项目结构
 
 ```
 bw2keepass/
 ├── bw_to_keepass/       # Python 命令行工具
-│   ├── __init__.py
-│   ├── __main__.py      # CLI 入口点
+│   ├── __main__.py      # CLI 入口
 │   ├── parser.py        # Bitwarden JSON 解析器
-│   ├── converter.py     # 转换器（JSON → KDBX）
+│   ├── converter.py     # 正向转换（BW → KDBX）
+│   ├── reverse_converter.py  # 反向转换（KDBX → BW）
+│   ├── csv_exporter.py  # CSV 导出
 │   └── writer.py        # KeePass 数据库写入器
-├── web/                 # 网页版
-│   └── index.html       # 纯前端单页面应用
-├── tests/               # 测试
-│   └── test_converter.py
+├── web/                 # 网页版 + PWA
+│   ├── index.html       # 纯前端单页应用
+│   ├── manifest.json    # PWA 清单
+│   ├── sw.js            # Service Worker（离线支持）
+│   └── icon-*.png      # PWA 图标
+├── tests/               # 测试（33 个用例）
+├── .github/workflows/   # GitHub Actions
+│   ├── build-apk.yml   # 自动构建 Android APK
+│   └── deploy-pages.yml # 部署网页版
 ├── requirements.txt
 └── README.md
 ```
 
-### 依赖
+## 🔒 隐私说明
 
-- [pykeepass](https://github.com/libkeepass/pykeepass) - KeePass 数据库操作（仅 CLI）
-- [kdbxweb](https://github.com/keeweb/kdbxweb) - 浏览器端 KDBX 生成（仅网页版）
-- Python 3.8+（仅 CLI）
+- **网页版**：所有数据在浏览器本地处理，不发送到任何服务器
+- **Android APK**：纯 WebView 包装网页代码，无后端，无数据收集
+- **CLI 工具**：本地运行，无网络请求
 
-## License
+## 📄 License
 
 MIT
