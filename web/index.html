@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BW2KeePass - Bitwarden → KeePass 转换器</title>
+    <title>Pass2KDBX - 密码管理器 → KeePass 转换器</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔐</text></svg>">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -209,6 +209,18 @@
 
         .file-input {
             display: none;
+        }
+
+        /* Format Badges */
+        .fmt-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 1rem;
+            background: var(--surface-hover);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            white-space: nowrap;
         }
 
         /* File Info */
@@ -583,9 +595,9 @@
         <header class="header">
             <div class="logo">
                 <span class="logo-icon">🔐</span>
-                <span>BW<span class="logo-accent">2</span>KeePass</span>
+                <span>Pass<span class="logo-accent">2</span>KDBX</span>
             </div>
-            <p class="subtitle">将 Bitwarden 导出 JSON 转换为 KeePass KDBX 数据库<br>所有处理均在浏览器本地完成，数据不会上传到任何服务器</p>
+            <p class="subtitle">将多种密码管理器导出文件转换为 KeePass KDBX 数据库<br>所有处理均在浏览器本地完成，数据不会上传到任何服务器</p>
         </header>
 
         <!-- Steps -->
@@ -605,14 +617,21 @@
 
         <!-- Step 1: Upload -->
         <div class="card" id="uploadCard">
-            <div class="card-title">📁 上传 Bitwarden 导出文件</div>
-            <div class="card-desc">支持 .json 和 .zip 格式的 Bitwarden 导出文件</div>
+            <div class="card-title">📁 上传密码管理器导出文件</div>
+            <div class="card-desc">自动识别文件格式，支持多种密码管理器导出</div>
             <div class="upload-zone" id="uploadZone">
                 <span class="upload-icon">⬆️</span>
                 <div class="upload-text">点击上传或拖拽文件到此处</div>
-                <div class="upload-hint">.json / .zip · 最大 100MB</div>
+                <div class="upload-hint">.json / .csv / .zip / .1pux · 最大 100MB</div>
             </div>
-            <input type="file" class="file-input" id="fileInput" accept=".json,.zip">
+            <input type="file" class="file-input" id="fileInput" accept=".json,.csv,.zip,.1pux">
+            <div style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;">
+                <span class="fmt-badge">🔐 Bitwarden JSON/ZIP</span>
+                <span class="fmt-badge">🔑 1Password 1PUX</span>
+                <span class="fmt-badge">📊 CSV 通用</span>
+                <span class="fmt-badge">🌐 Chrome 密码 CSV</span>
+                <span class="fmt-badge">🦊 Firefox CSV</span>
+            </div>
             
             <div class="file-info" id="fileInfo">
                 <span class="file-icon">📄</span>
@@ -674,7 +693,7 @@
         <footer class="footer">
             <a href="https://github.com/Chaniug/bw2keepass" target="_blank" rel="noopener">GitHub</a>
             <span style="margin: 0 0.5rem; color: var(--border);">·</span>
-            <span>v1.0</span>
+            <span>v1.5</span>
             <div class="privacy-note">
                 <span>🛡️</span> 所有数据在浏览器本地处理，不会上传到任何服务器
             </div>
@@ -684,8 +703,9 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script type="module">
-        import { Kdbx, Credentials, ProtectedValue, Consts } from 'https://cdn.jsdelivr.net/npm/kdbxweb@2.1.0/dist/kdbxweb.es.js';
+    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
+    <script>
+        const { Kdbx, Credentials, ProtectedValue, Consts } = kdbxweb;
 
         // ============ DOM Elements ============
         const uploadZone = document.getElementById('uploadZone');
@@ -756,8 +776,9 @@
 
         function handleFile(file) {
             const ext = file.name.split('.').pop().toLowerCase();
-            if (!['json', 'zip'].includes(ext)) {
-                showToast('请选择 .json 或 .zip 格式的文件', 'error');
+            const supported = ['json', 'zip', 'csv', '1pux'];
+            if (!supported.includes(ext)) {
+                showToast('请选择 .json / .csv / .zip / .1pux 格式的文件', 'error');
                 return;
             }
             if (file.size > 100 * 1024 * 1024) {
@@ -857,24 +878,49 @@
             try {
                 // Read file
                 progressStats.textContent = '正在读取文件...';
-                let jsonData;
-                if (selectedFile.name.endsWith('.zip')) {
-                    jsonData = await readZipFile(selectedFile);
-                } else {
+                const ext = selectedFile.name.split('.').pop().toLowerCase();
+                let vault;
+
+                if (ext === 'csv') {
                     const text = await selectedFile.text();
-                    jsonData = JSON.parse(text);
+                    vault = parseCSV(text, selectedFile.name);
+                    progressStats.textContent = `检测到 CSV 格式 · 找到 ${vault.items.length} 个条目`;
+                } else if (ext === '1pux') {
+                    vault = await parse1PUX(selectedFile);
+                    progressStats.textContent = `检测到 1Password 1PUX · 找到 ${vault.items.length} 个条目`;
+                } else if (ext === 'zip') {
+                    const jsonData = await readZipFile(selectedFile);
+                    vault = parseBitwardenJson(jsonData);
+                    progressStats.textContent = `检测到 Bitwarden ZIP · 找到 ${vault.items.length} 个条目`;
+                } else {
+                    // .json - auto-detect format
+                    const text = await selectedFile.text();
+                    const jsonData = JSON.parse(text);
+                    
+                    if (jsonData.encrypted && jsonData.passwordProtected) {
+                        vault = parseBitwardenEncrypted(jsonData);
+                        progressStats.textContent = `检测到 Bitwarden 加密 JSON · 找到 ${vault.items.length} 个条目`;
+                    } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
+                        vault = parse1PUXJSON(jsonData);
+                        progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
+                    } else {
+                        vault = parseBitwardenJson(jsonData);
+                        progressStats.textContent = `检测到 Bitwarden JSON · 找到 ${vault.items.length} 个条目`;
+                    }
                 }
 
-                // Parse
-                progressStats.textContent = '正在解析条目...';
-                const vault = parseBitwardenJson(jsonData);
                 parsedData = vault;
 
                 progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 KDBX 数据库...`;
 
                 // Create KDBX
+                // KDBX4 需要 Argon2 实现，浏览器环境没有原生支持
+                // 降级到 KDBX3（使用 AES-KDF），不需要 Argon2
                 const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
                 const db = Kdbx.create(credentials, 'Bitwarden Import');
+                // 设置 KDF 为 AES（KDBX3 默认），避免 Argon2 依赖
+                db.setKdf(Consts.KdfId.Aes);
+                db.upgrade(); // 确保升级到最新格式后再降级 KDF
 
                 // Create folder groups
                 const folderGroupMap = new Map();
@@ -883,6 +929,20 @@
                 for (const folder of vault.folders) {
                     const group = db.createGroup(db.getDefaultGroup(), sanitizePath(folder.name));
                     folderGroupMap.set(folder.id, group);
+                }
+
+                // For CSV imports, folderId may be a folder name string instead of an ID
+                // Create groups on-the-fly
+                const csvFolderNames = new Set();
+                for (const item of vault.items) {
+                    if (item.folderId && typeof item.folderId === 'string' && !folderGroupMap.has(item.folderId)) {
+                        csvFolderNames.add(item.folderId);
+                    }
+                }
+                for (const fname of csvFolderNames) {
+                    const group = db.createGroup(db.getDefaultGroup(), sanitizePath(fname));
+                    folderGroupMap.set(fname, group);
+                    vault.folders.push({ id: fname, name: fname });
                 }
 
                 // Create entries
@@ -948,7 +1008,7 @@
                 updateSteps(3);
                 step3.classList.add('done');
 
-                dbFileName = selectedFile.name.replace(/\.(json|zip)$/i, '') + '.kdbx';
+                dbFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
                 successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹`;
                 buildSummaryTable(vault);
 
@@ -1277,6 +1337,461 @@
             html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${vault.items.length}</td></tr>`;
             html += '</tbody>';
             summaryTable.innerHTML = html;
+        }
+
+        // ============ CSV Parser ============
+        function parseCSV(text, fileName) {
+            const items = [];
+            const folders = [];
+
+            // Detect delimiter: comma or tab
+            const firstLine = text.split('\n')[0] || '';
+            const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.split(',').length > firstLine.split(';').length ? ',' : ';');
+
+            const lines = text.trim().split(/\r?\n/);
+            if (lines.length < 2) return { folders, items };
+
+            // Parse header
+            const headers = parseCSVLine(lines[0], delimiter);
+            const headerMap = {};
+            headers.forEach((h, i) => { headerMap[h.trim().toLowerCase()] = i; });
+
+            // Detect CSV format
+            const format = detectCSVFormat(headerMap, fileName);
+
+            // Parse data rows
+            for (let i = 1; i < lines.length; i++) {
+                const row = parseCSVLine(lines[i], delimiter);
+                if (row.length === 0 || (row.length === 1 && !row[0])) continue;
+
+                const item = format.parseRow(row, headerMap, i);
+                if (item && item.name) {
+                    items.push(item);
+                }
+            }
+
+            return { folders, items };
+        }
+
+        function parseCSVLine(line, delimiter) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const ch = line[i];
+                if (inQuotes) {
+                    if (ch === '"') {
+                        if (i + 1 < line.length && line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        current += ch;
+                    }
+                } else {
+                    if (ch === '"') {
+                        inQuotes = true;
+                    } else if (ch === delimiter) {
+                        result.push(current.trim());
+                        current = '';
+                    } else {
+                        current += ch;
+                    }
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
+        function detectCSVFormat(headerMap, fileName) {
+            // Chrome CSV: name, url, username, password
+            if (headerMap['name'] !== undefined && headerMap['url'] !== undefined && headerMap['password'] !== undefined) {
+                return {
+                    name: 'Chrome',
+                    parseRow: (row, hm) => ({
+                        name: row[hm['name']] || row[hm['title']] || '',
+                        type: 1,
+                        login: {
+                            username: row[hm['username']] || row[hm['user']] || row[hm['login']] || '',
+                            password: row[hm['password']] || '',
+                            uris: [{ uri: row[hm['url']] || row[hm['website']] || '' }],
+                            totp: '',
+                        },
+                        notes: row[hm['note']] || row[hm['notes']] || '',
+                        folderId: row[hm['folder']] || row[hm['category']] || null,
+                    })
+                };
+            }
+
+            // 1Password CSV: title, url, username, password, notes, otpauth
+            if (headerMap['title'] !== undefined && (headerMap['url'] !== undefined || headerMap['website'] !== undefined)) {
+                return {
+                    name: '1Password',
+                    parseRow: (row, hm) => ({
+                        name: row[hm['title']] || '',
+                        type: 1,
+                        login: {
+                            username: row[hm['username']] || row[hm['user']] || '',
+                            password: row[hm['password']] || '',
+                            uris: [{ uri: row[hm['url']] || row[hm['website']] || row[hm['login url']] || '' }],
+                            totp: row[hm['otpauth']] || row[hm['totp']] || '',
+                        },
+                        notes: row[hm['notes']] || row[hm['note']] || '',
+                        folderId: null,
+                    })
+                };
+            }
+
+            // LastPass CSV: url, username, password, name, extra, grouping, fav
+            if (headerMap['url'] !== undefined && headerMap['username'] !== undefined && headerMap['extra'] !== undefined) {
+                return {
+                    name: 'LastPass',
+                    parseRow: (row, hm) => ({
+                        name: row[hm['name']] || row[hm['title']] || row[hm['url']] || '',
+                        type: 1,
+                        login: {
+                            username: row[hm['username']] || '',
+                            password: row[hm['password']] || '',
+                            uris: [{ uri: row[hm['url']] || '' }],
+                            totp: row[hm['totp']] || '',
+                        },
+                        notes: row[hm['extra']] || row[hm['notes']] || '',
+                        folderId: row[hm['grouping']] || row[hm['group']] || row[hm['folder']] || null,
+                    })
+                };
+            }
+
+            // Firefox CSV: "url","username","password","httpRealm",...
+            if (headerMap['hostname'] !== undefined || headerMap['httpRealm'] !== undefined) {
+                return {
+                    name: 'Firefox',
+                    parseRow: (row, hm) => {
+                        const host = row[hm['hostname']] || row[hm['url']] || '';
+                        const realm = row[hm['httprealm']] || row[hm['realm']] || '';
+                        return {
+                            name: realm ? `${host} (${realm})` : host || '未命名',
+                            type: 1,
+                            login: {
+                                username: row[hm['username']] || row[hm['user']] || '',
+                                password: row[hm['password']] || '',
+                                uris: [{ uri: host.startsWith('http') ? host : 'https://' + host }],
+                                totp: '',
+                            },
+                            notes: '',
+                            folderId: null,
+                        };
+                    }
+                };
+            }
+
+            // Bitwarden CSV: folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
+            if (headerMap['login_username'] !== undefined && headerMap['login_password'] !== undefined) {
+                return {
+                    name: 'Bitwarden',
+                    parseRow: (row, hm) => ({
+                        name: row[hm['name']] || row[hm['title']] || '',
+                        type: (row[hm['type']] || '').toLowerCase() === 'note' ? 2 : 1,
+                        login: {
+                            username: row[hm['login_username']] || '',
+                            password: row[hm['login_password']] || '',
+                            uris: [{ uri: row[hm['login_uri']] || row[hm['login_url']] || '' }],
+                            totp: row[hm['login_totp']] || '',
+                        },
+                        notes: row[hm['notes']] || row[hm['note']] || '',
+                        folderId: row[hm['folder']] || null,
+                        favorite: (row[hm['favorite']] || row[hm['fav']] || '') === '1' || (row[hm['favorite']] || '').toLowerCase() === 'true',
+                    })
+                };
+            }
+
+            // KeePass / Generic CSV: "Account","Login Name","Password","Web Site","Comments"
+            if (headerMap['account'] !== undefined || headerMap['title'] !== undefined || headerMap['website'] !== undefined) {
+                return {
+                    name: 'Generic',
+                    parseRow: (row, hm) => ({
+                        name: row[hm['account']] || row[hm['title']] || row[hm['name']] || '未命名',
+                        type: 1,
+                        login: {
+                            username: row[hm['login name']] || row[hm['username']] || row[hm['login']] || row[hm['user']] || '',
+                            password: row[hm['password']] || '',
+                            uris: [{ uri: row[hm['web site']] || row[hm['website']] || row[hm['url']] || '' }],
+                            totp: '',
+                        },
+                        notes: row[hm['comments']] || row[hm['notes']] || row[hm['note']] || '',
+                        folderId: null,
+                    })
+                };
+            }
+
+            // Generic fallback: try to match columns by content pattern
+            // Look for password-like column, url-like column, etc.
+            return {
+                name: 'Auto-Detect',
+                parseRow: (row, hm) => {
+                    const keys = Object.keys(hm);
+                    const pwCol = keys.find(k => /password|passwd|pwd/i.test(k));
+                    const userCol = keys.find(k => /user|username|login|email/i.test(k));
+                    const urlCol = keys.find(k => /url|website|site|link/i.test(k));
+                    const nameCol = keys.find(k => /name|title|account|site/i.test(k));
+                    const notesCol = keys.find(k => /notes|note|comment|desc/i.test(k));
+
+                    const pw = pwCol ? row[hm[pwCol]] : '';
+                    const user = userCol ? row[hm[userCol]] : '';
+                    const url = urlCol ? row[hm[urlCol]] : '';
+                    const name = nameCol ? row[hm[nameCol]] : (url || '未命名');
+                    const notes = notesCol ? row[hm[notesCol]] : '';
+
+                    return {
+                        name: name,
+                        type: 1,
+                        login: {
+                            username: user,
+                            password: pw,
+                            uris: [{ uri: url }],
+                            totp: '',
+                        },
+                        notes: notes,
+                        folderId: null,
+                    };
+                }
+            };
+        }
+
+        // ============ 1PUX Parser ============
+        async function parse1PUX(file) {
+            // 1PUX is a zip with .1pux extension containing a band/ directory
+            const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+            const zip = await JSZip.default.loadAsync(file);
+            const items = [];
+            const folders = [];
+            const vaultMap = new Map();
+
+            // Find export.data in each vault band
+            const dataFiles = Object.keys(zip.files).filter(name => name.match(/\/data\/[^/]+\.json$/) && !name.includes('__MACOSX'));
+            
+            for (const dataFile of dataFiles) {
+                try {
+                    const content = await zip.files[dataFile].async('string');
+                    const data = JSON.parse(content);
+                    
+                    // Items
+                    if (data.items) {
+                        for (const item of data.items) {
+                            if (item.trashed === true || item.trashed === 'Y') continue;
+                            const parsed = convert1PUXItem(item);
+                            if (parsed) items.push(parsed);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse 1PUX file:', dataFile, e);
+                }
+            }
+
+            return { folders, items };
+        }
+
+        function parse1PUXJSON(json) {
+            // 1PUX exported as single JSON (from 1Password CLI)
+            const items = [];
+            const folders = [];
+
+            if (json.items) {
+                for (const item of json.items) {
+                    if (item.trashed === true || item.trashed === 'Y') continue;
+                    const parsed = convert1PUXItem(item);
+                    if (parsed) items.push(parsed);
+                }
+            }
+
+            return { folders, items };
+        }
+
+        function convert1PUXItem(item) {
+            const overview = item.overview || {};
+            const details = item.details || {};
+            
+            const parsed = {
+                name: overview.title || overview.ainfo || '未命名',
+                type: 1,
+                notes: '',
+                folderId: null,
+                favorite: overview.favorite || false,
+            };
+
+            // Determine item category
+            const category = (overview.category || item.category || '').toUpperCase();
+
+            if (category === 'LOGIN' || category === 'PASSWORD' || !category) {
+                parsed.type = 1;
+                parsed.login = {
+                    username: '',
+                    password: '',
+                    uris: [],
+                    totp: '',
+                };
+
+                // URLs from overview
+                if (overview.url) {
+                    parsed.login.uris.push({ uri: overview.url });
+                }
+                if (overview.urls) {
+                    for (const u of overview.urls) {
+                        if (u.url && u.url !== overview.url) {
+                            parsed.login.uris.push({ uri: u.url });
+                        }
+                    }
+                }
+
+                // Fields from details
+                if (details.fields) {
+                    for (const field of details.fields) {
+                        const design = field.designation || '';
+                        const val = field.value || '';
+                        if (!val) continue;
+
+                        if (design === 'username') parsed.login.username = val;
+                        else if (design === 'password') parsed.login.password = val;
+                        else if (design === 'URL' && !parsed.login.uris.find(u => u.uri === val)) {
+                            parsed.login.uris.push({ uri: val });
+                        }
+                    }
+                }
+
+                // Notes from details
+                if (details.notesPlain) {
+                    parsed.notes = details.notesPlain;
+                }
+
+                // TOTP from details
+                if (details.sections) {
+                    for (const section of details.sections) {
+                        if (section.fields) {
+                            for (const field of section.fields) {
+                                if (field.k === 'TOTP' || field.t === 'OTP' || field.n === 'TOTP' || field.n === 'one-time password') {
+                                    if (field.v) parsed.login.totp = field.v;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Password history
+                if (details.passwordHistory) {
+                    parsed.passwordHistory = details.passwordHistory.map(ph => ({
+                        password: ph.value || '',
+                        lastUsedDate: ph.time ? new Date(ph.time * 1000).toISOString() : '',
+                    }));
+                }
+            } else if (category === 'SECURE_NOTE' || category === 'NOTE') {
+                parsed.type = 2;
+                parsed.login = null;
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+                if (overview.title) parsed.name = overview.title;
+            } else if (category === 'CREDIT_CARD' || category === 'BANK_ACCOUNT') {
+                parsed.type = 3;
+                parsed.login = null;
+                parsed.card = {};
+                if (details.sections) {
+                    for (const section of details.sections) {
+                        if (section.fields) {
+                            for (const field of section.fields) {
+                                const n = (field.n || field.t || '').toLowerCase();
+                                if (n.includes('cardholder') || n.includes('name')) parsed.card.cardholderName = field.v || '';
+                                if (n.includes('number') || n.includes('ccnum')) parsed.card.number = field.v || '';
+                                if (n.includes('expir') || n.includes('exp')) {
+                                    const exp = (field.v || '').split('/');
+                                    parsed.card.expMonth = exp[0] || '';
+                                    parsed.card.expYear = exp[1] || '';
+                                }
+                                if (n.includes('cvv') || n.includes('cvc') || n.includes('security') || n.includes('verification')) parsed.card.code = field.v || '';
+                                if (n.includes('type') || n.includes('brand')) parsed.card.brand = field.v || '';
+                            }
+                        }
+                    }
+                }
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+            } else if (category === 'IDENTITY') {
+                parsed.type = 4;
+                parsed.login = null;
+                parsed.identity = {};
+                if (details.sections) {
+                    for (const section of details.sections) {
+                        if (section.fields) {
+                            for (const field of section.fields) {
+                                const n = (field.n || field.t || '').toLowerCase();
+                                const v = field.v || '';
+                                if (n.includes('first')) parsed.identity.firstName = (parsed.identity.firstName || '') + ' ' + v;
+                                if (n.includes('last')) parsed.identity.lastName = v;
+                                if (n.includes('email')) parsed.identity.email = v;
+                                if (n.includes('phone')) parsed.identity.phone = v;
+                                if (n.includes('address')) parsed.identity.address1 = v;
+                                if (n.includes('city')) parsed.identity.city = v;
+                                if (n.includes('state')) parsed.identity.state = v;
+                                if (n.includes('zip') || n.includes('postal')) parsed.identity.postalCode = v;
+                                if (n.includes('country')) parsed.identity.country = v;
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Other types: treat as login with custom fields
+                parsed.type = 1;
+                parsed.login = {
+                    username: '',
+                    password: '',
+                    uris: [],
+                    totp: '',
+                };
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+            }
+
+            // Custom fields (all sections/fields not already captured)
+            parsed.customFields = [];
+            if (details.sections) {
+                for (const section of details.sections) {
+                    if (section.fields) {
+                        for (const field of section.fields) {
+                            const n = field.n || field.t || field.k || '';
+                            const v = field.v || field.t || '';
+                            if (n && v && n !== 'notesPlain' && n !== 'password' && n !== 'username') {
+                                parsed.customFields.push({ name: n, value: String(v), type: 0 });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Tags
+            if (overview.tags && overview.tags.length) {
+                parsed.customFields.push({ name: '_TAGS', value: overview.tags.join(', '), type: 0 });
+            }
+
+            // Dates
+            if (item.created_at || overview.created) {
+                parsed.creationDate = item.created_at || overview.created || '';
+            }
+            if (item.updated_at || overview.updated) {
+                parsed.revisionDate = item.updated_at || overview.updated || '';
+            }
+
+            return parsed;
+        }
+
+        // ============ Bitwarden Encrypted JSON Parser ============
+        function parseBitwardenEncrypted(json) {
+            // Bitwarden account-encrypted JSON: {"encrypted":true,"passwordProtected":false,"data":"..."}
+            // We cannot decrypt it in browser without the account key, but we can check structure
+            if (json.encrypted && json.data) {
+                throw new Error(
+                    '检测到 Bitwarden 加密导出格式。\n\n' +
+                    '请在 Bitwarden 中使用「无加密 JSON (.json)」格式重新导出：\n' +
+                    'Bitwarden → 设置 → 导出保管库 → 文件格式选择 .json（非加密）'
+                );
+            }
+            return { folders: [], items: [] };
         }
 
         // ============ ZIP Support ============
