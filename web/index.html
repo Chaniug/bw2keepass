@@ -1179,14 +1179,7 @@
         function buildNotes(item) {
             const parts = [];
             if (item.notes) parts.push(item.notes);
-            if (item.login) {
-                const extras = [];
-                if (item.login.totp) extras.push(`TOTP: ${item.login.totp}`);
-                if (item.login.uris?.length > 1) {
-                    for (let i = 1; i < item.login.uris.length; i++) extras.push(`备用URI: ${item.login.uris[i].uri}`);
-                }
-                if (extras.length) parts.push('\n[额外信息]\n' + extras.join('\n'));
-            }
+            // TOTP 和备用 URI 已在自定义字段中，不再重复写入 Notes
             if (item.card && (item.card.number || item.card.cardholderName)) {
                 const lines = ['\n[卡片信息]'];
                 if (item.card.cardholderName) lines.push(`持卡人: ${item.card.cardholderName}`);
