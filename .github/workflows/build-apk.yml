@@ -35,44 +35,49 @@ jobs:
 
       - name: Create Android project
         run: |
-          # Create project structure
-          mkdir -p app/src/main/java/cc/valk/pass2kdbx
-          mkdir -p app/src/main/res/values
-          mkdir -p app/src/main/res/drawable
-          mkdir -p app/src/main/assets
+          python3 <<'PYEOF'
+          import os
+          os.makedirs('app/src/main/java/cc/valk/pass2kdbx', exist_ok=True)
+          os.makedirs('app/src/main/res/values', exist_ok=True)
+          os.makedirs('app/src/main/res/drawable', exist_ok=True)
+          os.makedirs('app/src/main/assets', exist_ok=True)
 
-          # Copy web files to assets
-          cp -r web/* app/src/main/assets/
+          # 复制 web 文件到 assets
+          import shutil
+          for item in os.listdir('web'):
+              src = os.path.join('web', item)
+              dst = os.path.join('app/src/main/assets', item)
+              if os.path.isdir(src):
+                  shutil.copytree(src, dst, dirs_exist_ok=True)
+              else:
+                  shutil.copy2(src, dst)
 
           # AndroidManifest.xml
-          cat > app/src/main/AndroidManifest.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="cc.valk.pass2kdbx">
+          with open('app/src/main/AndroidManifest.xml', 'w') as f:
+              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
+              f.write('<manifest xmlns:android="http://schemas.android.com/apk/res/android"\n')
+              f.write('    package="cc.valk.pass2kdbx">\n')
+              f.write('    <uses-permission android:name="android.permission.INTERNET" />\n')
+              f.write('    <application\n')
+              f.write('        android:allowBackup="true"\n')
+              f.write('        android:icon="@drawable/ic_launcher"\n')
+              f.write('        android:label="Pass2KDBX"\n')
+              f.write('        android:theme="@style/AppTheme"\n')
+              f.write('        android:usesCleartextTraffic="true">\n')
+              f.write('        <activity\n')
+              f.write('            android:name=".MainActivity"\n')
+              f.write('            android:exported="true"\n')
+              f.write('            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">\n')
+              f.write('            <intent-filter>\n')
+              f.write('                <action android:name="android.intent.action.MAIN" />\n')
+              f.write('                <category android:name="android.intent.category.LAUNCHER" />\n')
+              f.write('            </intent-filter>\n')
+              f.write('        </activity>\n')
+              f.write('    </application>\n')
+              f.write('</manifest>\n')
 
-              <uses-permission android:name="android.permission.INTERNET" />
-
-              <application
-                  android:allowBackup="true"
-                  android:icon="@drawable/ic_launcher"
-                  android:label="Pass2KDBX"
-                  android:theme="@style/AppTheme">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-
-          # MainActivity.java - WebView wrapper with file picker support
-          cat > app/src/main/java/cc/valk/pass2kdbx/MainActivity.java << 'JAVAEOF'
-          package cc.valk.pass2kdbx;
+          # MainActivity.java
+          java_code = '''package cc.valk.pass2kdbx;
 
           import android.app.Activity;
           import android.content.Intent;
@@ -92,10 +97,8 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-
                   webView = new WebView(this);
                   setContentView(webView);
-
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setAllowFileAccess(true);
@@ -103,7 +106,6 @@ jobs:
                   settings.setDomStorageEnabled(true);
                   settings.setDatabaseEnabled(true);
                   settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient() {
                       @Override
@@ -114,7 +116,6 @@ jobs:
                           return true;
                       }
                   });
-
                   webView.loadUrl("file:///android_asset/index.html");
               }
 
@@ -126,7 +127,6 @@ jobs:
                       if (resultCode == RESULT_OK && data != null) {
                           Uri uri = data.getData();
                           if (uri != null) {
-                              // Grant persistable permission
                               getContentResolver().takePersistableUriPermission(
                                   uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
                               );
@@ -147,51 +147,56 @@ jobs:
                   }
               }
           }
-          JAVAEOF
+          '''
+          import textwrap
+          java_code = textwrap.dedent(java_code)
+          with open('app/src/main/java/cc/valk/pass2kdbx/MainActivity.java', 'w') as f:
+              f.write(java_code)
 
           # styles.xml
-          cat > app/src/main/res/values/styles.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <resources>
-              <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
-                  <item name="android:windowBackground">#0f1117</item>
-                  <item name="android:statusBarColor">#6c5ce7</item>
-                  <item name="android:navigationBarColor">#0f1117</item>
-              </style>
-          </resources>
-          EOF
+          with open('app/src/main/res/values/styles.xml', 'w') as f:
+              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
+              f.write('<resources>\n')
+              f.write('    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">\n')
+              f.write('        <item name="android:windowBackground">#0f1117</item>\n')
+              f.write('        <item name="android:statusBarColor">#6c5ce7</item>\n')
+              f.write('        <item name="android:navigationBarColor">#0f1117</item>\n')
+              f.write('    </style>\n')
+              f.write('</resources>\n')
 
-          # Generate launcher icon (simple solid color vector)
-          cat > app/src/main/res/drawable/ic_launcher.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="108dp"
-              android:height="108dp"
-              android:viewportWidth="108"
-              android:viewportHeight="108">
-              <path
-                  android:fillColor="#6c5ce7"
-                  android:pathData="M0,0h108v108H0z"/>
-              <path
-                  android:fillColor="#ffffff"
-                  android:pathData="M54,30c-8.8,0-16,7.2-16,16v8h-4c-2.2,0-4,1.8-4,4v24c0,2.2,1.8,4,4,4h40c2.2,0,4-1.8,4-4V58c0-2.2-1.8-4-4-4h-4v-8C70,37.2,62.8,30,54,30zM54,38c4.4,0,8,3.6,8,8v8H46v-8C46,41.6,49.6,38,54,38z"/>
-          </vector>
-          EOF
+          # ic_launcher.xml
+          with open('app/src/main/res/drawable/ic_launcher.xml', 'w') as f:
+              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
+              f.write('<vector xmlns:android="http://schemas.android.com/apk/res/android"\n')
+              f.write('    android:width="108dp"\n')
+              f.write('    android:height="108dp"\n')
+              f.write('    android:viewportWidth="108"\n')
+              f.write('    android:viewportHeight="108">\n')
+              f.write('    <path\n')
+              f.write('        android:fillColor="#6c5ce7"\n')
+              f.write('        android:pathData="M0,0h108v108H0z"/>\n')
+              f.write('    <path\n')
+              f.write('        android:fillColor="#ffffff"\n')
+              f.write('        android:pathData="M54,30c-8.8,0-16,7.2-16,16v8h-4c-2.2,0-4,1.8-4,4v24c0,2.2,1.8,4,4,4h40c2.2,0,4-1.8,4-4V58c0-2.2-1.8-4-4-4h-4v-8C70,37.2,62.8,30,54,30zM54,38c4.4,0,8,3.6,8,8v8H46v-8C46,41.6,49.6,38,54,38z"/>\n')
+              f.write('</vector>\n')
+
+          print("Android project created successfully")
+          # 列出 assets
+          for f in os.listdir('app/src/main/assets'):
+              p = os.path.join('app/src/main/assets', f)
+              print(f"  {f}: {os.path.getsize(p)} bytes")
+          PYEOF
 
       - name: Build APK
         run: |
-          # Build with aapt2 and d8
           BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
           PLATFORM=$ANDROID_HOME/platforms/android-34
-
-          # Ensure build output directory exists
           mkdir -p app/build
 
-          # Compile resources
-          $BUILD_TOOLS/aapt2 compile -o app/build/res.zip \
-            --dir app/src/main/res
+          # 1. 编译资源
+          $BUILD_TOOLS/aapt2 compile -o app/build/res.zip --dir app/src/main/res
 
-          # Link resources
+          # 2. 链接资源生成 base.apk
           $BUILD_TOOLS/aapt2 link -o app/build/base.apk \
             -I $PLATFORM/android.jar \
             --manifest app/src/main/AndroidManifest.xml \
@@ -204,7 +209,10 @@ jobs:
             --package-id 0x7f \
             app/build/res.zip
 
-          # Compile Java
+          echo "=== base.apk 内容 ==="
+          unzip -l app/build/base.apk
+
+          # 3. 编译 Java
           mkdir -p app/build/obj
           javac -source 17 -target 17 \
             -cp $PLATFORM/android.jar \
@@ -212,41 +220,56 @@ jobs:
             app/src/main/java/cc/valk/pass2kdbx/MainActivity.java \
             app/build/gen/cc/valk/pass2kdbx/R.java
 
-          # DEX
+          # 4. DEX 编译
           mkdir -p app/build/dex
           $BUILD_TOOLS/d8 --lib $PLATFORM/android.jar \
             --output app/build/dex \
             app/build/obj/cc/valk/pass2kdbx/*.class
 
-          # Merge DEX into APK
+          # 5. 合并：解压 base.apk + 添加 DEX + 确保 assets 存在
           mkdir -p app/build/merge
           cd app/build/merge
           unzip -q ../base.apk
+          cp ../dex/classes.dex .
 
-          # Copy DEX
-          mkdir -p classes.dex.d
-          cp ../dex/classes.dex classes.dex
+          # 检查 assets 是否在 APK 中（aapt2 -A 可能不打包实际文件）
+          if [ ! -d "assets" ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then
+            echo "assets 缺失，手动添加..."
+            mkdir -p assets
+            cp -r ../../../src/main/assets/* assets/
+          fi
 
-          # Re-zip
+          echo "=== merge 目录内容 ==="
+          ls -la
+          echo "=== assets 内容 ==="
+          ls -la assets/ 2>/dev/null || echo "无 assets"
+
+          # 重新打包
           zip -qr ../unsigned.apk .
-
-          # Align
           cd ../../..
+
+          # 6. 对齐
           $BUILD_TOOLS/zipalign -p -f 4 app/build/unsigned.apk app/build/aligned.apk
 
-          # Sign with debug key
+          # 7. 生成 debug 签名
           keytool -genkey -v -keystore app/build/debug.keystore \
             -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
             -dname "CN=Debug, OU=Pass2KDBX, O=Valk, L=Unknown, S=Unknown, C=US" \
             -noprompt
 
+          # 8. 签名
           $BUILD_TOOLS/apksigner sign \
             --ks app/build/debug.keystore \
             --ks-pass pass:android \
             --key-pass pass:android \
             --out app/build/Pass2KDBX.apk \
             app/build/aligned.apk
+
+          echo "=== 最终 APK 信息 ==="
+          ls -lh app/build/Pass2KDBX.apk
+          echo "=== APK 内容列表 ==="
+          unzip -l app/build/Pass2KDBX.apk
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v5
@@ -258,14 +281,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Delete existing tag and release if present
           gh release delete "apk-latest" --yes --cleanup-tag 2>/dev/null || true
           git push origin :refs/tags/apk-latest 2>/dev/null || true
-
-          # Create new tag and release
           git tag -f apk-latest
           git push origin apk-latest --force
-
           gh release create apk-latest \
             app/build/Pass2KDBX.apk \
             --title "Pass2KDBX APK (Latest)" \
