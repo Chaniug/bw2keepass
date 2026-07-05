@@ -21,7 +21,7 @@
             const creds = new Credentials(ProtectedValue.fromString('test123'));
             const db = Kdbx.create(creds, 'Test DB');
             db.upgrade();
-            db.setKdf(Consts.KdfId.Argon2d);
+            db.setKdf(Consts.KdfId.Aes);  // debug 用 AES-KDF 避免依赖
             
             const group = db.createGroup(db.getDefaultGroup(), 'TestFolder');
             const entry = db.createEntry(group);

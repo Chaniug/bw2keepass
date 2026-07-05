@@ -389,6 +389,20 @@
     <div class="toast" id="toast"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
+        <script>
+        // 尝试加载 hash-wasm 提供 Argon2 支持（浏览器/WebView 兼容）
+        let argon2Ready = false;
+        import('https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/+esm').then(async (wasm) => {
+            try {
+                kdbxweb.Kdbx.setArgon2Impl((password, salt, memory, iterations, parallelism, type, version, hashLength) => {
+                    const opts = { password, salt, memCost: memory, timeCost: iterations, parallelism, hashSize: hashLength };
+                    if (type === 2) return wasm.argon2id(opts);
+                    return wasm.argon2d(opts);
+                });
+                argon2Ready = true;
+            } catch (e) { console.warn('Argon2 WASM 加载失败，回退到 AES-KDF', e); }
+        }).catch(() => {});
+        </script>
     <script>
         const { Kdbx, Credentials, ProtectedValue, Consts } = kdbxweb;
 
@@ -799,8 +813,9 @@
 
             const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
             const db = Kdbx.create(credentials, dbName.value.trim() || 'My Vault');
-            db.upgrade();                        // 升级到 KDBX 4
-            db.setKdf(Consts.KdfId.Argon2d);     // Argon2d KDF（抗 GPU/ASIC 暴力破解）
+            db.upgrade();  // 升级到 KDBX 4
+            // Argon2d（如有 WASM 支持），否则回退 AES-KDF（均为 KDBX 4 格式）
+            db.setKdf(argon2Ready ? Consts.KdfId.Argon2d : Consts.KdfId.Aes);
 
             const folderGroupMap = new Map();
             folderGroupMap.set(null, db.getDefaultGroup());
