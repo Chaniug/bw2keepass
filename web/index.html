@@ -669,22 +669,22 @@
                 if (item.deleted) continue;
                 const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
                 const entry = db.createEntry(parentGroup);
-                entry.fields.Title = item.name || '(无标题)';
-                if (item.login?.username) entry.fields.UserName = item.login.username;
-                if (item.login?.password) entry.fields.Password = ProtectedValue.fromString(item.login.password);
-                if (item.login?.uris?.length) entry.fields.URL = item.login.uris[0].uri || '';
+                entry.fields.set('Title', item.name || '(无标题)');
+                if (item.login?.username) entry.fields.set('UserName', item.login.username);
+                if (item.login?.password) entry.fields.set('Password', ProtectedValue.fromString(item.login.password));
+                if (item.login?.uris?.length) entry.fields.set('URL', item.login.uris[0].uri || '');
                 const notes = buildNotes(item);
-                if (notes) entry.fields.Notes = notes;
+                if (notes) entry.fields.set('Notes', notes);
                 const customFields = buildCustomFields(item);
                 for (const [key, value] of Object.entries(customFields)) {
                     if (key === 'TOTP Seed' || key === 'Password' || key === 'TOTP') {
-                        entry.fields[key] = ProtectedValue.fromString(String(value));
+                        entry.fields.set(key, ProtectedValue.fromString(String(value)));
                     } else {
-                        entry.fields[key] = String(value);
+                        entry.fields.set(key, String(value));
                     }
                 }
                 const tags = buildTags(item);
-                if (tags.length) entry.fields['_TAGS'] = tags.join(' ');
+                if (tags.length) entry.fields.set('_TAGS', tags.join(' '));
                 entryCount++;
                 progressStats.textContent = `已处理 ${entryCount}/${vault.items.length} 个条目...`;
             }
