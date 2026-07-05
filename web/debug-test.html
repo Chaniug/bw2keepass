@@ -20,8 +20,8 @@
             L('=== Test 1: entry.fields.set() ===');
             const creds = new Credentials(ProtectedValue.fromString('test123'));
             const db = Kdbx.create(creds, 'Test DB');
-            db.setKdf(Consts.KdfId.Aes);
             db.upgrade();
+            db.setKdf(Consts.KdfId.Argon2d);
             
             const group = db.createGroup(db.getDefaultGroup(), 'TestFolder');
             const entry = db.createEntry(group);

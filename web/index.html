@@ -799,8 +799,8 @@
 
             const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
             const db = Kdbx.create(credentials, dbName.value.trim() || 'My Vault');
-            db.setKdf(Consts.KdfId.Aes);
-            db.upgrade();
+            db.upgrade();                        // 升级到 KDBX 4
+            db.setKdf(Consts.KdfId.Argon2d);     // Argon2d KDF（抗 GPU/ASIC 暴力破解）
 
             const folderGroupMap = new Map();
             folderGroupMap.set(null, db.getDefaultGroup());
