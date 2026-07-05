@@ -225,6 +225,14 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
             val = custom_fields[key]
             if val and val not in [u['uri'] for u in uris]:
                 uris.append({'uri': val, 'match': None})
+    # AndroidApp 字段 → 还原 androidapp:// URI
+    for key in sorted(custom_fields.keys()):
+        if key == 'AndroidApp' or (key.startswith('AndroidApp') and key[10:].isdigit()):
+            pkg = custom_fields[key]
+            if pkg:
+                uri = f"androidapp://{pkg}"
+                if uri not in [u['uri'] for u in uris]:
+                    uris.append({'uri': uri, 'match': None})
 
     # 提取 passkeys
     fido2_credentials = _extract_passkeys(entry)
@@ -232,7 +240,7 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     # 提取自定义字段（排除内部字段和 passkey 字段）
     skip_prefixes = (
         'BitwardenType', 'BitwardenID', 'TOTP Seed', 'TOTP Settings',
-        'otp', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
+        'otp', 'AndroidApp', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
         '_TAGS', 'CardBrand', 'CardNumber', 'CardExpiry',
         'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
         'IdentityTitle', 'IdentityFirstName', 'IdentityLastName',

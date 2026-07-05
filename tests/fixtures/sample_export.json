@@ -32,6 +32,10 @@
           {
             "match": null,
             "uri": "https://github.com/login"
+          },
+          {
+            "match": null,
+            "uri": "androidapp://com.github.android"
           }
         ]
       },

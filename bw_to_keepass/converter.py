@@ -47,9 +47,11 @@ def get_entry_password(item: VaultItem) -> str:
 
 
 def get_entry_url(item: VaultItem) -> str:
-    """获取 KeePass 条目 URL"""
+    """获取 KeePass 条目 URL，优先选择 http(s) 协议，跳过 androidapp:// 等非标准协议"""
     if item.type == 1 and item.uris:
-        return item.uris[0].uri
+        for u in item.uris:
+            if u.uri and (u.uri.startswith("http://") or u.uri.startswith("https://")):
+                return u.uri
     return ""
 
 
@@ -119,12 +121,16 @@ def get_entry_notes(item: VaultItem) -> str:
         if ssh_parts:
             parts.insert(0, "[SSH 密钥]\n" + "\n".join(ssh_parts))
 
-    # 附加 URI（多个 URL 时）
+    # 附加 URI（多个 URL 时，排除 androidapp:// — 已写入 AndroidApp 字段）
     if item.type == 1 and len(item.uris) > 1:
-        uri_lines = ["\n[其他 URI]"]
-        for i, u in enumerate(item.uris[1:], start=2):
-            uri_lines.append(f"URI {i}: {u.uri}")
-        parts.append("\n".join(uri_lines))
+        extra_web_uris = [u.uri for u in item.uris
+                          if u.uri and not u.uri.startswith("androidapp://")
+                          and u.uri != get_entry_url(item)]
+        if extra_web_uris:
+            uri_lines = ["\n[其他 URI]"]
+            for i, uri in enumerate(extra_web_uris, start=2):
+                uri_lines.append(f"URI {i}: {uri}")
+            parts.append("\n".join(uri_lines))
 
     # 密码历史
     if item.password_history:
@@ -278,6 +284,15 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
             # KeePassXC/OTP 插件格式
             fields["TOTP Seed"] = item.totp
             fields["otp"] = f"otpauth://totp/{item.name}?secret={item.totp}"
+        # androidapp:// URI → KeePassDX AndroidApp 字段
+        app_idx = 0
+        for u in item.uris:
+            if u.uri and u.uri.startswith("androidapp://"):
+                package = u.uri[len("androidapp://"):]
+                if package:
+                    key = "AndroidApp" if app_idx == 0 else f"AndroidApp{app_idx + 1}"
+                    fields[key] = package
+                    app_idx += 1
 
     # 卡片额外字段
     if item.type == 3:

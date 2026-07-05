@@ -821,7 +821,11 @@
                 entry.fields.set('Title', item.name || '(无标题)');
                 if (item.login?.username) entry.fields.set('UserName', item.login.username);
                 if (item.login?.password) entry.fields.set('Password', ProtectedValue.fromString(item.login.password));
-                if (item.login?.uris?.length) entry.fields.set('URL', item.login.uris[0].uri || '');
+                if (item.login?.uris?.length) {
+                    // 优先选择 http(s) URL 作为主 URL，跳过 androidapp:// 等非标准协议
+                    const webUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')));
+                    if (webUri) entry.fields.set('URL', webUri.uri);
+                }
                 const notes = buildNotes(item);
                 if (notes) entry.fields.set('Notes', notes);
                 const customFields = buildCustomFields(item);
@@ -1204,6 +1208,12 @@
                     const extraUri = getText(`URI_${i}`);
                     if (extraUri) item.login.uris.push({ uri: extraUri, match: null });
                 }
+                // AndroidApp 字段 → 还原 androidapp:// URI
+                for (let i = 0; i <= 10; i++) {
+                    const key = i === 0 ? 'AndroidApp' : `AndroidApp${i + 1}`;
+                    const pkg = getText(key);
+                    if (pkg) item.login.uris.push({ uri: `androidapp://${pkg}`, match: null });
+                }
             }
 
             // Extract card info
@@ -1243,6 +1253,7 @@
             const skipFields = new Set([
                 'Title', 'UserName', 'Password', 'URL', 'Notes',
                 'BitwardenType', 'TOTP Seed', 'TOTP', 'otp',
+                'AndroidApp',
                 'CardBrand', 'CardNumber', 'CardExpiry',
                 'CreationDate', 'RevisionDate',
                 'SSHFingerprint', '_TAGS'
@@ -1841,10 +1852,33 @@
                 fields['otp'] = otpauthUrl;
             }
             if (item.login?.uris?.length > 1) {
-                // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC）
-                for (let i = 1; i < item.login.uris.length; i++) {
-                    const key = i === 1 ? 'KP2A_URL' : `KP2A_URL_${i - 1}`;
-                    fields[key] = item.login.uris[i].uri || '';
+                // androidapp:// URI → KeePassDX AndroidApp 字段
+                let appIdx = 0;
+                const seenUris = new Set();
+                for (const u of item.login.uris) {
+                    const uri = u.uri || '';
+                    if (!uri || seenUris.has(uri)) continue;
+                    seenUris.add(uri);
+                    if (uri.startsWith('androidapp://')) {
+                        const pkg = uri.slice('androidapp://'.length);
+                        if (pkg) {
+                            const key = appIdx === 0 ? 'AndroidApp' : `AndroidApp${appIdx + 1}`;
+                            fields[key] = pkg;
+                            appIdx++;
+                        }
+                    }
+                }
+                // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC），排除 androidapp://
+                const mainUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')));
+                let urlIdx = 0;
+                for (const u of item.login.uris) {
+                    const uri = u.uri || '';
+                    if (!uri || uri.startsWith('androidapp://') || uri === (mainUri && mainUri.uri)) continue;
+                    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+                        urlIdx++;
+                        const key = urlIdx === 1 ? 'KP2A_URL' : `KP2A_URL_${urlIdx}`;
+                        fields[key] = uri;
+                    }
                 }
             }
             if (item.card) {

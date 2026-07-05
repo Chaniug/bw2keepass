@@ -53,7 +53,7 @@ class TestParser(unittest.TestCase):
         self.assertEqual(github.username, "octocat")
         self.assertEqual(github.password, "super-secret-password")
         self.assertEqual(github.totp, "JBSWY3DPEHPK3PXP")
-        self.assertEqual(len(github.uris), 2)
+        self.assertEqual(len(github.uris), 3)
         self.assertEqual(github.uris[0].uri, "https://github.com")
         self.assertEqual(github.folder, "Work")
         self.assertTrue(github.favorite)
@@ -192,6 +192,15 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(fields["BitwardenType"], "Login")
         self.assertIn("TOTP Seed", fields)
         self.assertIn("2FA Recovery Code", fields)
+        # androidapp:// URI 应映射为 AndroidApp 字段
+        self.assertEqual(fields.get("AndroidApp"), "com.github.android")
+
+    def test_androidapp_url_skipped(self):
+        """验证 androidapp:// 不会成为主 URL"""
+        item = next(i for i in self.items if i.name == "GitHub")
+        url = get_entry_url(item)
+        self.assertTrue(url.startswith("https://"))
+        self.assertNotIn("androidapp://", url)
 
     def test_fido2_custom_fields(self):
         """测试 FIDO2 凭据的自定义字段（对齐 KeePassXC PR #11401 格式）"""
