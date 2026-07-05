@@ -196,7 +196,7 @@ jobs:
           # 1. 编译资源
           $BUILD_TOOLS/aapt2 compile -o app/build/res.zip --dir app/src/main/res
 
-          # 2. 链接资源生成 base.apk
+          # 2. 链接资源生成 base.apk（含 assets）
           $BUILD_TOOLS/aapt2 link -o app/build/base.apk \
             -I $PLATFORM/android.jar \
             --manifest app/src/main/AndroidManifest.xml \
@@ -226,45 +226,39 @@ jobs:
             --output app/build/dex \
             app/build/obj/cc/valk/pass2kdbx/*.class
 
-          # 5. 合并：解压 base.apk + 添加 DEX + 确保 assets 存在
-          mkdir -p app/build/merge
-          cd app/build/merge
-          unzip -q ../base.apk
-          cp ../dex/classes.dex .
-
-          # 检查 assets 是否在 APK 中（aapt2 -A 可能不打包实际文件）
-          if [ ! -d "assets" ] || [ -z "$(ls -A assets 2>/dev/null)" ]; then
-            echo "assets 缺失，手动添加..."
-            mkdir -p assets
-            cp -r ../../../src/main/assets/* assets/
-          fi
-
-          echo "=== merge 目录内容 ==="
-          ls -la
-          echo "=== assets 内容 ==="
-          ls -la assets/ 2>/dev/null || echo "无 assets"
-
-          # 重新打包
-          zip -qr ../unsigned.apk .
+          # 5. 将 classes.dex 直接添加到 base.apk（不重新打包，保持 aapt2 的 ZIP 结构）
+          cp app/build/base.apk app/build/unsigned.apk
+          cd app/build/dex
+          zip -0 -j ../unsigned.apk classes.dex
           cd ../../..
 
-          # 6. 对齐
+          echo "=== unsigned.apk 内容 ==="
+          unzip -l app/build/unsigned.apk
+
+          # 6. 对齐（必须在签名之前）
           $BUILD_TOOLS/zipalign -p -f 4 app/build/unsigned.apk app/build/aligned.apk
 
-          # 7. 生成 debug 签名
+          # 7. 生成签名密钥
           keytool -genkey -v -keystore app/build/debug.keystore \
             -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android \
-            -dname "CN=Debug, OU=Pass2KDBX, O=Valk, L=Unknown, S=Unknown, C=US" \
+            -dname "CN=Pass2KDBX, OU=App, O=Valk, L=Unknown, S=Unknown, C=US" \
             -noprompt
 
-          # 8. 签名
+          # 8. 签名（启用 v1+v2+v3 签名方案，兼容所有 Android 版本）
           $BUILD_TOOLS/apksigner sign \
             --ks app/build/debug.keystore \
             --ks-pass pass:android \
             --key-pass pass:android \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
             --out app/build/Pass2KDBX.apk \
             app/build/aligned.apk
+
+          # 9. 验证签名
+          echo "=== 验证 APK 签名 ==="
+          $BUILD_TOOLS/apksigner verify --verbose app/build/Pass2KDBX.apk || true
 
           echo "=== 最终 APK 信息 ==="
           ls -lh app/build/Pass2KDBX.apk
