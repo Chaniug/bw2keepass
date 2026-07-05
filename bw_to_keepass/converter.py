@@ -137,6 +137,33 @@ def get_entry_notes(item: VaultItem) -> str:
             hist_lines.append(f"- {h.password}{date_str}")
         parts.append("\n".join(hist_lines))
 
+    # FIDO2 / Passkey 凭据
+    if item.fido2_credentials:
+        fido_lines = ["\n[Passkey / FIDO2 凭据]"]
+        for i, fc in enumerate(item.fido2_credentials):
+            if len(item.fido2_credentials) > 1:
+                fido_lines.append(f"\n--- Passkey #{i + 1} ---")
+            if fc.rp_name:
+                fido_lines.append(f"服务: {fc.rp_name} ({fc.rp_id})")
+            else:
+                fido_lines.append(f"依赖方: {fc.rp_id}")
+            if fc.user_name:
+                fido_lines.append(f"用户名: {fc.user_name}")
+            if fc.user_display_name:
+                fido_lines.append(f"显示名称: {fc.user_display_name}")
+            fido_lines.append(f"凭据ID: {fc.credential_id}")
+            fido_lines.append(f"算法: {fc.key_algorithm} ({fc.key_curve})")
+            fido_lines.append(f"类型: {fc.key_type}")
+            fido_lines.append(f"可发现: {fc.discoverable}")
+            fido_lines.append(f"计数器: {fc.counter}")
+            if fc.user_handle:
+                fido_lines.append(f"用户句柄: {fc.user_handle}")
+            if fc.key_value:
+                fido_lines.append(f"密钥值: {fc.key_value}")
+            if fc.creation_date:
+                fido_lines.append(f"创建时间: {fc.creation_date}")
+        parts.append("\n".join(fido_lines))
+
     return "\n".join(parts)
 
 
@@ -148,6 +175,8 @@ def get_entry_tags(item: VaultItem) -> list[str]:
         tags.append(type_name)
     if item.favorite:
         tags.append("Favorite")
+    if item.fido2_credentials:
+        tags.append("Passkey")
     return tags
 
 
@@ -213,6 +242,32 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
     for cf in item.custom_fields:
         if cf.name not in fields:
             fields[cf.name] = cf.value
+
+    # FIDO2 / Passkey 凭据自定义字段
+    for i, fc in enumerate(item.fido2_credentials):
+        idx = f"_{i}" if len(item.fido2_credentials) > 1 else ""
+        if fc.credential_id:
+            fields[f"KPEX_PASSKEY_CREDENTIAL_ID{idx}"] = fc.credential_id
+        if fc.key_value:
+            fields[f"KPEX_PASSKEY_KEY_VALUE{idx}"] = fc.key_value
+        if fc.rp_id:
+            fields[f"KPEX_PASSKEY_RP_ID{idx}"] = fc.rp_id
+        if fc.rp_name:
+            fields[f"KPEX_PASSKEY_RP_NAME{idx}"] = fc.rp_name
+        if fc.user_handle:
+            fields[f"KPEX_PASSKEY_USER_HANDLE{idx}"] = fc.user_handle
+        if fc.user_name:
+            fields[f"KPEX_PASSKEY_USER_NAME{idx}"] = fc.user_name
+        if fc.key_algorithm:
+            fields[f"KPEX_PASSKEY_ALGORITHM{idx}"] = fc.key_algorithm
+        if fc.key_curve:
+            fields[f"KPEX_PASSKEY_CURVE{idx}"] = fc.key_curve
+        if fc.counter:
+            fields[f"KPEX_PASSKEY_COUNTER{idx}"] = fc.counter
+        if fc.discoverable:
+            fields[f"KPEX_PASSKEY_DISCOVERABLE{idx}"] = fc.discoverable
+        if fc.creation_date:
+            fields[f"KPEX_PASSKEY_CREATION{idx}"] = fc.creation_date
 
     # 时间戳
     if item.creation_date:

@@ -104,6 +104,31 @@ class TestParser(unittest.TestCase):
         self.assertIn("ssh-ed25519", ssh.ssh_public_key)
         self.assertEqual(ssh.ssh_key_fingerprint, "SHA256:abcdef1234567890")
 
+    def test_parse_fido2_credentials(self):
+        """测试 FIDO2 / Passkey 凭据解析"""
+        github = next((i for i in self.items if i.name == "GitHub"), None)
+        self.assertIsNotNone(github)
+        self.assertEqual(len(github.fido2_credentials), 1)
+        fc = github.fido2_credentials[0]
+        self.assertEqual(fc.credential_id, "e64a25a4-3081-4bc4-baf3-426638381cf6")
+        self.assertEqual(fc.key_type, "public-key")
+        self.assertEqual(fc.key_algorithm, "ECDSA")
+        self.assertEqual(fc.key_curve, "P-256")
+        self.assertEqual(fc.rp_id, "github.com")
+        self.assertEqual(fc.rp_name, "GitHub")
+        self.assertEqual(fc.user_name, "octocat")
+        self.assertEqual(fc.user_display_name, "Octocat")
+        self.assertEqual(fc.counter, "42")
+        self.assertEqual(fc.discoverable, "true")
+        self.assertIn("example_key_value", fc.key_value)
+
+    def test_no_fido2_on_other_types(self):
+        """测试非登录类型的条目没有 FIDO2 凭据"""
+        wifi = next((i for i in self.items if i.name == "WiFi Password"), None)
+        self.assertEqual(len(wifi.fido2_credentials), 0)
+        card = next((i for i in self.items if i.name == "Visa Card"), None)
+        self.assertEqual(len(card.fido2_credentials), 0)
+
     def test_deleted_items_skipped(self):
         """测试已删除条目被跳过"""
         deleted = [i for i in self.items if i.name == "Deleted Account"]
@@ -152,6 +177,37 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(fields["BitwardenType"], "Login")
         self.assertIn("TOTP Seed", fields)
         self.assertIn("2FA Recovery Code", fields)
+
+    def test_fido2_custom_fields(self):
+        """测试 FIDO2 凭据的自定义字段"""
+        item = next(i for i in self.items if i.name == "GitHub")
+        fields = build_custom_fields(item)
+        self.assertIn("KPEX_PASSKEY_CREDENTIAL_ID", fields)
+        self.assertEqual(
+            fields["KPEX_PASSKEY_CREDENTIAL_ID"],
+            "e64a25a4-3081-4bc4-baf3-426638381cf6"
+        )
+        self.assertIn("KPEX_PASSKEY_RP_ID", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_RP_ID"], "github.com")
+        self.assertIn("KPEX_PASSKEY_RP_NAME", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_RP_NAME"], "GitHub")
+        self.assertIn("KPEX_PASSKEY_ALGORITHM", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_ALGORITHM"], "ECDSA")
+        self.assertIn("KPEX_PASSKEY_CURVE", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_CURVE"], "P-256")
+        self.assertIn("KPEX_PASSKEY_DISCOVERABLE", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_DISCOVERABLE"], "true")
+        self.assertIn("KPEX_PASSKEY_COUNTER", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_COUNTER"], "42")
+
+    def test_fido2_in_notes(self):
+        """测试 FIDO2 凭据出现在备注中"""
+        item = next(i for i in self.items if i.name == "GitHub")
+        notes = get_entry_notes(item)
+        self.assertIn("Passkey / FIDO2", notes)
+        self.assertIn("github.com", notes)
+        self.assertIn("ECDSA", notes)
+        self.assertIn("e64a25a4-3081-4bc4-baf3-426638381cf6", notes)
 
     def test_sanitize_path(self):
         self.assertEqual(sanitize_path("Work/Project"), "Work_Project")

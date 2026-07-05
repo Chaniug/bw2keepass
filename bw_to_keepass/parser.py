@@ -41,6 +41,28 @@ class PasswordHistory:
 
 
 @dataclass
+class Fido2Credential:
+    """FIDO2/WebAuthn/Passkey 凭据
+
+    对应 Bitwarden JSON 导出中的 fido2Credentials 数组元素。
+    KeePass/KDBX 格式不原生支持 Passkey，此数据以备注和自定义字段形式保留。
+    """
+    credential_id: str = ""
+    key_type: str = ""         # "public-key"
+    key_algorithm: str = ""     # "ECDSA"
+    key_curve: str = ""         # "P-256"
+    key_value: str = ""         # 加密的私钥材料
+    rp_id: str = ""             # 依赖方 ID（域名）
+    rp_name: str = ""           # 依赖方名称
+    user_handle: str = ""       # 用户句柄
+    user_name: str = ""         # 用户名
+    user_display_name: str = "" # 用户显示名称
+    counter: str = "0"          # 签名计数器
+    discoverable: str = "false" # 是否为可发现凭据
+    creation_date: str = ""     # 创建时间
+
+
+@dataclass
 class VaultItem:
     """标准化后的密码库条目"""
     id: str
@@ -86,6 +108,9 @@ class VaultItem:
     ssh_key_fingerprint: str = ""
 
     # Secure Note (type=2) uses notes field
+
+    # FIDO2 / Passkey (任何类型都可能包含)
+    fido2_credentials: list[Fido2Credential] = field(default_factory=list)
 
     # Custom fields
     custom_fields: list[CustomField] = field(default_factory=list)
@@ -185,6 +210,24 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
             item.password_history.append(PasswordHistory(
                 password=hist_data.get('password', ''),
                 last_used_date=hist_data.get('lastUsedDate'),
+            ))
+
+        # FIDO2 / Passkey 凭据
+        for fido_data in item_data.get('fido2Credentials', []):
+            item.fido2_credentials.append(Fido2Credential(
+                credential_id=fido_data.get('credentialId', '') or '',
+                key_type=fido_data.get('keyType', '') or '',
+                key_algorithm=fido_data.get('keyAlgorithm', '') or '',
+                key_curve=fido_data.get('keyCurve', '') or '',
+                key_value=fido_data.get('keyValue', '') or '',
+                rp_id=fido_data.get('rpId', '') or '',
+                rp_name=fido_data.get('rpName', '') or '',
+                user_handle=fido_data.get('userHandle', '') or '',
+                user_name=fido_data.get('userName', '') or '',
+                user_display_name=fido_data.get('userDisplayName', '') or '',
+                counter=str(fido_data.get('counter', '0')) or '0',
+                discoverable=str(fido_data.get('discoverable', 'false')) or 'false',
+                creation_date=fido_data.get('creationDate', '') or '',
             ))
 
         items.append(item)

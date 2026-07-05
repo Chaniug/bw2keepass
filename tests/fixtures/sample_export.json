@@ -48,6 +48,23 @@
           "password": "old-password-1"
         }
       ],
+      "fido2Credentials": [
+        {
+          "credentialId": "e64a25a4-3081-4bc4-baf3-426638381cf6",
+          "keyType": "public-key",
+          "keyAlgorithm": "ECDSA",
+          "keyCurve": "P-256",
+          "keyValue": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE...example_key_value",
+          "rpId": "github.com",
+          "rpName": "GitHub",
+          "userHandle": "dXNlci1oYW5kbGUtZXhhbXBsZQ",
+          "userName": "octocat",
+          "userDisplayName": "Octocat",
+          "counter": "42",
+          "discoverable": "true",
+          "creationDate": "2024-03-15T00:00:00.000Z"
+        }
+      ],
       "creationDate": "2023-01-01T00:00:00.000Z",
       "revisionDate": "2024-06-01T12:00:00.000Z",
       "deletedDate": null
