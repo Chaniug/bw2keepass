@@ -2,8 +2,14 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Pass2KDBX - 密码管理器格式互转</title>
+    <meta name="description" content="Bitwarden 与 KeePass 格式互转工具，支持 Passkey 完整迁移。纯浏览器端处理，数据不上传服务器。">
+    <meta name="theme-color" content="#6c5ce7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pass2KDBX">
+    <link rel="manifest" href="/manifest.json">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔐</text></svg>">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -162,6 +168,29 @@
         .password-options button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
         .password-options button:hover { color: var(--accent-hover); }
 
+        /* Checkbox / Option */
+        .option-row {
+            display: flex; align-items: flex-start; gap: 0.6rem; margin-top: 1.25rem;
+            padding: 0.85rem 1rem; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 0.75rem; font-size: 0.82rem; line-height: 1.5;
+            color: var(--text-secondary); transition: border-color 0.2s;
+        }
+        .option-row:hover { border-color: var(--accent); }
+        .option-row input[type="checkbox"] {
+            width: 1rem; height: 1rem; margin-top: 0.15rem; flex-shrink: 0;
+            accent-color: var(--accent); cursor: pointer;
+        }
+        .option-row label { cursor: pointer; }
+        .option-row .option-hint {
+            display: block; font-size: 0.75rem; color: var(--text-secondary);
+            opacity: 0.7; margin-top: 0.2rem;
+        }
+        .option-row .option-tag {
+            display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.45rem;
+            border-radius: 0.3rem; background: var(--accent); color: #fff;
+            margin-left: 0.35rem; vertical-align: middle; font-weight: 500;
+        }
+
         /* Progress */
         .progress-section { display: none; text-align: center; padding: 2rem; }
         .progress-section.show { display: block; }
@@ -306,6 +335,17 @@
             <div class="password-options">
                 <span id="strengthLabel">输入密码</span>
                 <button id="generatePassword">🎲 生成随机密码</button>
+            </div>
+
+            <!-- Passkey 分离选项 -->
+            <div class="option-row" id="passkeyOptionRow" style="display: none;">
+                <input type="checkbox" id="separatePasskey">
+                <label for="separatePasskey">
+                    同时分离导出 Passkey 文件<span class="option-tag">备选</span>
+                    <span class="option-hint" id="passkeyOptionHint">
+                        勾选后将额外生成 .passkey 文件，可通过 KeePassXC → Database → Import Passkey 单独导入。KDBX 中已包含 Passkey 数据，此选项仅作为备用导入方式。
+                    </span>
+                </label>
             </div>
 
             <div class="btn-group" style="margin-top: 1.5rem;">
@@ -501,7 +541,7 @@
         }
 
         // ============ Step Navigation ============
-        nextStepBtn.addEventListener('click', () => {
+        nextStepBtn.addEventListener('click', async () => {
             const ext = selectedFile.name.split('.').pop().toLowerCase();
             // Skip password step for non-KDBX files in to-bitwarden direction
             if (currentDir === 'to-bitwarden' && ext !== 'kdbx') {
@@ -513,6 +553,8 @@
             passwordCard.classList.add('show');
             updateSteps(2);
             dbPassword.focus();
+            // 预扫描文件检测是否有 Passkey
+            checkForPasskeys();
         });
 
         backBtn.addEventListener('click', () => {
@@ -573,6 +615,47 @@
             togglePassword.textContent = '🙈';
             updatePasswordStrength();
         });
+
+        // ============ Passkey Pre-scan ============
+        async function checkForPasskeys() {
+            const passkeyRow = document.getElementById('passkeyOptionRow');
+            const passkeyHint = document.getElementById('passkeyOptionHint');
+            const separateCheckbox = document.getElementById('separatePasskey');
+            // Reset
+            separateCheckbox.checked = false;
+            passkeyRow.style.display = 'none';
+
+            if (currentDir !== 'to-kdbx' || !selectedFile) return;
+
+            try {
+                const ext = selectedFile.name.split('.').pop().toLowerCase();
+                const data = await selectedFile.arrayBuffer();
+                let text;
+                if (ext === 'zip') {
+                    const jszip = new JSZip();
+                    const zip = await jszip.loadAsync(data);
+                    const jsonFile = Object.keys(zip.files).find(n => n.endsWith('data.json') || n.endsWith('.json'));
+                    if (!jsonFile) return;
+                    text = await zip.file(jsonFile).async('string');
+                } else {
+                    text = new TextDecoder().decode(data);
+                }
+                const json = JSON.parse(text);
+                let passkeyCount = 0;
+                for (const item of json.items || []) {
+                    if (item.deletedDate) continue;
+                    const fidos = item.fido2Credentials || (item.login && item.login.fido2Credentials) || [];
+                    passkeyCount += fidos.length;
+                }
+                if (passkeyCount > 0) {
+                    passkeyRow.style.display = '';
+                    passkeyHint.textContent =
+                        `检测到 ${passkeyCount} 个 Passkey。勾选后将额外生成 .passkey 文件，可通过 KeePassXC → Database → Import Passkey 单独导入。KDBX 中已包含 Passkey 数据，此选项仅作为备用导入方式。`;
+                }
+            } catch (e) {
+                // 预扫描失败不影响正常使用
+            }
+        }
 
         // ============ Conversion ============
         convertBtn.addEventListener('click', () => startConversion());
@@ -700,9 +783,10 @@
             progressStats.textContent = '正在加密并生成 KDBX 文件...';
             generatedData = await db.save();
 
-            // Generate .passkey ZIP if passkeys exist
+            // Generate .passkey files only if user opted in
+            const separatePasskey = document.getElementById('separatePasskey');
             generatedPasskeyData = null;
-            if (passkeys.length > 0) {
+            if (passkeys.length > 0 && separatePasskey.checked) {
                 const passkeyFiles = [];
                 for (const pk of passkeys) {
                     const passkeyJson = buildPasskeyFile(pk.fc, pk.item);
@@ -950,11 +1034,24 @@
             generatedData = JSON.stringify(bwExport, null, 2);
             outputFileName = selectedFile.name.replace(/\.kdbx$/i, '') + '.json';
 
+            // 统计 passkey 数量
+            let passkeyCount = 0;
+            for (const item of bwItems) {
+                if (item.fido2Credentials && item.fido2Credentials.length > 0) {
+                    passkeyCount += item.fido2Credentials.length;
+                }
+            }
+
+            // 同时生成 CSV 数据
+            generatedCsvData = buildCSVFromBwItems(bwItems, folders);
+
             progressCard.classList.remove('show');
             successCard.classList.add('show');
             updateSteps(3); step3.classList.add('done');
             downloadBtn.textContent = '💾 下载 Bitwarden JSON';
-            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${folders.length} 个文件夹`;
+
+            let passkeyInfo = passkeyCount > 0 ? ` · ${passkeyCount} 个 Passkey 已保留` : '';
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${folders.length} 个文件夹${passkeyInfo}`;
 
             // Summary
             const typeCount = {};
@@ -968,6 +1065,9 @@
             }
             html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${bwItems.length}</td></tr></tbody>`;
             summaryTable.innerHTML = html;
+
+            // 显示 CSV 下载按钮
+            showCsvDownloadBtn(passkeyCount);
 
             showToast('转换完成！');
         }
@@ -1057,6 +1157,24 @@
                 item.login = null;
             }
 
+            // Extract passkeys (reverse: KPEX_PASSKEY_* → fido2Credentials)
+            const passkeyFields = {};
+            for (const [key, value] of fields) {
+                if (key.startsWith('KPEX_PASSKEY_')) {
+                    const text = typeof value === 'string' ? value : (typeof value.getText === 'function' ? value.getText() : String(value));
+                    passkeyFields[key] = text;
+                }
+            }
+            if (Object.keys(passkeyFields).length > 0) {
+                const fidoCreds = extractPasskeysFromFields(passkeyFields);
+                if (fidoCreds.length > 0) {
+                    item.fido2Credentials = fidoCreds;
+                    if (item.login) {
+                        // Store on login as well (Bitwarden format)
+                    }
+                }
+            }
+
             // Extract custom fields (skip internal fields)
             const skipFields = new Set([
                 'Title', 'UserName', 'Password', 'URL', 'Notes',
@@ -1117,8 +1235,92 @@
             });
         }
 
+        // ============ CSV 导出 ============
+        let generatedCsvData = null;
+
+        function buildCSVFromBwItems(bwItems, folders) {
+            // 构建文件夹 ID → 名称映射
+            const folderMap = {};
+            for (const f of folders) {
+                folderMap[f.id] = f.name;
+            }
+
+            const rows = [];
+            const columns = ['Title', 'UserName', 'Password', 'URL', 'Notes', 'TOTP', 'Group', 'Type', 'HasPasskey'];
+
+            for (const item of bwItems) {
+                const row = {
+                    Title: item.name || '',
+                    UserName: item.login?.username || '',
+                    Password: item.login?.password || '',
+                    URL: (item.login?.uris && item.login.uris.length > 0) ? item.login.uris[0].uri : '',
+                    Notes: item.notes || '',
+                    TOTP: item.login?.totp || '',
+                    Group: folderMap[item.folderId] || '',
+                    Type: TYPE_NAMES[item.type] || 'Login',
+                    HasPasskey: (item.fido2Credentials && item.fido2Credentials.length > 0) ? 'YES' : 'NO',
+                };
+                rows.push(row);
+            }
+
+            // 生成 CSV 字符串（BOM + 逗号分隔）
+            const escapeCsv = (val) => {
+                const s = String(val || '');
+                if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+                    return '"' + s.replace(/"/g, '""') + '"';
+                }
+                return s;
+            };
+
+            const header = columns.map(escapeCsv).join(',');
+            const dataLines = rows.map(r => columns.map(c => escapeCsv(r[c])).join(','));
+            return '\uFEFF' + header + '\n' + dataLines.join('\n');
+        }
+
+        function showCsvDownloadBtn(passkeyCount) {
+            // Remove existing
+            const existing = document.getElementById('csvDownloadBtn');
+            if (existing) existing.remove();
+
+            const container = document.createElement('div');
+            container.style.cssText = 'margin-top: 0.75rem;';
+
+            const btn = document.createElement('button');
+            btn.id = 'csvDownloadBtn';
+            btn.className = 'btn btn-outline';
+            btn.textContent = '📊 下载 CSV 文件';
+            btn.style.cssText = 'width: 100%;';
+            btn.addEventListener('click', () => {
+                if (!generatedCsvData) return;
+                const blob = new Blob([generatedCsvData], { type: 'text/csv;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = outputFileName.replace(/\.json$/i, '') + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('CSV 文件已下载');
+            });
+
+            container.appendChild(btn);
+
+            // 如果有 passkey，添加警告
+            if (passkeyCount > 0) {
+                const warning = document.createElement('div');
+                warning.style.cssText = 'margin-top: 0.5rem; padding: 0.6rem 0.8rem; background: rgba(240, 165, 0, 0.1); border: 1px solid rgba(240, 165, 0, 0.25); border-radius: 0.5rem; font-size: 0.78rem; color: #f0a500; line-height: 1.5;';
+                warning.innerHTML = `⚠️ <strong>注意：</strong>CSV 格式无法保留 ${passkeyCount} 个 Passkey 凭据。<br>如需保留 Passkey，请使用上方的 Bitwarden JSON 格式下载。`;
+                container.appendChild(warning);
+            }
+
+            const btnGroup = document.querySelector('#successCard .btn-group');
+            if (btnGroup) btnGroup.parentNode.insertBefore(container, btnGroup.nextSibling);
+        }
+
         // Bitwarden credentialId is a UUID like "e64a25a4-3081-4bc4-baf3-426638381cf6"
-        // KeePassXC converts it to base64 (UUID → hex bytes → base64)
+        // KeePassXC converts: UUID → remove dashes → hex bytes → base64url (no padding)
+        // KeePassXC 源码: QByteArray::fromHex(uuid) → toBase64(Base64UrlEncoding | OmitTrailingEquals)
         function uuidToBase64(uuid) {
             if (!uuid || uuid.includes('=') || uuid.includes('+') || uuid.includes('/')) {
                 // Already looks like base64, return as-is
@@ -1132,25 +1334,142 @@
             }
             let binary = '';
             for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-            return btoa(binary);
+            // btoa → standard base64 → convert to URL-safe base64 → remove padding
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
         }
 
-        // Bitwarden keyValue may be URL-encoded base64, KeePassXC expects standard base64 PEM
+        // Bitwarden keyValue → KeePassXC PEM format
+        // KeePassXC 源码 (BitwardenReader.cpp) 的转换流程：
+        //   1. fromBase64(keyValue, Base64UrlEncoding) → 原始字节
+        //   2. toBase64(Base64Encoding) → 标准 base64
+        //   3. 包裹 PEM 头尾
+        // Bitwarden 的 keyValue 是 base64 编码的 DER 密钥（非 URL 编码），
+        // 我们做 URL-safe base64 解码后再标准 base64 编码，然后包裹 PEM。
         function formatPrivateKeyPEM(keyValue) {
             if (!keyValue) return '';
-            // If already PEM format, return as-is
             if (keyValue.includes('-----BEGIN')) return keyValue;
-            // Decode URL encoding (%2B → +, %2F → /, %3D → =, etc.)
-            let decoded = keyValue;
-            try { decoded = decodeURIComponent(keyValue); } catch (e) { /* not URL encoded */ }
-            // Wrap in PEM format
-            const lines = [];
-            lines.push('-----BEGIN PRIVATE KEY-----');
-            for (let i = 0; i < decoded.length; i += 64) {
-                lines.push(decoded.substring(i, i + 64));
+            try {
+                // 1. URL-safe base64 解码为原始字节
+                // 将 keyValue 转为 URL-safe 格式后解码
+                const urlSafe = keyValue.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = keyValue.length % 4;
+                const padded = padding ? urlSafe + '='.repeat(4 - padding) : urlSafe;
+                const rawBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+                // 2. 重新编码为标准 base64
+                let binary = '';
+                for (let i = 0; i < rawBytes.length; i++) binary += String.fromCharCode(rawBytes[i]);
+                const stdB64 = btoa(binary);
+                // 3. 包裹 PEM
+                const lines = ['-----BEGIN PRIVATE KEY-----'];
+                for (let i = 0; i < stdB64.length; i += 64) {
+                    lines.push(stdB64.substring(i, i + 64));
+                }
+                lines.push('-----END PRIVATE KEY-----');
+                return lines.join('\n');
+            } catch (e) {
+                // 回退：直接包裹原始值
+                const lines = ['-----BEGIN PRIVATE KEY-----'];
+                for (let i = 0; i < keyValue.length; i += 64) {
+                    lines.push(keyValue.substring(i, i + 64));
+                }
+                lines.push('-----END PRIVATE KEY-----');
+                return lines.join('\n');
             }
-            lines.push('-----END PRIVATE KEY-----');
-            return lines.join('\n');
+        }
+
+        // ============ Passkey 反向转换 ============
+        // 将 KeePassXC 的 KPEX_PASSKEY_* 自定义字段反向转换为 Bitwarden fido2Credentials
+
+        // base64url → UUID hex (反向: uuidToBase64)
+        function base64ToUUID(b64url) {
+            if (!b64url) return '';
+            // 如果已经是 UUID 格式
+            if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(b64url)) return b64url;
+            try {
+                // URL-safe base64 → 标准 base64
+                let std = b64url.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = std.length % 4;
+                if (padding) std += '='.repeat(4 - padding);
+                // 解码为字节
+                const binary = atob(std);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                // 字节 → hex
+                let hex = '';
+                for (let i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+                // 格式化为 UUID
+                if (hex.length === 32) {
+                    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
+                }
+                return hex;
+            } catch (e) {
+                return b64url;
+            }
+        }
+
+        // PEM → URL-safe base64 (反向: formatPrivateKeyPEM)
+        function pemToB64Url(pem) {
+            if (!pem) return '';
+            if (!pem.includes('-----BEGIN')) return pem;
+            try {
+                // 提取 base64 内容
+                const lines = pem.split('\n').filter(l => !l.startsWith('-----'));
+                const stdB64 = lines.join('').trim();
+                // 标准 base64 → 字节
+                const binary = atob(stdB64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                // 字节 → 标准 base64 → URL-safe base64 → 去掉 padding
+                let rawB64 = '';
+                for (let i = 0; i < bytes.length; i++) rawB64 += String.fromCharCode(bytes[i]);
+                return btoa(rawB64).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            } catch (e) {
+                return pem;
+            }
+        }
+
+        // 从 KPEX_PASSKEY_* 字段提取 fido2Credentials
+        function extractPasskeysFromFields(passkeyFields) {
+            // 收集所有 credential ID 字段
+            const credKeys = Object.keys(passkeyFields)
+                .filter(k => k.startsWith('KPEX_PASSKEY_CREDENTIAL_ID'))
+                .sort((a, b) => {
+                    const getIdx = (k) => k === 'KPEX_PASSKEY_CREDENTIAL_ID' ? -1 : parseInt(k.split('_').pop());
+                    return getIdx(a) - getIdx(b);
+                });
+
+            const result = [];
+            for (const ck of credKeys) {
+                let suffix = '';
+                if (ck !== 'KPEX_PASSKEY_CREDENTIAL_ID') {
+                    suffix = '_' + ck.split('_').pop();
+                }
+
+                const credentialIdB64 = passkeyFields[ck] || '';
+                const credentialId = base64ToUUID(credentialIdB64);
+                const keyPem = passkeyFields[`KPEX_PASSKEY_PRIVATE_KEY_PEM${suffix}`] || '';
+                const keyValue = pemToB64Url(keyPem);
+                const rpId = passkeyFields[`KPEX_PASSKEY_RELYING_PARTY${suffix}`] || '';
+                const userHandle = passkeyFields[`KPEX_PASSKEY_USER_HANDLE${suffix}`] || '';
+                const userName = passkeyFields[`KPEX_PASSKEY_USERNAME${suffix}`] || '';
+
+                result.push({
+                    credentialId: credentialId,
+                    keyType: 'public-key',
+                    keyAlgorithm: 'ECDSA',
+                    keyCurve: 'P-256',
+                    keyValue: keyValue,
+                    rpId: rpId,
+                    rpName: rpId,
+                    userHandle: userHandle,
+                    userName: userName,
+                    userDisplayName: userName,
+                    counter: '0',
+                    discoverable: 'true',
+                    creationDate: '',
+                });
+            }
+            return result;
         }
 
         // Generate .passkey file JSON for KeePassXC import
@@ -1342,7 +1661,7 @@
         }
 
         function resetAll() {
-            selectedFile = null; parsedData = null; generatedData = null; generatedPasskeyData = null;
+            selectedFile = null; parsedData = null; generatedData = null; generatedPasskeyData = null; generatedCsvData = null;
             dbPassword.value = '';
             passwordStrengthBar.style.width = '0';
             strengthLabel.textContent = '输入密码';
@@ -1354,11 +1673,19 @@
             successCard.classList.remove('show');
             passwordCard.classList.remove('show');
             progressCard.classList.remove('show');
+            // Reset passkey option
+            const passkeyRow = document.getElementById('passkeyOptionRow');
+            const separateCheckbox = document.getElementById('separatePasskey');
+            if (passkeyRow) passkeyRow.style.display = 'none';
+            if (separateCheckbox) separateCheckbox.checked = false;
             uploadCard.style.display = '';
             updateSteps(1);
             // Remove passkey download button if exists
             const pkBtn = document.getElementById('passkeyDownloadBtn');
             if (pkBtn) pkBtn.remove();
+            // Remove CSV download button if exists
+            const csvBtn = document.getElementById('csvDownloadBtn');
+            if (csvBtn) csvBtn.remove();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -1486,13 +1813,14 @@
                 const fc = item.fido2Credentials[i];
                 const idx = item.fido2Credentials.length > 1 ? `_${i}` : '';
                 // KeePassXC 标准 Passkey 字段（兼容 KeePassXC / KeePassPasskey）
-                if (fc.credentialId) fields[`KPEX_PASSKEY_CREDENTIAL_ID${idx}`] = fc.credentialId;
-                if (fc.keyValue) fields[`KPEX_PASSKEY_PRIVATE_KEY_PEM${idx}`] = fc.keyValue;
+                // 需要做与 KeePassXC PR #11401 一致的格式转换：
+                //   credentialId: UUID → base64url
+                //   keyValue: URL-safe base64 → PEM
+                if (fc.credentialId) fields[`KPEX_PASSKEY_CREDENTIAL_ID${idx}`] = uuidToBase64(fc.credentialId);
+                if (fc.keyValue) fields[`KPEX_PASSKEY_PRIVATE_KEY_PEM${idx}`] = formatPrivateKeyPEM(fc.keyValue);
                 if (fc.rpId) fields[`KPEX_PASSKEY_RELYING_PARTY${idx}`] = fc.rpId;
                 if (fc.userHandle) fields[`KPEX_PASSKEY_USER_HANDLE${idx}`] = fc.userHandle;
                 if (fc.userName) fields[`KPEX_PASSKEY_USERNAME${idx}`] = fc.userName;
-                fields[`KPEX_PASSKEY_FLAG_BE${idx}`] = '1';
-                fields[`KPEX_PASSKEY_FLAG_BS${idx}`] = '1';
             }
             if (item.creationDate) fields['CreationDate'] = item.creationDate;
             if (item.revisionDate) fields['RevisionDate'] = item.revisionDate;
@@ -1798,6 +2126,12 @@
                 e.preventDefault(); startConversion();
             }
         });
+        // ============ Service Worker 注册 ============
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
     </script>
 </body>
 </html>

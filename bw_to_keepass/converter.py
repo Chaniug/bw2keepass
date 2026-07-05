@@ -2,6 +2,7 @@
 转换器：将 Bitwarden VaultItem 转换为 KeePass 条目
 """
 
+import base64
 import re
 from .parser import VaultItem, Folder
 
@@ -180,6 +181,82 @@ def get_entry_tags(item: VaultItem) -> list[str]:
     return tags
 
 
+def _uuid_to_base64(uuid_str: str) -> str:
+    """将 Bitwarden 的 UUID 格式 credentialId 转换为 KeePassXC 期望的 base64 格式
+
+    Bitwarden: "e64a25a4-3081-4bc4-baf3-426638381cf6" (UUID)
+    KeePassXC:  UUID → hex bytes → base64url (no padding)
+    """
+    if not uuid_str:
+        return ""
+    # 如果已经像是 base64（包含 +/= 等字符），直接返回
+    if any(c in uuid_str for c in ('+', '/', '=')):
+        return uuid_str
+    # 去除 UUID 横线
+    hex_str = uuid_str.replace('-', '')
+    # 验证是否为纯十六进制
+    if not all(c in '0123456789abcdefABCDEF' for c in hex_str):
+        return uuid_str  # 不是 UUID，原样返回
+    try:
+        raw_bytes = bytes.fromhex(hex_str)
+        # KeePassXC 使用 URL-safe base64，去掉尾部 =
+        return base64.urlsafe_b64encode(raw_bytes).decode('ascii').rstrip('=')
+    except (ValueError, TypeError):
+        return uuid_str
+
+
+def _format_private_key_pem(key_value: str) -> str:
+    """将 Bitwarden 的 keyValue 转换为 KeePassXC 期望的 PEM 格式
+
+    KeePassXC 源码 (BitwardenReader.cpp) 中的转换流程：
+        1. QByteArray::fromBase64(keyValue, Base64UrlEncoding) → 原始字节
+        2. toBase64(Base64Encoding) → 标准 base64
+        3. 包裹 PEM 头尾
+
+    Bitwarden 的 keyValue 使用 URL-safe base64 编码（含 - 和 _ 字符），
+    不是 URL 编码（%xx 格式）。我们直接按 URL-safe base64 解码。
+    """
+    if not key_value:
+        return ""
+    # 如果已经是 PEM 格式，直接返回
+    if '-----BEGIN' in key_value:
+        return key_value
+    try:
+        # 1. URL-safe base64 解码为原始字节
+        # 补齐 padding（URL-safe base64 通常省略 =）
+        padding = 4 - len(key_value) % 4
+        if padding != 4:
+            key_value += '=' * padding
+        raw_bytes = base64.urlsafe_b64decode(key_value)
+        # 2. 重新编码为标准 base64
+        std_b64 = base64.standard_b64encode(raw_bytes).decode('ascii')
+        # 3. 按 64 字符分行，包裹 PEM 头尾
+        lines = ['-----BEGIN PRIVATE KEY-----']
+        for i in range(0, len(std_b64), 64):
+            lines.append(std_b64[i:i+64])
+        lines.append('-----END PRIVATE KEY-----')
+        return '\n'.join(lines)
+    except Exception:
+        # 解码失败时，回退尝试 URL decode（兼容旧数据格式）
+        import urllib.parse
+        try:
+            decoded = urllib.parse.unquote(key_value)
+            # 再次尝试 URL-safe base64 解码
+            padding = 4 - len(decoded) % 4
+            if padding != 4:
+                decoded += '=' * padding
+            raw_bytes = base64.urlsafe_b64decode(decoded)
+            std_b64 = base64.standard_b64encode(raw_bytes).decode('ascii')
+        except Exception:
+            # 最终回退：直接包裹原始值
+            std_b64 = key_value
+        lines = ['-----BEGIN PRIVATE KEY-----']
+        for i in range(0, len(std_b64), 64):
+            lines.append(std_b64[i:i+64])
+        lines.append('-----END PRIVATE KEY-----')
+        return '\n'.join(lines)
+
+
 def build_custom_fields(item: VaultItem) -> dict[str, str]:
     """
     构建 KeePass 自定义字符串字段
@@ -244,30 +321,22 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
             fields[cf.name] = cf.value
 
     # FIDO2 / Passkey 凭据自定义字段
+    # 字段名和格式完全对齐 KeePassXC PR #11401 的实现
+    # 参考: https://github.com/keepassxreboot/keepassxc/pull/11401
     for i, fc in enumerate(item.fido2_credentials):
         idx = f"_{i}" if len(item.fido2_credentials) > 1 else ""
         if fc.credential_id:
-            fields[f"KPEX_PASSKEY_CREDENTIAL_ID{idx}"] = fc.credential_id
+            # credentialId: Bitwarden UUID → base64url (KeePassXC 格式)
+            fields[f"KPEX_PASSKEY_CREDENTIAL_ID{idx}"] = _uuid_to_base64(fc.credential_id)
         if fc.key_value:
-            fields[f"KPEX_PASSKEY_KEY_VALUE{idx}"] = fc.key_value
+            # keyValue: Bitwarden URL-safe base64 → PEM 格式 (KeePassXC 格式)
+            fields[f"KPEX_PASSKEY_PRIVATE_KEY_PEM{idx}"] = _format_private_key_pem(fc.key_value)
         if fc.rp_id:
-            fields[f"KPEX_PASSKEY_RP_ID{idx}"] = fc.rp_id
-        if fc.rp_name:
-            fields[f"KPEX_PASSKEY_RP_NAME{idx}"] = fc.rp_name
+            fields[f"KPEX_PASSKEY_RELYING_PARTY{idx}"] = fc.rp_id
         if fc.user_handle:
             fields[f"KPEX_PASSKEY_USER_HANDLE{idx}"] = fc.user_handle
         if fc.user_name:
-            fields[f"KPEX_PASSKEY_USER_NAME{idx}"] = fc.user_name
-        if fc.key_algorithm:
-            fields[f"KPEX_PASSKEY_ALGORITHM{idx}"] = fc.key_algorithm
-        if fc.key_curve:
-            fields[f"KPEX_PASSKEY_CURVE{idx}"] = fc.key_curve
-        if fc.counter:
-            fields[f"KPEX_PASSKEY_COUNTER{idx}"] = fc.counter
-        if fc.discoverable:
-            fields[f"KPEX_PASSKEY_DISCOVERABLE{idx}"] = fc.discoverable
-        if fc.creation_date:
-            fields[f"KPEX_PASSKEY_CREATION{idx}"] = fc.creation_date
+            fields[f"KPEX_PASSKEY_USERNAME{idx}"] = fc.user_name
 
     # 时间戳
     if item.creation_date:

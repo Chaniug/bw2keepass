@@ -1,0 +1,277 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        run: |
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
+          unzip -q tools.zip
+          mv cmdline-tools latest
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Create Android project
+        run: |
+          # Create project structure
+          mkdir -p app/src/main/java/cc/valk/pass2kdbx
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/assets
+
+          # Copy web files to assets
+          cp -r web/* app/src/main/assets/
+
+          # AndroidManifest.xml
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              package="cc.valk.pass2kdbx">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@drawable/ic_launcher"
+                  android:label="Pass2KDBX"
+                  android:theme="@style/AppTheme">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          # MainActivity.java - WebView wrapper with file picker support
+          cat > app/src/main/java/cc/valk/pass2kdbx/MainActivity.java << 'JAVAEOF'
+          package cc.valk.pass2kdbx;
+
+          import android.app.Activity;
+          import android.content.Intent;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.webkit.ValueCallback;
+
+          public class MainActivity extends Activity {
+              private WebView webView;
+              private ValueCallback<Uri[]> filePathCallback;
+              private static final int FILE_CHOOSER_REQUEST = 100;
+
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  webView = new WebView(this);
+                  setContentView(webView);
+
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setAllowFileAccess(true);
+                  settings.setAllowContentAccess(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+
+                  webView.setWebViewClient(new WebViewClient());
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> fpc, FileChooserParams params) {
+                          filePathCallback = fpc;
+                          Intent intent = params.createIntent();
+                          startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                          return true;
+                      }
+                  });
+
+                  webView.loadUrl("file:///android_asset/index.html");
+              }
+
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+                  if (requestCode == FILE_CHOOSER_REQUEST && filePathCallback != null) {
+                      Uri[] results = null;
+                      if (resultCode == RESULT_OK && data != null) {
+                          Uri uri = data.getData();
+                          if (uri != null) {
+                              // Grant persistable permission
+                              getContentResolver().takePersistableUriPermission(
+                                  uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                              );
+                              results = new Uri[]{uri};
+                          }
+                      }
+                      filePathCallback.onReceiveValue(results);
+                      filePathCallback = null;
+                  }
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+          }
+          JAVAEOF
+
+          # styles.xml
+          cat > app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+                  <item name="android:windowBackground">#0f1117</item>
+                  <item name="android:statusBarColor">#6c5ce7</item>
+                  <item name="android:navigationBarColor">#0f1117</item>
+              </style>
+          </resources>
+          EOF
+
+          # Generate launcher icon (simple solid color vector)
+          cat > app/src/main/res/drawable/ic_launcher.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#6c5ce7"
+                  android:pathData="M0,0h108v108H0z"/>
+              <path
+                  android:fillColor="#ffffff"
+                  android:pathData="M54,30c-8.8,0-16,7.2-16,16v8h-4c-2.2,0-4,1.8-4,4v24c0,2.2,1.8,4,4,4h40c2.2,0,4-1.8,4-4V58c0-2.2-1.8-4-4-4h-4v-8C70,37.2,62.8,30,54,30zM54,38c4.4,0,8,3.6,8,8v8H46v-8C46,41.6,49.6,38,54,38z"/>
+          </vector>
+          EOF
+
+      - name: Build APK
+        run: |
+          # Build with aapt2 and d8
+          BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
+          PLATFORM=$ANDROID_HOME/platforms/android-34
+
+          # Compile resources
+          $BUILD_TOOLS/aapt2 compile -o app/build/res.zip \
+            --dir app/src/main/res
+
+          # Link resources
+          $BUILD_TOOLS/aapt2 link -o app/build/base.apk \
+            -I $PLATFORM/android.jar \
+            --manifest app/src/main/AndroidManifest.xml \
+            --java app/build/gen \
+            -A app/src/main/assets \
+            --min-sdk-version 21 \
+            --target-sdk-version 34 \
+            --version-code 1 \
+            --version-name 1.0 \
+            --package-id 0x7f \
+            app/build/res.zip
+
+          # Compile Java
+          mkdir -p app/build/obj
+          javac -source 17 -target 17 \
+            -cp $PLATFORM/android.jar \
+            -d app/build/obj \
+            app/src/main/java/cc/valk/pass2kdbx/MainActivity.java \
+            app/build/gen/cc/valk/pass2kdbx/R.java
+
+          # DEX
+          $BUILD_TOOLS/d8 --lib $PLATFORM/android.jar \
+            --output app/build/dex \
+            app/build/obj/cc/valk/pass2kdbx/*.class
+
+          # Merge DEX into APK
+          mkdir -p app/build/merge
+          cd app/build/merge
+          unzip -q ../base.apk
+
+          # Copy DEX
+          mkdir -p classes.dex.d
+          cp ../dex/classes.dex classes.dex
+
+          # Re-zip
+          zip -qr ../unsigned.apk .
+
+          # Align
+          cd ../../..
+          $BUILD_TOOLS/zipalign -p -f 4 app/build/unsigned.apk app/build/aligned.apk
+
+          # Sign with debug key
+          keytool -genkey -v -keystore app/build/debug.keystore \
+            -alias debug -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Debug, OU=Pass2KDBX, O=Valk, L=Unknown, S=Unknown, C=US" \
+            -noprompt
+
+          $BUILD_TOOLS/apksigner sign \
+            --ks app/build/debug.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out app/build/Pass2KDBX.apk \
+            app/build/aligned.apk
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pass2KDBX-APK
+          path: app/build/Pass2KDBX.apk
+
+      - name: Create/Update Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete existing tag and release if present
+          gh release delete "apk-latest" --yes --cleanup-tag 2>/dev/null || true
+          git push origin :refs/tags/apk-latest 2>/dev/null || true
+
+          # Create new tag and release
+          git tag -f apk-latest
+          git push origin apk-latest --force
+
+          gh release create apk-latest \
+            app/build/Pass2KDBX.apk \
+            --title "Pass2KDBX APK (Latest)" \
+            --notes "## Pass2KDBX Android APK
+
+          自动构建的 Android APK，可直接安装。
+
+          - 构建时间：$(date -u '+%Y-%m-%d %H:%M UTC')
+          - 提交：${{ github.sha }}
+          - 安装：下载 APK → 允许"未知来源"安装 → 打开使用
+
+          > 此 Release 每次构建自动更新。" \
+            --latest

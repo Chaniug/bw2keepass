@@ -179,26 +179,45 @@ class TestConverter(unittest.TestCase):
         self.assertIn("2FA Recovery Code", fields)
 
     def test_fido2_custom_fields(self):
-        """测试 FIDO2 凭据的自定义字段"""
+        """测试 FIDO2 凭据的自定义字段（对齐 KeePassXC PR #11401 格式）"""
         item = next(i for i in self.items if i.name == "GitHub")
         fields = build_custom_fields(item)
+        # 核心字段名对齐 KeePassXC
         self.assertIn("KPEX_PASSKEY_CREDENTIAL_ID", fields)
-        self.assertEqual(
+        # credentialId 应转换为 base64url（不再是原始 UUID）
+        self.assertNotEqual(
             fields["KPEX_PASSKEY_CREDENTIAL_ID"],
-            "e64a25a4-3081-4bc4-baf3-426638381cf6"
+            "e64a25a4-3081-4bc4-baf3-426638381cf6"  # 原始 UUID
         )
-        self.assertIn("KPEX_PASSKEY_RP_ID", fields)
-        self.assertEqual(fields["KPEX_PASSKEY_RP_ID"], "github.com")
-        self.assertIn("KPEX_PASSKEY_RP_NAME", fields)
-        self.assertEqual(fields["KPEX_PASSKEY_RP_NAME"], "GitHub")
-        self.assertIn("KPEX_PASSKEY_ALGORITHM", fields)
-        self.assertEqual(fields["KPEX_PASSKEY_ALGORITHM"], "ECDSA")
-        self.assertIn("KPEX_PASSKEY_CURVE", fields)
-        self.assertEqual(fields["KPEX_PASSKEY_CURVE"], "P-256")
-        self.assertIn("KPEX_PASSKEY_DISCOVERABLE", fields)
-        self.assertEqual(fields["KPEX_PASSKEY_DISCOVERABLE"], "true")
-        self.assertIn("KPEX_PASSKEY_COUNTER", fields)
-        self.assertEqual(fields["KPEX_PASSKEY_COUNTER"], "42")
+        # 验证是 base64url 格式（不含 +/=）
+        cid = fields["KPEX_PASSKEY_CREDENTIAL_ID"]
+        self.assertNotIn('+', cid)
+        self.assertNotIn('/', cid)
+        self.assertNotIn('=', cid)
+        self.assertNotIn('-', cid)  # 不再含 UUID 横线
+        # relyingParty 字段
+        self.assertIn("KPEX_PASSKEY_RELYING_PARTY", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_RELYING_PARTY"], "github.com")
+        # username 字段
+        self.assertIn("KPEX_PASSKEY_USERNAME", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_USERNAME"], "octocat")
+        # userHandle 字段
+        self.assertIn("KPEX_PASSKEY_USER_HANDLE", fields)
+        # private key PEM 字段
+        self.assertIn("KPEX_PASSKEY_PRIVATE_KEY_PEM", fields)
+        pem = fields["KPEX_PASSKEY_PRIVATE_KEY_PEM"]
+        self.assertIn("-----BEGIN PRIVATE KEY-----", pem)
+        self.assertIn("-----END PRIVATE KEY-----", pem)
+        # 以下旧字段不应存在
+        self.assertNotIn("KPEX_PASSKEY_RP_ID", fields)
+        self.assertNotIn("KPEX_PASSKEY_RP_NAME", fields)
+        self.assertNotIn("KPEX_PASSKEY_USER_NAME", fields)
+        self.assertNotIn("KPEX_PASSKEY_KEY_VALUE", fields)
+        self.assertNotIn("KPEX_PASSKEY_ALGORITHM", fields)
+        self.assertNotIn("KPEX_PASSKEY_CURVE", fields)
+        self.assertNotIn("KPEX_PASSKEY_COUNTER", fields)
+        self.assertNotIn("KPEX_PASSKEY_DISCOVERABLE", fields)
+        self.assertNotIn("KPEX_PASSKEY_CREATION", fields)
 
     def test_fido2_in_notes(self):
         """测试 FIDO2 凭据出现在备注中"""
@@ -209,10 +228,97 @@ class TestConverter(unittest.TestCase):
         self.assertIn("ECDSA", notes)
         self.assertIn("e64a25a4-3081-4bc4-baf3-426638381cf6", notes)
 
+
     def test_sanitize_path(self):
         self.assertEqual(sanitize_path("Work/Project"), "Work_Project")
         self.assertEqual(sanitize_path("A\\B"), "A_B")
         self.assertEqual(sanitize_path("Normal"), "Normal")
+
+
+class TestReverseConverter(unittest.TestCase):
+    """测试反向转换（KeePass 格式 → Bitwarden 格式）"""
+
+    def test_base64url_to_uuid(self):
+        """测试 base64url → UUID 反向转换"""
+        from bw_to_keepass.reverse_converter import _base64url_to_uuid
+        # KeePassXC 测试数据: o-FfiyfBQq6Qz6YVrYeFTw → a3e15f8b-27c1-42ae-90cf-a615ad87854f
+        result = _base64url_to_uuid('o-FfiyfBQq6Qz6YVrYeFTw')
+        self.assertEqual(result, 'a3e15f8b-27c1-42ae-90cf-a615ad87854f')
+
+    def test_base64url_to_uuid_already_uuid(self):
+        """测试已经是 UUID 格式的不做转换"""
+        from bw_to_keepass.reverse_converter import _base64url_to_uuid
+        result = _base64url_to_uuid('e64a25a4-3081-4bc4-baf3-426638381cf6')
+        self.assertEqual(result, 'e64a25a4-3081-4bc4-baf3-426638381cf6')
+
+    def test_base64url_to_uuid_roundtrip(self):
+        """测试 base64url ↔ UUID 往返转换一致性"""
+        from bw_to_keepass.reverse_converter import _base64url_to_uuid
+        from bw_to_keepass.converter import _uuid_to_base64
+        original = 'a3e15f8b-27c1-42ae-90cf-a615ad87854f'
+        b64 = _uuid_to_base64(original)
+        restored = _base64url_to_uuid(b64)
+        self.assertEqual(restored, original)
+
+    def test_pem_to_b64url(self):
+        """测试 PEM → URL-safe base64 反向转换"""
+        from bw_to_keepass.reverse_converter import _pem_to_b64url
+        # 构造一个简单的 PEM
+        pem = '-----BEGIN PRIVATE KEY-----\nYWJjZGVm\n-----END PRIVATE KEY-----'
+        result = _pem_to_b64url(pem)
+        # abcdef 的 base64url 是 YWJjZGVm（无 padding）
+        self.assertEqual(result, 'YWJjZGVm')
+
+    def test_pem_to_b64url_already_b64(self):
+        """测试已经是 base64 的不过 PEM 处理"""
+        from bw_to_keepass.reverse_converter import _pem_to_b64url
+        result = _pem_to_b64url('YWJjZGVm')
+        self.assertEqual(result, 'YWJjZGVm')
+
+    def test_pem_to_b64url_empty(self):
+        """测试空值处理"""
+        from bw_to_keepass.reverse_converter import _pem_to_b64url
+        self.assertEqual(_pem_to_b64url(''), '')
+        self.assertEqual(_pem_to_b64url(None), '')
+
+    def test_base64url_to_uuid_empty(self):
+        """测试空值处理"""
+        from bw_to_keepass.reverse_converter import _base64url_to_uuid
+        self.assertEqual(_base64url_to_uuid(''), '')
+        self.assertEqual(_base64url_to_uuid(None), '')
+
+    def test_pem_b64url_roundtrip(self):
+        """测试 PEM ↔ URL-safe base64 往返转换"""
+        from bw_to_keepass.reverse_converter import _pem_to_b64url
+        from bw_to_keepass.converter import _format_private_key_pem
+        # 使用 KeePassXC 测试数据中的 keyValue
+        original_b64 = 'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgmr4GQQjerojFuf0ZouOuUllMvAwxZSZAfB6gwDYcLiehRANCAAT0WR5zVSp6ieusvjkLkzaGc7fjGBmwpiuLPxR_d-ZjqMI9L2DKh-takp6wGt2x0n4jzr1KA352NZg0vjZX9CHh'
+        pem = _format_private_key_pem(original_b64)
+        restored = _pem_to_b64url(pem)
+        self.assertEqual(restored, original_b64)
+
+
+class TestCSVExporter(unittest.TestCase):
+    """测试 CSV 导出功能"""
+
+    def test_import_csv_exporter(self):
+        """测试 CSV 导出模块可以导入"""
+        from bw_to_keepass.csv_exporter import CSV_COLUMNS, BITWARDEN_CSV_COLUMNS, KEEPASS_CSV_COLUMNS
+        self.assertIsInstance(CSV_COLUMNS, list)
+        self.assertIsInstance(BITWARDEN_CSV_COLUMNS, list)
+        self.assertIsInstance(KEEPASS_CSV_COLUMNS, list)
+
+    def test_csv_columns_have_required(self):
+        """测试 CSV 列定义包含必要字段"""
+        from bw_to_keepass.csv_exporter import CSV_COLUMNS
+        required = ['Title', 'UserName', 'Password', 'URL', 'Notes']
+        for col in required:
+            self.assertIn(col, CSV_COLUMNS)
+
+    def test_generic_csv_has_passkey_warning(self):
+        """测试通用 CSV 有 Passkey 标记列"""
+        from bw_to_keepass.csv_exporter import CSV_COLUMNS
+        self.assertIn('HasPasskey', CSV_COLUMNS)
 
 
 if __name__ == "__main__":

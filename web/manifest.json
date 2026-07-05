@@ -1,0 +1,28 @@
+{
+  "name": "Pass2KDBX - 密码管理器格式互转",
+  "short_name": "Pass2KDBX",
+  "description": "Bitwarden 与 KeePass 格式互转工具，支持 Passkey 完整迁移",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#6c5ce7",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
