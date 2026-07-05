@@ -1,0 +1,163 @@
+{
+  "encrypted": false,
+  "folders": [
+    {
+      "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "name": "Work"
+    },
+    {
+      "id": "f2b3c4d5-e6f7-8901-bcde-f12345678901",
+      "name": "Personal"
+    }
+  ],
+  "items": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      "organizationId": null,
+      "folderId": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "type": 1,
+      "reprompt": 0,
+      "name": "GitHub",
+      "notes": "My GitHub account",
+      "favorite": true,
+      "login": {
+        "username": "octocat",
+        "password": "super-secret-password",
+        "totp": "JBSWY3DPEHPK3PXP",
+        "uris": [
+          {
+            "match": 1,
+            "uri": "https://github.com"
+          },
+          {
+            "match": null,
+            "uri": "https://github.com/login"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "name": "2FA Recovery Code",
+          "value": "ABCD-EFGH-IJKL",
+          "type": 1
+        }
+      ],
+      "passwordHistory": [
+        {
+          "lastUsedDate": "2024-01-15T10:30:00.000Z",
+          "password": "old-password-1"
+        }
+      ],
+      "creationDate": "2023-01-01T00:00:00.000Z",
+      "revisionDate": "2024-06-01T12:00:00.000Z",
+      "deletedDate": null
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8901-2345-678901bcdefa",
+      "organizationId": null,
+      "folderId": "f2b3c4d5-e6f7-8901-bcde-f12345678901",
+      "type": 2,
+      "reprompt": 0,
+      "name": "WiFi Password",
+      "notes": "Home WiFi:\nSSID: MyHomeWiFi\nPassword: wifi-password-123",
+      "secureNote": {
+        "type": 0
+      },
+      "favorite": false,
+      "creationDate": "2023-03-15T08:00:00.000Z",
+      "revisionDate": "2024-01-01T00:00:00.000Z",
+      "deletedDate": null
+    },
+    {
+      "id": "c3d4e5f6-a7b8-9012-3456-789012cdefab",
+      "organizationId": null,
+      "folderId": null,
+      "type": 3,
+      "reprompt": 0,
+      "name": "Visa Card",
+      "notes": "Primary credit card",
+      "card": {
+        "cardholderName": "John Doe",
+        "brand": "Visa",
+        "number": "4111111111111111",
+        "expMonth": "12",
+        "expYear": "2026",
+        "code": "123"
+      },
+      "favorite": false,
+      "creationDate": "2023-06-01T00:00:00.000Z",
+      "revisionDate": "2024-03-01T00:00:00.000Z",
+      "deletedDate": null
+    },
+    {
+      "id": "d4e5f6a7-b8c9-0123-4567-890123defabc",
+      "organizationId": null,
+      "folderId": "f2b3c4d5-e6f7-8901-bcde-f12345678901",
+      "type": 4,
+      "reprompt": 0,
+      "name": "John's Identity",
+      "notes": "Personal identity info",
+      "identity": {
+        "title": "Mr",
+        "firstName": "John",
+        "middleName": "Michael",
+        "lastName": "Doe",
+        "address1": "123 Main St",
+        "address2": "Apt 4B",
+        "address3": null,
+        "city": "New York",
+        "state": "NY",
+        "postalCode": "10001",
+        "country": "US",
+        "company": "Acme Corp",
+        "email": "john@example.com",
+        "phone": "+1-555-123-4567",
+        "ssn": "123-45-6789",
+        "username": "johndoe",
+        "passportNumber": "P12345678",
+        "licenseNumber": "DL-987654"
+      },
+      "favorite": false,
+      "creationDate": "2023-01-15T00:00:00.000Z",
+      "revisionDate": "2024-02-20T00:00:00.000Z",
+      "deletedDate": null
+    },
+    {
+      "id": "e5f6a7b8-c9d0-1234-5678-901234efabcd",
+      "organizationId": null,
+      "folderId": null,
+      "type": 5,
+      "reprompt": 0,
+      "name": "GitHub SSH Key",
+      "notes": "SSH key for GitHub",
+      "sshKey": {
+        "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\nexample_private_key\n-----END OPENSSH PRIVATE KEY-----",
+        "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... example@host",
+        "keyFingerprint": "SHA256:abcdef1234567890"
+      },
+      "favorite": false,
+      "creationDate": "2023-02-01T00:00:00.000Z",
+      "revisionDate": "2024-05-01T00:00:00.000Z",
+      "deletedDate": null
+    },
+    {
+      "id": "f6a7b8c9-d0e1-2345-6789-012345fabcd0",
+      "organizationId": null,
+      "folderId": null,
+      "type": 1,
+      "reprompt": 0,
+      "name": "Deleted Account",
+      "notes": "This should not be imported",
+      "login": {
+        "username": "deleted_user",
+        "password": "deleted_password",
+        "totp": null,
+        "uris": []
+      },
+      "favorite": false,
+      "creationDate": "2023-01-01T00:00:00.000Z",
+      "revisionDate": "2024-01-01T00:00:00.000Z",
+      "deletedDate": "2024-06-01T00:00:00.000Z"
+    }
+  ]
+}

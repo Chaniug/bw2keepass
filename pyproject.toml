@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools"
+
+[project]
+name = "bw-to-keepass"
+version = "0.1.0"
+description = "将 Bitwarden 导出 JSON 转换为 KeePass KDBX 格式"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+dependencies = [
+    "pykeepass>=4.1.0",
+]
+
+[project.scripts]
+bw-to-keepass = "bw_to_keepass.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/bw-to-keepass"

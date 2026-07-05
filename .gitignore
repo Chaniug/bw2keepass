@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Test outputs
+*.kdbx
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bitwarden exports (don't commit actual password data!)
+*.json
+*.zip
+!tests/fixtures/*.json
