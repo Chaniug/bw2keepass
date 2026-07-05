@@ -1197,26 +1197,7 @@
                 }
                 parts.push(lines.join('\n'));
             }
-            if (item.fido2Credentials?.length) {
-                const lines = ['\n[Passkey / FIDO2 凭据]'];
-                for (let i = 0; i < item.fido2Credentials.length; i++) {
-                    const fc = item.fido2Credentials[i];
-                    if (item.fido2Credentials.length > 1) lines.push(`\n--- Passkey #${i + 1} ---`);
-                    if (fc.rpName) lines.push(`服务: ${fc.rpName} (${fc.rpId})`);
-                    else lines.push(`依赖方: ${fc.rpId}`);
-                    if (fc.userName) lines.push(`用户名: ${fc.userName}`);
-                    if (fc.userDisplayName) lines.push(`显示名称: ${fc.userDisplayName}`);
-                    lines.push(`凭据ID: ${fc.credentialId}`);
-                    lines.push(`算法: ${fc.keyAlgorithm} (${fc.keyCurve})`);
-                    lines.push(`类型: ${fc.keyType}`);
-                    lines.push(`可发现: ${fc.discoverable}`);
-                    lines.push(`计数器: ${fc.counter}`);
-                    if (fc.userHandle) lines.push(`用户句柄: ${fc.userHandle}`);
-                    if (fc.keyValue) lines.push(`密钥值: ${fc.keyValue}`);
-                    if (fc.creationDate) lines.push(`创建时间: ${fc.creationDate}`);
-                }
-                parts.push(lines.join('\n'));
-            }
+            // Passkey / FIDO2 凭据已在自定义字段中，不再重复写入 Notes
             return parts.join('\n');
         }
 
