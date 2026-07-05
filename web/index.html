@@ -1401,7 +1401,7 @@
                             fingerprint: item.sshKey.fingerprint || '',
                         };
                     }
-                    for (const fc of (item.fido2Credentials || [])) {
+                    for (const fc of (item.login?.fido2Credentials || [])) {
                         parsed.fido2Credentials.push({
                             credentialId: fc.credentialId || '', keyType: fc.keyType || '',
                             keyAlgorithm: fc.keyAlgorithm || '', keyCurve: fc.keyCurve || '',
