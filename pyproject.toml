@@ -17,4 +17,4 @@ dependencies = [
 bw-to-keepass = "bw_to_keepass.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/bw-to-keepass"
+Homepage = "https://github.com/Chaniug/bw2keepass"

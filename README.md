@@ -20,7 +20,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/bw-to-keepass.git
+git clone https://github.com/Chaniug/bw2keepass.git
 cd bw-to-keepass
 
 # 创建虚拟环境
