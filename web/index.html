@@ -418,6 +418,40 @@
             console.error('Unhandled rejection:', e.reason);
         });
 
+        // ============ 文件下载辅助（兼容 WebView） ============
+        async function downloadBlob(blob, fileName, mimeType) {
+            // 优先用 Android 接口（WebView 环境）
+            if (window.AndroidFileSaver) {
+                try {
+                    const buf = await blob.arrayBuffer();
+                    const bytes = new Uint8Array(buf);
+                    // 转 base64（分块避免栈溢出）
+                    let binary = '';
+                    const chunkSize = 0x8000;
+                    for (let i = 0; i < bytes.length; i += chunkSize) {
+                        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+                    }
+                    const base64 = btoa(binary);
+                    window.AndroidFileSaver.saveFile(base64, fileName, mimeType || 'application/octet-stream');
+                    showToast('文件已保存到 Downloads 目录');
+                    return;
+                } catch (e) {
+                    console.error('AndroidFileSaver error:', e);
+                    // 失败则回退到标准方式
+                }
+            }
+            // 标准浏览器：用 a.download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast('文件已下载');
+        }
+
         // ============ DOM Elements ============
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
@@ -1337,15 +1371,7 @@
             btn.addEventListener('click', () => {
                 if (!generatedCsvData) return;
                 const blob = new Blob([generatedCsvData], { type: 'text/csv;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = outputFileName.replace(/\.json$/i, '') + '.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast('CSV 文件已下载');
+                downloadBlob(blob, outputFileName.replace(/\.json$/i, '') + '.csv', 'text/csv');
             });
 
             container.appendChild(btn);
@@ -1535,15 +1561,7 @@
             if (!generatedData) return;
             const mime = outputFileName.endsWith('.kdbx') ? 'application/octet-stream' : 'application/json';
             const blob = new Blob([generatedData], { type: mime });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = outputFileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showToast('文件已下载');
+            downloadBlob(blob, outputFileName, mime);
         });
 
         newConvertBtn.addEventListener('click', resetAll);
@@ -1571,15 +1589,7 @@
                 // Single passkey: download directly as .passkey file
                 const pk = passkeyFiles[0];
                 const blob = new Blob([JSON.stringify(pk.json, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = pk.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast('Passkey 文件已下载');
+                downloadBlob(blob, pk.name, 'application/json');
             } else {
                 // Multiple passkeys: download as ZIP
                 downloadPasskeysAsZip(passkeyFiles);
@@ -1681,15 +1691,8 @@
             }
 
             const zipBlob = new Blob([zipData], { type: 'application/zip' });
-            const url = URL.createObjectURL(zipBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = outputFileName.replace(/\.kdbx$/i, '_passkeys.zip');
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            showToast(`${passkeyFiles.length} 个 Passkey 文件已打包下载`);
+            const zipName = outputFileName.replace(/\.kdbx$/i, '_passkeys.zip');
+            downloadBlob(zipBlob, zipName, 'application/zip');
         }
 
         // Simple CRC32 for ZIP
