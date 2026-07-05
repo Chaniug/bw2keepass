@@ -337,7 +337,7 @@
         <footer class="footer">
             <a href="https://github.com/Chaniug/bw2keepass" target="_blank" rel="noopener">GitHub</a>
             <span style="margin: 0 0.5rem; color: var(--border);">·</span>
-            <span>v2.0</span>
+            <span>v2.1</span>
             <div class="privacy-note"><span>🛡️</span> 所有数据在浏览器本地处理，不会上传到任何服务器</div>
         </footer>
     </div>
@@ -431,18 +431,21 @@
                 passwordDesc.textContent = '此密码将用于加密您的 KeePass 数据库';
                 document.getElementById('step2').childNodes[1].textContent = ' 密码';
             } else {
-                uploadTitle.textContent = '📁 上传 KeePass KDBX 文件';
-                uploadDesc.textContent = '支持 KDBX3 和 KDBX4 格式的 KeePass 数据库';
-                uploadHint.textContent = '.kdbx · 最大 100MB';
+                uploadTitle.textContent = '📁 上传密码管理器导出文件';
+                uploadDesc.textContent = '支持 KDBX / CSV / 1PUX / JSON 等格式';
+                uploadHint.textContent = '.kdbx / .json / .csv / .zip / .1pux · 最大 100MB';
                 uploadBadges.style.display = '';
                 uploadBadges.innerHTML = `
                     <span class="fmt-badge">🔐 KeePass KDBX</span>
-                    <span class="fmt-badge">🔑 KeePassXC</span>
-                    <span class="fmt-badge">🔒 KDBX3/KDBX4</span>
+                    <span class="fmt-badge">🔑 1Password 1PUX</span>
+                    <span class="fmt-badge">📊 CSV 通用</span>
+                    <span class="fmt-badge">🌐 Chrome CSV</span>
+                    <span class="fmt-badge">🦊 Firefox CSV</span>
+                    <span class="fmt-badge">📦 Bitwarden JSON</span>
                 `;
-                fileInput.setAttribute('accept', '.kdbx');
+                fileInput.setAttribute('accept', '.kdbx,.json,.csv,.zip,.1pux');
                 passwordTitle.textContent = '🔑 输入 KeePass 数据库密码';
-                passwordDesc.textContent = '用于解密您的 KeePass 数据库';
+                passwordDesc.textContent = '仅 KDBX 文件需要密码，其他格式将自动跳过';
                 document.getElementById('step2').childNodes[1].textContent = ' 解密';
             }
         }
@@ -471,16 +474,15 @@
 
         function handleFile(file) {
             const ext = file.name.split('.').pop().toLowerCase();
-            let supported;
-            if (currentDir === 'to-kdbx') {
-                supported = ['json', 'zip', 'csv', '1pux'];
-            } else {
-                supported = ['kdbx'];
+            const allFormats = ['json', 'zip', 'csv', '1pux', 'kdbx'];
+            if (!allFormats.includes(ext)) {
+                showToast('请选择 .json / .csv / .zip / .1pux / .kdbx 格式的文件', 'error');
+                return;
             }
 
-            if (!supported.includes(ext)) {
-                const hint = currentDir === 'to-kdbx' ? '.json / .csv / .zip / .1pux' : '.kdbx';
-                showToast(`请选择 ${hint} 格式的文件`, 'error');
+            // KDBX only valid in to-bitwarden direction
+            if (ext === 'kdbx' && currentDir === 'to-kdbx') {
+                showToast('KDBX 文件请切换到「→ Bitwarden」方向使用', 'error');
                 return;
             }
             if (file.size > 100 * 1024 * 1024) {
@@ -499,6 +501,13 @@
 
         // ============ Step Navigation ============
         nextStepBtn.addEventListener('click', () => {
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+            // Skip password step for non-KDBX files in to-bitwarden direction
+            if (currentDir === 'to-bitwarden' && ext !== 'kdbx') {
+                // Auto-start conversion without password
+                startConversion();
+                return;
+            }
             uploadCard.style.display = 'none';
             passwordCard.classList.add('show');
             updateSteps(2);
@@ -568,7 +577,10 @@
         convertBtn.addEventListener('click', () => startConversion());
 
         async function startConversion() {
-            if (!selectedFile || !dbPassword.value) return;
+            if (!selectedFile) return;
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+            const needsPassword = (currentDir === 'to-kdbx') || (currentDir === 'to-bitwarden' && ext === 'kdbx');
+            if (needsPassword && !dbPassword.value) return;
 
             uploadCard.style.display = 'none';
             passwordCard.classList.remove('show');
@@ -692,6 +704,134 @@
 
         // ============ TO BITWARDEN ============
         async function convertToBitwarden() {
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+
+            // If it's a KDBX file, load and convert KeePass entries
+            if (ext === 'kdbx') {
+                await convertKdbxToBitwarden();
+                return;
+            }
+
+            // For CSV / 1PUX / JSON / ZIP - parse them into the same vault structure,
+            // then serialize to Bitwarden JSON
+            progressStats.textContent = '正在读取文件...';
+            let vault;
+
+            if (ext === 'csv') {
+                const text = await selectedFile.text();
+                vault = parseCSV(text, selectedFile.name);
+                progressStats.textContent = `检测到 CSV 格式 · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === '1pux') {
+                vault = await parse1PUX(selectedFile);
+                progressStats.textContent = `检测到 1Password 1PUX · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === 'zip') {
+                const jsonData = await readZipFile(selectedFile);
+                vault = parseBitwardenJson(jsonData);
+                progressStats.textContent = `检测到 Bitwarden ZIP · 找到 ${vault.items.length} 个条目`;
+            } else {
+                const text = await selectedFile.text();
+                const jsonData = JSON.parse(text);
+                if (jsonData.encrypted && jsonData.passwordProtected) {
+                    vault = parseBitwardenEncrypted(jsonData);
+                } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
+                    vault = parse1PUXJSON(jsonData);
+                    progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
+                } else {
+                    vault = parseBitwardenJson(jsonData);
+                    progressStats.textContent = `检测到 Bitwarden JSON · 找到 ${vault.items.length} 个条目`;
+                }
+            }
+
+            // Serialize vault to Bitwarden JSON format
+            await convertVaultToBitwarden(vault);
+        }
+
+        async function convertVaultToBitwarden(vault) {
+            progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 Bitwarden JSON...`;
+
+            // Convert internal folders to Bitwarden folder format
+            const bwFolders = (vault.folders || []).map(f => ({
+                id: f.id,
+                name: f.name
+            }));
+
+            // Convert items to Bitwarden item format
+            const bwItems = [];
+            for (const item of vault.items) {
+                if (item.deleted) continue;
+                const bwItem = convertVaultItemToBW(item);
+                if (bwItem) bwItems.push(bwItem);
+            }
+
+            const bwExport = {
+                encrypted: false,
+                folders: bwFolders,
+                items: bwItems
+            };
+
+            generatedData = JSON.stringify(bwExport, null, 2);
+            outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.json';
+
+            progressCard.classList.remove('show');
+            successCard.classList.add('show');
+            updateSteps(3); step3.classList.add('done');
+            downloadBtn.textContent = '💾 下载 Bitwarden JSON';
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${bwFolders.length} 个文件夹`;
+
+            // Summary
+            const typeCount = {};
+            for (const item of bwItems) {
+                const tn = TYPE_NAMES[item.type] || '其他';
+                typeCount[tn] = (typeCount[tn] || 0) + 1;
+            }
+            let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
+            for (const [type, count] of Object.entries(typeCount)) {
+                html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
+            }
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${bwItems.length}</td></tr></tbody>`;
+            summaryTable.innerHTML = html;
+
+            showToast('转换完成！');
+        }
+
+        function convertVaultItemToBW(item) {
+            if (!item.name && !item.login) return null;
+
+            const bwItem = {
+                id: generateUUID(),
+                organizationId: null,
+                folderId: item.folderId || null,
+                type: item.type || 1,
+                reprompt: 0,
+                name: item.name || '(无标题)',
+                notes: item.notes || null,
+                favorite: item.favorite || false,
+                login: item.login ? {
+                    username: item.login.username || null,
+                    password: item.login.password || null,
+                    totp: item.login.totp || null,
+                    uris: (item.login.uris || []).map(u => ({ uri: u.uri || u, match: null })),
+                } : null,
+                card: item.card || null,
+                identity: item.identity || null,
+                secureNote: item.type === 2 ? { type: 0 } : null,
+                collectionIds: [],
+                fields: (item.customFields || []).map(f => ({
+                    name: f.name,
+                    value: String(f.value || ''),
+                    type: f.type || 0
+                })),
+                passwordHistory: (item.passwordHistory || []).map(ph => ({
+                    password: ph.password || '',
+                    lastUsedDate: ph.lastUsedDate || ''
+                })),
+                fido2Credentials: [],
+            };
+
+            return bwItem;
+        }
+
+        async function convertKdbxToBitwarden() {
             progressStats.textContent = '正在加载 KDBX 数据库...';
             const buf = await selectedFile.arrayBuffer();
             const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
