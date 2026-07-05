@@ -388,6 +388,36 @@
     <script>
         const { Kdbx, Credentials, ProtectedValue, Consts } = kdbxweb;
 
+        // ============ Polyfill: File.arrayBuffer() for older WebView ============
+        if (typeof File !== 'undefined' && File.prototype && !File.prototype.arrayBuffer) {
+            File.prototype.arrayBuffer = function() {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+                    reader.readAsArrayBuffer(this);
+                });
+            };
+        }
+        // Polyfill: Blob.arrayBuffer() (some WebView versions)
+        if (typeof Blob !== 'undefined' && Blob.prototype && !Blob.prototype.arrayBuffer) {
+            Blob.prototype.arrayBuffer = function() {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+                    reader.readAsArrayBuffer(this);
+                });
+            };
+        }
+        // 全局错误捕获，防止未处理异常导致白屏
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error || e.message);
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled rejection:', e.reason);
+        });
+
         // ============ DOM Elements ============
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');

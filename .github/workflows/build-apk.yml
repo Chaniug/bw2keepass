@@ -83,22 +83,29 @@ jobs:
           import android.content.Intent;
           import android.net.Uri;
           import android.os.Bundle;
+          import android.util.Log;
           import android.webkit.WebChromeClient;
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
           import android.webkit.ValueCallback;
+          import android.webkit.ConsoleMessage;
+          import android.os.Build;
+          import android.webkit.PermissionRequest;
+          import android.content.ActivityNotFoundException;
 
           public class MainActivity extends Activity {
               private WebView webView;
               private ValueCallback<Uri[]> filePathCallback;
               private static final int FILE_CHOOSER_REQUEST = 100;
+              private static final String TAG = "Pass2KDBX";
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   webView = new WebView(this);
                   setContentView(webView);
+
                   WebSettings settings = webView.getSettings();
                   settings.setJavaScriptEnabled(true);
                   settings.setAllowFileAccess(true);
@@ -106,45 +113,100 @@ jobs:
                   settings.setDomStorageEnabled(true);
                   settings.setDatabaseEnabled(true);
                   settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                  settings.setJavaScriptCanOpenWindowsAutomatically(true);
+                  settings.setSupportMultipleWindows(false);
+                  settings.setLoadWithOverviewMode(true);
+                  settings.setUseWideViewPort(true);
+                  settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
                   webView.setWebViewClient(new WebViewClient());
                   webView.setWebChromeClient(new WebChromeClient() {
                       @Override
                       public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> fpc, FileChooserParams params) {
+                          // 如果之前的回调没处理完，先取消
+                          if (filePathCallback != null) {
+                              filePathCallback.onReceiveValue(null);
+                              filePathCallback = null;
+                          }
                           filePathCallback = fpc;
-                          Intent intent = params.createIntent();
-                          startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                          try {
+                              Intent intent = params.createIntent();
+                              intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                              startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                          } catch (ActivityNotFoundException e) {
+                              Log.e(TAG, "No file chooser available", e);
+                              filePathCallback.onReceiveValue(null);
+                              filePathCallback = null;
+                              return false;
+                          }
+                          return true;
+                      }
+
+                      @Override
+                      public void onPermissionRequest(PermissionRequest request) {
+                          // 自动授予所有权限（文件访问等）
+                          request.grant(request.getResources());
+                      }
+
+                      @Override
+                      public boolean onConsoleMessage(ConsoleMessage cm) {
+                          Log.d(TAG, "JS: " + cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
                           return true;
                       }
                   });
+
                   webView.loadUrl("file:///android_asset/index.html");
               }
 
               @Override
               protected void onActivityResult(int requestCode, int resultCode, Intent data) {
                   super.onActivityResult(requestCode, resultCode, data);
-                  if (requestCode == FILE_CHOOSER_REQUEST && filePathCallback != null) {
-                      Uri[] results = null;
-                      if (resultCode == RESULT_OK && data != null) {
-                          Uri uri = data.getData();
-                          if (uri != null) {
-                              getContentResolver().takePersistableUriPermission(
-                                  uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                              );
-                              results = new Uri[]{uri};
+                  if (requestCode != FILE_CHOOSER_REQUEST || filePathCallback == null) {
+                      return;
+                  }
+                  Uri[] results = null;
+                  try {
+                      if (resultCode == RESULT_OK) {
+                          if (data != null && data.getData() != null) {
+                              // 单文件选择
+                              results = new Uri[]{data.getData()};
+                          } else if (data != null && data.getClipData() != null) {
+                              // 多文件选择
+                              int count = data.getClipData().getItemCount();
+                              results = new Uri[count];
+                              for (int i = 0; i < count; i++) {
+                                  results[i] = data.getClipData().getItemAt(i).getUri();
+                              }
                           }
                       }
-                      filePathCallback.onReceiveValue(results);
-                      filePathCallback = null;
+                  } catch (Exception e) {
+                      Log.e(TAG, "onActivityResult error", e);
+                      results = null;
                   }
+                  try {
+                      filePathCallback.onReceiveValue(results);
+                  } catch (Exception e) {
+                      Log.e(TAG, "callback error", e);
+                  }
+                  filePathCallback = null;
               }
 
               @Override
               public void onBackPressed() {
-                  if (webView.canGoBack()) {
+                  if (webView != null && webView.canGoBack()) {
                       webView.goBack();
                   } else {
                       super.onBackPressed();
                   }
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (webView != null) {
+                      webView.destroy();
+                      webView = null;
+                  }
+                  super.onDestroy();
               }
           }
           '''
