@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BW2KeePass - Bitwarden → KeePass 转换器</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔐</text></svg>">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #22252f;
+            --border: #2a2d37;
+            --text: #e1e4ea;
+            --text-secondary: #8b8fa7;
+            --accent: #6c5ce7;
+            --accent-hover: #7f6ff0;
+            --accent-glow: rgba(108, 92, 231, 0.3);
+            --success: #00cec9;
+            --danger: #ff6b6b;
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        /* 背景动画 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(0, 206, 201, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(253, 121, 168, 0.04) 0%, transparent 50%);
+            z-index: -1;
+            animation: bgShift 20s ease-in-out infinite;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(2%, -1%); }
+            66% { transform: translate(-1%, 2%); }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 720px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo-icon {
+            font-size: 2.2rem;
+        }
+
+        .logo-accent {
+            background: linear-gradient(135deg, var(--accent), var(--success));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* Steps */
+        .steps {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: color 0.3s;
+        }
+
+        .step.active { color: var(--text); }
+        .step.done { color: var(--success); }
+
+        .step-num {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border: 2px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .step.active .step-num {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .step.done .step-num {
+            border-color: var(--success);
+            background: rgba(0, 206, 201, 0.15);
+        }
+
+        .step-arrow {
+            color: var(--border);
+            margin: 0 0.25rem;
+        }
+
+        /* Card */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(108, 92, 231, 0.25);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .card-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+        }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .upload-zone:hover, .upload-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(108, 92, 231, 0.04);
+        }
+
+        .upload-zone.drag-over {
+            border-style: solid;
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .upload-text {
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+        }
+
+        .upload-hint {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        /* File Info */
+        .file-info {
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--surface-hover);
+            border-radius: var(--radius-sm);
+            margin-top: 1rem;
+        }
+
+        .file-info.show { display: flex; }
+
+        .file-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+
+        .file-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 0.15rem;
+        }
+
+        .file-remove {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .file-remove:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Password Input */
+        .password-section {
+            display: none;
+        }
+
+        .password-section.show { display: block; }
+
+        .input-group {
+            position: relative;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            padding-right: 3rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.3s;
+            outline: none;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent);
+        }
+
+        .input-group input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 0.25rem;
+        }
+
+        .password-strength {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 0.6rem;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s, background 0.3s;
+            width: 0;
+        }
+
+        .password-options {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .password-options button {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .password-options button:hover {
+            color: var(--accent-hover);
+        }
+
+        /* Progress */
+        .progress-section {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .progress-section.show { display: block; }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .progress-stats {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Success */
+        .success-section {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .success-section.show { display: block; }
+
+        .success-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            display: block;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .success-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.35rem;
+        }
+
+        .success-details {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 4px 20px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: #000;
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 4px 20px rgba(0, 206, 201, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Summary Table */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            padding: 0.6rem 0.75rem;
+            text-align: left;
+        }
+
+        .summary-table th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-table td {
+            border-bottom: 1px solid rgba(42, 45, 55, 0.5);
+        }
+
+        .summary-table .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 0.75rem 1.5rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .privacy-note {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            justify-content: center;
+            margin-top: 0.75rem;
+            padding: 0.6rem 1rem;
+            background: rgba(0, 206, 201, 0.06);
+            border-radius: 2rem;
+            font-size: 0.75rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .card { padding: 1.25rem; }
+            .upload-zone { padding: 2rem 1rem; }
+            .btn-group { flex-direction: column; }
+            .btn { width: 100%; }
+            .steps { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🔐</span>
+                <span>BW<span class="logo-accent">2</span>KeePass</span>
+            </div>
+            <p class="subtitle">将 Bitwarden 导出 JSON 转换为 KeePass KDBX 数据库<br>所有处理均在浏览器本地完成，数据不会上传到任何服务器</p>
+        </header>
+
+        <!-- Steps -->
+        <div class="steps">
+            <div class="step active" id="step1">
+                <span class="step-num">1</span> 上传文件
+            </div>
+            <span class="step-arrow">→</span>
+            <div class="step" id="step2">
+                <span class="step-num">2</span> 设置密码
+            </div>
+            <span class="step-arrow">→</span>
+            <div class="step" id="step3">
+                <span class="step-num">3</span> 下载
+            </div>
+        </div>
+
+        <!-- Step 1: Upload -->
+        <div class="card" id="uploadCard">
+            <div class="card-title">📁 上传 Bitwarden 导出文件</div>
+            <div class="card-desc">支持 .json 和 .zip 格式的 Bitwarden 导出文件</div>
+            <div class="upload-zone" id="uploadZone">
+                <span class="upload-icon">⬆️</span>
+                <div class="upload-text">点击上传或拖拽文件到此处</div>
+                <div class="upload-hint">.json / .zip · 最大 100MB</div>
+            </div>
+            <input type="file" class="file-input" id="fileInput" accept=".json,.zip">
+            
+            <div class="file-info" id="fileInfo">
+                <span class="file-icon">📄</span>
+                <div class="file-details">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-meta" id="fileMeta"></div>
+                </div>
+                <button class="file-remove" id="fileRemove" title="移除文件">✕</button>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1.25rem;">
+                <button class="btn btn-primary" id="nextStepBtn" disabled>下一步：设置密码 →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Password -->
+        <div class="card password-section" id="passwordCard">
+            <div class="card-title">🔑 设置 KeePass 数据库密码</div>
+            <div class="card-desc">此密码将用于加密您的 KeePass 数据库</div>
+            
+            <div class="input-group">
+                <input type="password" id="dbPassword" placeholder="输入数据库主密码" autocomplete="new-password">
+                <button class="toggle-password" id="togglePassword" title="显示/隐藏密码">👁️</button>
+            </div>
+            <div class="password-strength">
+                <div class="password-strength-bar" id="passwordStrengthBar"></div>
+            </div>
+            <div class="password-options">
+                <span id="strengthLabel">输入密码</span>
+                <button id="generatePassword">🎲 生成随机密码</button>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1.5rem;">
+                <button class="btn btn-outline" id="backBtn">← 返回</button>
+                <button class="btn btn-primary" id="convertBtn" disabled>开始转换</button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="card progress-section" id="progressCard">
+            <div class="spinner"></div>
+            <div class="progress-text">正在转换中...</div>
+            <div class="progress-stats" id="progressStats"></div>
+        </div>
+
+        <!-- Success -->
+        <div class="card success-section" id="successCard">
+            <span class="success-icon">✅</span>
+            <div class="success-title">转换完成！</div>
+            <div class="success-details" id="successDetails"></div>
+            <table class="summary-table" id="summaryTable"></table>
+            <div class="btn-group" style="margin-top: 1.25rem;">
+                <button class="btn btn-outline" id="newConvertBtn">🔄 转换新文件</button>
+                <button class="btn btn-success" id="downloadBtn">💾 下载 KDBX 文件</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <a href="https://github.com/Chaniug/bw2keepass" target="_blank" rel="noopener">GitHub</a>
+            <span style="margin: 0 0.5rem; color: var(--border);">·</span>
+            <span>v1.0</span>
+            <div class="privacy-note">
+                <span>🛡️</span> 所有数据在浏览器本地处理，不会上传到任何服务器
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+        import { Kdbx, Credentials, ProtectedValue, Consts } from 'https://cdn.jsdelivr.net/npm/kdbxweb@2.1.0/dist/kdbxweb.es.js';
+
+        // ============ DOM Elements ============
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileMeta = document.getElementById('fileMeta');
+        const fileRemove = document.getElementById('fileRemove');
+        const nextStepBtn = document.getElementById('nextStepBtn');
+
+        const uploadCard = document.getElementById('uploadCard');
+        const passwordCard = document.getElementById('passwordCard');
+        const progressCard = document.getElementById('progressCard');
+        const successCard = document.getElementById('successCard');
+
+        const dbPassword = document.getElementById('dbPassword');
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordStrengthBar = document.getElementById('passwordStrengthBar');
+        const strengthLabel = document.getElementById('strengthLabel');
+        const generatePassword = document.getElementById('generatePassword');
+        const convertBtn = document.getElementById('convertBtn');
+        const backBtn = document.getElementById('backBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const newConvertBtn = document.getElementById('newConvertBtn');
+
+        const progressStats = document.getElementById('progressStats');
+        const successDetails = document.getElementById('successDetails');
+        const summaryTable = document.getElementById('summaryTable');
+        const toast = document.getElementById('toast');
+
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
+
+        // ============ State ============
+        let selectedFile = null;
+        let parsedData = null;
+        let generatedKdbx = null;
+        let dbFileName = 'vault.kdbx';
+
+        // ============ Type Name Map ============
+        const TYPE_NAMES = { 1: 'Login', 2: 'SecureNote', 3: 'Card', 4: 'Identity', 5: 'SSHKey' };
+
+        // ============ File Handling ============
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileRemove.addEventListener('click', () => {
+            selectedFile = null;
+            parsedData = null;
+            fileInfo.classList.remove('show');
+            uploadZone.style.display = '';
+            nextStepBtn.disabled = true;
+            fileInput.value = '';
+        });
+
+        function handleFile(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!['json', 'zip'].includes(ext)) {
+                showToast('请选择 .json 或 .zip 格式的文件', 'error');
+                return;
+            }
+            if (file.size > 100 * 1024 * 1024) {
+                showToast('文件大小不能超过 100MB', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = file.name;
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            fileMeta.textContent = `${sizeMB} MB · ${ext.toUpperCase()}`;
+            fileInfo.classList.add('show');
+            uploadZone.style.display = 'none';
+            nextStepBtn.disabled = false;
+        }
+
+        // ============ Step Navigation ============
+        nextStepBtn.addEventListener('click', () => {
+            uploadCard.style.display = 'none';
+            passwordCard.classList.add('show');
+            updateSteps(2);
+            dbPassword.focus();
+        });
+
+        backBtn.addEventListener('click', () => {
+            passwordCard.classList.remove('show');
+            uploadCard.style.display = '';
+            updateSteps(1);
+        });
+
+        function updateSteps(active) {
+            [step1, step2, step3].forEach((s, i) => {
+                s.classList.remove('active', 'done');
+                if (i + 1 < active) s.classList.add('done');
+                if (i + 1 === active) s.classList.add('active');
+            });
+        }
+
+        // ============ Password ============
+        togglePassword.addEventListener('click', () => {
+            const type = dbPassword.type === 'password' ? 'text' : 'password';
+            dbPassword.type = type;
+            togglePassword.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+
+        dbPassword.addEventListener('input', updatePasswordStrength);
+
+        function updatePasswordStrength() {
+            const val = dbPassword.value;
+            let score = 0;
+            if (val.length >= 8) score++;
+            if (val.length >= 12) score++;
+            if (/[a-z]/.test(val) && /[A-Z]/.test(val)) score++;
+            if (/\d/.test(val)) score++;
+            if (/[^a-zA-Z0-9]/.test(val)) score++;
+
+            const pct = (score / 5) * 100;
+            passwordStrengthBar.style.width = pct + '%';
+
+            let color, label;
+            if (score <= 1) { color = '#ff6b6b'; label = '弱'; }
+            else if (score <= 2) { color = '#feca57'; label = '一般'; }
+            else if (score <= 3) { color = '#54a0ff'; label = '较好'; }
+            else if (score <= 4) { color = '#5f27cd'; label = '强'; }
+            else { color = '#00cec9'; label = '非常强'; }
+
+            passwordStrengthBar.style.background = color;
+            strengthLabel.textContent = val ? `密码强度：${label}` : '输入密码';
+            convertBtn.disabled = val.length < 8;
+        }
+
+        generatePassword.addEventListener('click', () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+            const arr = new Uint8Array(24);
+            crypto.getRandomValues(arr);
+            let pw = '';
+            for (let i = 0; i < 24; i++) pw += chars[arr[i] % chars.length];
+            dbPassword.value = pw;
+            dbPassword.type = 'text';
+            togglePassword.textContent = '🙈';
+            updatePasswordStrength();
+        });
+
+        // ============ Conversion ============
+        convertBtn.addEventListener('click', () => startConversion());
+
+        async function startConversion() {
+            if (!selectedFile || !dbPassword.value) return;
+
+            // Show progress
+            uploadCard.style.display = 'none';
+            passwordCard.classList.remove('show');
+            progressCard.classList.add('show');
+            successCard.classList.remove('show');
+            updateSteps(3);
+
+            try {
+                // Read file
+                progressStats.textContent = '正在读取文件...';
+                let jsonData;
+                if (selectedFile.name.endsWith('.zip')) {
+                    jsonData = await readZipFile(selectedFile);
+                } else {
+                    const text = await selectedFile.text();
+                    jsonData = JSON.parse(text);
+                }
+
+                // Parse
+                progressStats.textContent = '正在解析条目...';
+                const vault = parseBitwardenJson(jsonData);
+                parsedData = vault;
+
+                progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 KDBX 数据库...`;
+
+                // Create KDBX
+                const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
+                const db = Kdbx.create(credentials, 'Bitwarden Import');
+
+                // Create folder groups
+                const folderGroupMap = new Map();
+                folderGroupMap.set(null, db.getDefaultGroup());
+
+                for (const folder of vault.folders) {
+                    const group = db.createGroup(db.getDefaultGroup(), sanitizePath(folder.name));
+                    folderGroupMap.set(folder.id, group);
+                }
+
+                // Create entries
+                let entryCount = 0;
+                for (const item of vault.items) {
+                    if (item.deleted) continue;
+
+                    const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
+                    const entry = db.createEntry(parentGroup);
+
+                    // Title
+                    entry.fields.Title = item.name || '(无标题)';
+
+                    // Username
+                    if (item.login?.username) {
+                        entry.fields.UserName = item.login.username;
+                    }
+
+                    // Password
+                    if (item.login?.password) {
+                        entry.fields.Password = ProtectedValue.fromString(item.login.password);
+                    }
+
+                    // URL
+                    if (item.login?.uris?.length) {
+                        entry.fields.URL = item.login.uris[0].uri || '';
+                    }
+
+                    // Notes
+                    const notes = buildNotes(item);
+                    if (notes) {
+                        entry.fields.Notes = notes;
+                    }
+
+                    // Custom fields
+                    const customFields = buildCustomFields(item);
+                    for (const [key, value] of Object.entries(customFields)) {
+                        if (key === 'TOTP Seed' || key === 'Password' || key === 'TOTP') {
+                            entry.fields[key] = ProtectedValue.fromString(String(value));
+                        } else {
+                            entry.fields[key] = String(value);
+                        }
+                    }
+
+                    // Tags (KeePass entry tags are space-separated)
+                    const tags = buildTags(item);
+                    if (tags.length) {
+                        // Store as a custom field since kdbxweb entry.tags is limited
+                        entry.fields['_TAGS'] = tags.join(' ');
+                    }
+
+                    entryCount++;
+                    progressStats.textContent = `已处理 ${entryCount}/${vault.items.length} 个条目...`;
+                }
+
+                // Save
+                progressStats.textContent = '正在加密并生成 KDBX 文件...';
+                generatedKdbx = await db.save();
+
+                // Show success
+                progressCard.classList.remove('show');
+                successCard.classList.add('show');
+                updateSteps(3);
+                step3.classList.add('done');
+
+                dbFileName = selectedFile.name.replace(/\.(json|zip)$/i, '') + '.kdbx';
+                successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹`;
+                buildSummaryTable(vault);
+
+                showToast('转换完成！');
+
+            } catch (err) {
+                progressCard.classList.remove('show');
+                uploadCard.style.display = '';
+                updateSteps(1);
+                console.error('Conversion error:', err);
+                showToast('转换失败：' + (err.message || '未知错误'), 'error');
+            }
+        }
+
+        // ============ Download ============
+        downloadBtn.addEventListener('click', () => {
+            if (!generatedKdbx) return;
+            const blob = new Blob([generatedKdbx], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = dbFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('KDBX 文件已下载');
+        });
+
+        newConvertBtn.addEventListener('click', () => {
+            selectedFile = null;
+            parsedData = null;
+            generatedKdbx = null;
+            dbPassword.value = '';
+            passwordStrengthBar.style.width = '0';
+            strengthLabel.textContent = '输入密码';
+            convertBtn.disabled = true;
+            fileInput.value = '';
+            fileInfo.classList.remove('show');
+            uploadZone.style.display = '';
+            nextStepBtn.disabled = true;
+            successCard.classList.remove('show');
+            uploadCard.style.display = '';
+            updateSteps(1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // ============ Parsing ============
+        function parseBitwardenJson(json) {
+            const folders = [];
+            const items = [];
+
+            if (json.folders) {
+                for (const f of json.folders) {
+                    folders.push({ id: f.id, name: f.name });
+                }
+            }
+
+            if (json.items) {
+                for (const item of json.items) {
+                    if (item.deletedDate) continue; // Skip deleted
+
+                    const parsed = {
+                        id: item.id,
+                        name: item.name || '',
+                        type: item.type || 1,
+                        notes: item.notes || '',
+                        favorite: item.favorite || false,
+                        folderId: item.folderId || null,
+                        collectionIds: item.collectionIds || [],
+                        deleted: false,
+                        creationDate: item.creationDate || '',
+                        revisionDate: item.revisionDate || '',
+                        login: null,
+                        card: null,
+                        identity: null,
+                        secureNote: null,
+                        sshKey: null,
+                        fido2Credentials: [],
+                        customFields: [],
+                        passwordHistory: [],
+                    };
+
+                    // Login
+                    if (item.login) {
+                        parsed.login = {
+                            username: item.login.username || '',
+                            password: item.login.password || '',
+                            totp: item.login.totp || '',
+                            uris: (item.login.uris || []).map(u => ({ uri: u.uri || '', match: u.match || null })),
+                        };
+                    }
+
+                    // Card
+                    if (item.card) {
+                        parsed.card = {
+                            cardholderName: item.card.cardholderName || '',
+                            brand: item.card.brand || '',
+                            number: item.card.number || '',
+                            expMonth: item.card.expMonth || '',
+                            expYear: item.card.expYear || '',
+                            code: item.card.code || '',
+                        };
+                    }
+
+                    // Identity
+                    if (item.identity) {
+                        parsed.identity = { ...item.identity };
+                    }
+
+                    // Secure Note
+                    if (item.secureNote) {
+                        parsed.secureNote = { type: item.secureNote.type || 0 };
+                    }
+
+                    // SSH Key
+                    if (item.sshKey) {
+                        parsed.sshKey = {
+                            privateKey: item.sshKey.privateKey || '',
+                            publicKey: item.sshKey.publicKey || '',
+                            fingerprint: item.sshKey.fingerprint || '',
+                        };
+                    }
+
+                    // FIDO2 Credentials
+                    for (const fc of (item.fido2Credentials || [])) {
+                        parsed.fido2Credentials.push({
+                            credentialId: fc.credentialId || '',
+                            keyType: fc.keyType || '',
+                            keyAlgorithm: fc.keyAlgorithm || '',
+                            keyCurve: fc.keyCurve || '',
+                            keyValue: fc.keyValue || '',
+                            rpId: fc.rpId || '',
+                            rpName: fc.rpName || '',
+                            userHandle: fc.userHandle || '',
+                            userName: fc.userName || '',
+                            userDisplayName: fc.userDisplayName || '',
+                            counter: String(fc.counter || '0'),
+                            discoverable: String(fc.discoverable || 'false'),
+                            creationDate: fc.creationDate || '',
+                        });
+                    }
+
+                    // Custom fields
+                    for (const cf of (item.fields || [])) {
+                        parsed.customFields.push({
+                            name: cf.name || '',
+                            value: cf.value || '',
+                            type: cf.type || 0,
+                        });
+                    }
+
+                    // Password history
+                    for (const ph of (item.passwordHistory || [])) {
+                        parsed.passwordHistory.push({
+                            password: ph.password || '',
+                            lastUsedDate: ph.lastUsedDate || '',
+                        });
+                    }
+
+                    items.push(parsed);
+                }
+            }
+
+            return { folders, items };
+        }
+
+        // ============ Notes Builder ============
+        function buildNotes(item) {
+            const parts = [];
+
+            if (item.notes) {
+                parts.push(item.notes);
+            }
+
+            // Login extras
+            if (item.login) {
+                const extras = [];
+                if (item.login.totp) {
+                    extras.push(`TOTP: ${item.login.totp}`);
+                }
+                if (item.login.uris?.length > 1) {
+                    for (let i = 1; i < item.login.uris.length; i++) {
+                        extras.push(`备用URI: ${item.login.uris[i].uri}`);
+                    }
+                }
+                if (extras.length) {
+                    parts.push('\n[额外信息]\n' + extras.join('\n'));
+                }
+            }
+
+            // Card details
+            if (item.card && (item.card.number || item.card.cardholderName)) {
+                const cardLines = ['\n[卡片信息]'];
+                if (item.card.cardholderName) cardLines.push(`持卡人: ${item.card.cardholderName}`);
+                if (item.card.brand) cardLines.push(`品牌: ${item.card.brand}`);
+                if (item.card.number) cardLines.push(`卡号: ${item.card.number}`);
+                if (item.card.expMonth) cardLines.push(`有效期: ${item.card.expMonth}/${item.card.expYear}`);
+                if (item.card.code) cardLines.push(`安全码: ${item.card.code}`);
+                parts.push(cardLines.join('\n'));
+            }
+
+            // Password history
+            if (item.passwordHistory?.length) {
+                const histLines = ['\n[密码历史]'];
+                for (const h of item.passwordHistory.slice(0, 10)) {
+                    const ds = h.lastUsedDate ? ` (${h.lastUsedDate})` : '';
+                    histLines.push(`- ${h.password}${ds}`);
+                }
+                parts.push(histLines.join('\n'));
+            }
+
+            // FIDO2 / Passkey
+            if (item.fido2Credentials?.length) {
+                const fidoLines = ['\n[Passkey / FIDO2 凭据]'];
+                for (let i = 0; i < item.fido2Credentials.length; i++) {
+                    const fc = item.fido2Credentials[i];
+                    if (item.fido2Credentials.length > 1) {
+                        fidoLines.push(`\n--- Passkey #${i + 1} ---`);
+                    }
+                    if (fc.rpName) fidoLines.push(`服务: ${fc.rpName} (${fc.rpId})`);
+                    else fidoLines.push(`依赖方: ${fc.rpId}`);
+                    if (fc.userName) fidoLines.push(`用户名: ${fc.userName}`);
+                    if (fc.userDisplayName) fidoLines.push(`显示名称: ${fc.userDisplayName}`);
+                    fidoLines.push(`凭据ID: ${fc.credentialId}`);
+                    fidoLines.push(`算法: ${fc.keyAlgorithm} (${fc.keyCurve})`);
+                    fidoLines.push(`类型: ${fc.keyType}`);
+                    fidoLines.push(`可发现: ${fc.discoverable}`);
+                    fidoLines.push(`计数器: ${fc.counter}`);
+                    if (fc.userHandle) fidoLines.push(`用户句柄: ${fc.userHandle}`);
+                    if (fc.keyValue) fidoLines.push(`密钥值: ${fc.keyValue}`);
+                    if (fc.creationDate) fidoLines.push(`创建时间: ${fc.creationDate}`);
+                }
+                parts.push(fidoLines.join('\n'));
+            }
+
+            return parts.join('\n');
+        }
+
+        // ============ Custom Fields Builder ============
+        function buildCustomFields(item) {
+            const fields = {};
+
+            // Type
+            if (item.type) {
+                fields['BitwardenType'] = TYPE_NAMES[item.type] || `Type${item.type}`;
+            }
+
+            // TOTP
+            if (item.login?.totp) {
+                fields['TOTP Seed'] = item.login.totp;
+            }
+
+            // URIs
+            if (item.login?.uris?.length > 1) {
+                for (let i = 1; i < item.login.uris.length; i++) {
+                    fields[`URI_${i + 1}`] = item.login.uris[i].uri || '';
+                }
+            }
+
+            // Card
+            if (item.card) {
+                if (item.card.brand) fields['CardBrand'] = item.card.brand;
+                if (item.card.number) fields['CardNumber'] = item.card.number;
+                if (item.card.expMonth) fields['CardExpiry'] = `${item.card.expMonth}/${item.card.expYear}`;
+            }
+
+            // SSH
+            if (item.sshKey?.fingerprint) {
+                fields['SSHFingerprint'] = item.sshKey.fingerprint;
+            }
+
+            // Custom fields
+            for (const cf of item.customFields) {
+                if (!fields[cf.name]) {
+                    fields[cf.name] = cf.value;
+                }
+            }
+
+            // FIDO2 / Passkey
+            for (let i = 0; i < item.fido2Credentials.length; i++) {
+                const fc = item.fido2Credentials[i];
+                const idx = item.fido2Credentials.length > 1 ? `_${i}` : '';
+                if (fc.credentialId) fields[`KPEX_PASSKEY_CREDENTIAL_ID${idx}`] = fc.credentialId;
+                if (fc.keyValue) fields[`KPEX_PASSKEY_KEY_VALUE${idx}`] = fc.keyValue;
+                if (fc.rpId) fields[`KPEX_PASSKEY_RP_ID${idx}`] = fc.rpId;
+                if (fc.rpName) fields[`KPEX_PASSKEY_RP_NAME${idx}`] = fc.rpName;
+                if (fc.userHandle) fields[`KPEX_PASSKEY_USER_HANDLE${idx}`] = fc.userHandle;
+                if (fc.userName) fields[`KPEX_PASSKEY_USER_NAME${idx}`] = fc.userName;
+                if (fc.keyAlgorithm) fields[`KPEX_PASSKEY_ALGORITHM${idx}`] = fc.keyAlgorithm;
+                if (fc.keyCurve) fields[`KPEX_PASSKEY_CURVE${idx}`] = fc.keyCurve;
+                if (fc.counter) fields[`KPEX_PASSKEY_COUNTER${idx}`] = fc.counter;
+                if (fc.discoverable) fields[`KPEX_PASSKEY_DISCOVERABLE${idx}`] = fc.discoverable;
+                if (fc.creationDate) fields[`KPEX_PASSKEY_CREATION${idx}`] = fc.creationDate;
+            }
+
+            // Timestamps
+            if (item.creationDate) fields['CreationDate'] = item.creationDate;
+            if (item.revisionDate) fields['RevisionDate'] = item.revisionDate;
+
+            return fields;
+        }
+
+        // ============ Tags Builder ============
+        function buildTags(item) {
+            const tags = [];
+            const typeName = TYPE_NAMES[item.type];
+            if (typeName) tags.push(typeName);
+            if (item.favorite) tags.push('Favorite');
+            if (item.fido2Credentials?.length) tags.push('Passkey');
+            return tags;
+        }
+
+        // ============ Summary Table ============
+        function buildSummaryTable(vault) {
+            const typeCount = {};
+            for (const item of vault.items) {
+                const tn = TYPE_NAMES[item.type] || `其他`;
+                typeCount[tn] = (typeCount[tn] || 0) + 1;
+            }
+
+            let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
+            for (const [type, count] of Object.entries(typeCount)) {
+                html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
+            }
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${vault.items.length}</td></tr>`;
+            html += '</tbody>';
+            summaryTable.innerHTML = html;
+        }
+
+        // ============ ZIP Support ============
+        async function readZipFile(file) {
+            // Dynamic import of JSZip if needed
+            const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+            const zip = await JSZip.default.loadAsync(file);
+            // Find the first .json file
+            const jsonFile = Object.keys(zip.files).find(name => name.endsWith('.json'));
+            if (!jsonFile) throw new Error('ZIP 文件中未找到 JSON 数据');
+            const content = await zip.files[jsonFile].async('string');
+            return JSON.parse(content);
+        }
+
+        // ============ Helpers ============
+        function sanitizePath(path) {
+            return path.replace(/[\/\\]/g, '_');
+        }
+
+        function showToast(msg, type = '') {
+            toast.textContent = msg;
+            toast.className = 'toast ' + type + ' show';
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // ============ Keyboard shortcuts ============
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && passwordCard.classList.contains('show') && !convertBtn.disabled) {
+                e.preventDefault();
+                startConversion();
+            }
+        });
+    </script>
+</body>
+</html>
