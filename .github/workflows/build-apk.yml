@@ -213,6 +213,7 @@ jobs:
             app/build/gen/cc/valk/pass2kdbx/R.java
 
           # DEX
+          mkdir -p app/build/dex
           $BUILD_TOOLS/d8 --lib $PLATFORM/android.jar \
             --output app/build/dex \
             app/build/obj/cc/valk/pass2kdbx/*.class
