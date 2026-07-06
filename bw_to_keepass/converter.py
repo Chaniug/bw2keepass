@@ -47,10 +47,15 @@ def get_entry_password(item: VaultItem) -> str:
 
 
 def get_entry_url(item: VaultItem) -> str:
-    """获取 KeePass 条目 URL，优先选择 http(s) 协议，跳过 androidapp:// 等非标准协议"""
+    """获取 KeePass 条目 URL，优先 http(s) 协议，跳过 androidapp://，无前缀的当 URL 处理"""
     if item.type == 1 and item.uris:
+        # 第一轮：优先 http(s)
         for u in item.uris:
             if u.uri and (u.uri.startswith("http://") or u.uri.startswith("https://")):
+                return u.uri
+        # 第二轮：非 androidapp:// 的当 URL（如 account.coolapk.com）
+        for u in item.uris:
+            if u.uri and not u.uri.startswith("androidapp://"):
                 return u.uri
     return ""
 
