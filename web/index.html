@@ -2854,7 +2854,8 @@
 
             const kdfType = jsonData.kdfType || 0;
             const kdfIterations = jsonData.kdfIterations || 100000;
-            const salt = jsonData.salt; // Base64 字符串, Bitwarden 用 UTF-8 编码作为 PBKDF2 salt
+            // Bitwarden 的 salt 是 Base64 字符串，PBKDF2 使用其解码后的原始字节作为 salt
+            const saltBytes = base64ToArrayBuffer(jsonData.salt);
 
             // 1. PBKDF2 密钥派生
             const enc = new TextEncoder();
@@ -2863,7 +2864,7 @@
                 { name: 'PBKDF2' }, false, ['deriveBits']
             );
             const masterKey = await crypto.subtle.deriveBits(
-                { name: 'PBKDF2', salt: enc.encode(salt), iterations: kdfIterations, hash: 'SHA-256' },
+                { name: 'PBKDF2', salt: saltBytes, iterations: kdfIterations, hash: 'SHA-256' },
                 passwordKey, 256
             );
 
@@ -2913,6 +2914,8 @@
                 encType,
                 iv: base64ToArrayBuffer(parts[0]),
                 ct: base64ToArrayBuffer(parts[1]),
+                ivB64: parts[0],
+                ctB64: parts[1],
                 mac: parts[2] // 保持 base64 字符串，用于比较
             };
         }
@@ -2935,14 +2938,12 @@
 
         // AES-CBC 解密 + HMAC 验证
         async function decryptCipherString(cipherStr, encKey, macKey) {
-            const { encType, iv, ct, mac } = parseCipherString(cipherStr);
+            const { encType, iv, ct, ivB64, ctB64, mac } = parseCipherString(cipherStr);
             // encType 2 = AesCbc256_HmacSha256_B64
             if (encType !== 2) throw new Error('不支持的加密类型: ' + encType);
 
-            // HMAC 完整性验证
-            const macData = new Uint8Array(iv.byteLength + ct.byteLength);
-            macData.set(new Uint8Array(iv), 0);
-            macData.set(new Uint8Array(ct), iv.byteLength);
+            // HMAC 完整性验证（Bitwarden 规范：对 iv 和 ct 的 base64 字符串拼接做 HMAC）
+            const macData = enc.encode(ivB64 + ctB64);
 
             const hmacKey = await crypto.subtle.importKey('raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
             const computedSig = await crypto.subtle.sign('HMAC', hmacKey, macData);
