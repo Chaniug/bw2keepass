@@ -2852,36 +2852,91 @@
                 throw new Error('不是有效的 Bitwarden 加密导出格式');
             }
 
+            const enc = new TextEncoder();
             const kdfType = jsonData.kdfType || 0;
             const kdfIterations = jsonData.kdfIterations || 100000;
-            // Bitwarden 的 salt 字段是 Base64 字符串，但 PBKDF2 实际使用其 UTF-8 文本作为 salt 原始字节
-            const saltBytes = enc.encode(jsonData.salt);
+            const kdfMemory = jsonData.kdfMemory || 64;       // Bitwarden 以 MiB 存储
+            const kdfParallelism = jsonData.kdfParallelism || 4;
 
-            // 1. PBKDF2 密钥派生
-            const enc = new TextEncoder();
-            const passwordKey = await crypto.subtle.importKey(
-                'raw', enc.encode(password),
-                { name: 'PBKDF2' }, false, ['deriveBits']
-            );
-            const masterKey = await crypto.subtle.deriveBits(
-                { name: 'PBKDF2', salt: saltBytes, iterations: kdfIterations, hash: 'SHA-256' },
-                passwordKey, 256
-            );
+            // Bitwarden 导出里的 salt 字段是 Base64 字符串。官方 bitwarden_crypto 采用
+            // Base64 解码得到原始字节参与 KDF（与 C# Convert.FromBase64String 一致）；
+            // 个别旧路径曾使用 UTF-8 文本。两种都尝试，以 MAC 校验为准选择正确者。
+            const saltCandidates = [
+                base64ToArrayBuffer(jsonData.salt),   // 官方：Base64 解码
+                enc.encode(jsonData.salt),            // 兼容：UTF-8 文本
+            ];
+            // Argon2 的 memory 单位在不同来源表述不一（MiB vs KiB），同时尝试两种
+            const argonMemoryCandidates = [kdfMemory * 1024, kdfMemory];
 
-            // 2. HKDF-Expand 密钥拉伸（Bitwarden stretchKey：分别用 "enc"/"mac" 作为 info 派生）
-            const masterKeyBytes = new Uint8Array(masterKey);
-            const encKey = await hkdfExpand(masterKeyBytes, 32, 'enc');
-            const macKey = await hkdfExpand(masterKeyBytes, 32, 'mac');
+            let lastErr = null;
+            for (const saltBytes of saltCandidates) {
+                try {
+                    let masterKey;
+                    if (kdfType === 1) {
+                        // Argon2id（账户使用 Argon2id KDF 时）
+                        if (typeof hashwasm === 'undefined') {
+                            throw new Error('当前环境未加载 hash-wasm，无法解密 Argon2 加密导出，请检查网络后重试');
+                        }
+                        let derived = null, derr = null, derrMsg = '';
+                        for (const mem of argonMemoryCandidates) {
+                            try {
+                                derived = await hashwasm.argon2id({
+                                    password: password,
+                                    salt: new Uint8Array(saltBytes),
+                                    parallelism: kdfParallelism,
+                                    iterations: kdfIterations,
+                                    memorySize: mem,
+                                    hashLength: 32,
+                                    outputType: 'binary',
+                                });
+                                derr = null;
+                                break;
+                            } catch (e) {
+                                derr = e;
+                                derrMsg = e && e.message ? e.message : String(e);
+                            }
+                        }
+                        if (derr && !derived) {
+                            throw new Error('Argon2 派生失败：' + derrMsg);
+                        }
+                        masterKey = derived;
+                    } else if (kdfType === 0) {
+                        // PBKDF2-SHA256（默认）
+                        const passwordKey = await crypto.subtle.importKey(
+                            'raw', enc.encode(password),
+                            { name: 'PBKDF2' }, false, ['deriveBits']
+                        );
+                        masterKey = await crypto.subtle.deriveBits(
+                            { name: 'PBKDF2', salt: saltBytes, iterations: kdfIterations, hash: 'SHA-256' },
+                            passwordKey, 256
+                        );
+                    } else {
+                        throw new Error('不支持的 KDF 类型: ' + kdfType + '（当前仅支持 PBKDF2 与 Argon2id）');
+                    }
 
-            // 3. 解密 encKeyValidation 验证密码正确性（旧版导出可能没有此字段）
-            if (jsonData.encKeyValidation_DO_NOT_EDIT) {
-                await decryptCipherString(jsonData.encKeyValidation_DO_NOT_EDIT, encKey, macKey);
+                    // HKDF-Expand 密钥拉伸（Bitwarden stretchKey：分别用 "enc"/"mac" 作为 info 派生）
+                    const masterKeyBytes = new Uint8Array(masterKey);
+                    const encKey = await hkdfExpand(masterKeyBytes, 32, 'enc');
+                    const macKey = await hkdfExpand(masterKeyBytes, 32, 'mac');
+
+                    // 解密 encKeyValidation 验证密码/算法正确性（旧版导出可能没有此字段，则改校验 data）
+                    if (jsonData.encKeyValidation_DO_NOT_EDIT) {
+                        await decryptCipherString(jsonData.encKeyValidation_DO_NOT_EDIT, encKey, macKey);
+                    } else {
+                        await decryptCipherString(jsonData.data, encKey, macKey);
+                    }
+
+                    // 校验通过，解密主数据
+                    const dataBuffer = await decryptCipherString(jsonData.data, encKey, macKey);
+                    const decryptedText = new TextDecoder().decode(dataBuffer);
+                    return JSON.parse(decryptedText);
+                } catch (e) {
+                    // 该 salt/参数组合不通过 MAC 校验，尝试下一种候选
+                    lastErr = e;
+                }
             }
-
-            // 4. 解密主数据
-            const dataBuffer = await decryptCipherString(jsonData.data, encKey, macKey);
-            const decryptedText = new TextDecoder().decode(dataBuffer);
-            return JSON.parse(decryptedText);
+            // 所有候选组合均失败
+            throw new Error('密码错误或数据已损坏（MAC 验证失败）');
         }
 
         // HKDF-Expand (RFC 5869): 从 PRK 派生子密钥，info 为上下文字符串（Bitwarden 用 "enc"/"mac"）

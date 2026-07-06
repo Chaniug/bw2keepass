@@ -1,12 +1,17 @@
 """
 Bitwarden 加密导出（密码保护 JSON）解密
 
-算法与 web/index.html 中的 decryptBitwardenEncryptedJson 完全一致，并经
-218 条真实数据验证。规格参考 Bitwarden 加密导出文档：
-https://bitwarden.com/help/encrypted-export/
+算法与 web/index.html 中的 decryptBitwardenEncryptedJson 完全一致。规格参考
+Bitwarden 加密导出文档：https://bitwarden.com/help/encrypted-export/
+
+Bitwarden 导出里的 salt 字段是 Base64 字符串。官方 bitwarden_crypto 采用 Base64
+解码得到原始字节参与 KDF（与 C# Convert.FromBase64String 一致）；个别旧路径曾使用
+UTF-8 文本。本模块两种都尝试，并以 encKeyValidation / data 的 MAC 校验为准选择正确者。
 
 流程：
-  1. PBKDF2-SHA256(password, UTF-8(salt), iterations) -> 256-bit masterKey
+  1. 按账户 KDF 派生主密钥
+       - PBKDF2-SHA256(password, salt, iterations)          -> 256-bit masterKey
+       - Argon2id(password, salt, t, m, p)                  -> 256-bit masterKey
   2. HKDF-Expand（info="enc" / "mac"）           -> encKey / macKey  (stretchKey)
   3. 校验 encKeyValidation_DO_NOT_EDIT（验证导出密码是否正确）
   4. 解密 data：AES-256-CBC + HMAC-SHA256(iv‖ct) 常量时间比较
@@ -77,6 +82,31 @@ def _decrypt_cipher_string(cipher_str: str, enc_key: bytes, mac_key: bytes) -> b
     return padded[:-pad_len]
 
 
+def _derive_master_key(kdf_type: int, password: str, salt: bytes,
+                       kdf_iterations: int, kdf_memory: int, kdf_parallelism: int) -> bytes:
+    """按 KDF 类型派生主密钥。Argon2 的 memory 单位在不同来源表述不一（MiB vs KiB），
+    由调用方在循环中尝试两种候选值。"""
+    if kdf_type == 0:
+        # PBKDF2-SHA256
+        return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, kdf_iterations, dklen=32)
+    if kdf_type == 1:
+        # Argon2id
+        try:
+            from argon2.low_level import hash_secret_raw, Type
+        except ImportError as e:  # pragma: no cover - 依赖缺失提示
+            raise EncryptedExportError(
+                "解密 Argon2 加密导出需要 argon2-cffi，请执行 `pip install argon2-cffi`"
+            ) from e
+        return hash_secret_raw(
+            password.encode('utf-8'), salt,
+            time_cost=kdf_iterations, memory_cost=kdf_memory,
+            parallelism=kdf_parallelism, hash_len=32, type=Type.ID, version=19,
+        )
+    raise EncryptedExportError(
+        f"不支持的 KDF 类型: {kdf_type}（当前仅支持 PBKDF2 与 Argon2id）"
+    )
+
+
 def decrypt_bitwarden_export(data: dict, password: str) -> dict:
     """解密 Bitwarden 密码保护导出 JSON，返回明文 JSON dict
 
@@ -92,19 +122,54 @@ def decrypt_bitwarden_export(data: dict, password: str) -> dict:
             and data.get('salt') and data.get('data')):
         raise EncryptedExportError("不是有效的 Bitwarden 加密导出格式")
 
+    kdf_type = int(data.get('kdfType') or 0)
     kdf_iterations = int(data.get('kdfIterations') or 100000)
-    # 注意：Bitwarden 的 salt 为 base64 字符串，但 PBKDF2 使用其 UTF-8 文本作为 salt 原始字节
-    salt = data['salt'].encode('utf-8')
+    kdf_memory = int(data.get('kdfMemory') or 64)        # Bitwarden 以 MiB 存储
+    kdf_parallelism = int(data.get('kdfParallelism') or 4)
 
-    master_key = hashlib.pbkdf2_hmac(
-        'sha256', password.encode('utf-8'), salt, kdf_iterations, dklen=32
-    )
-    enc_key = _hkdf_expand(master_key, 32, b'enc')
-    mac_key = _hkdf_expand(master_key, 32, b'mac')
+    # salt 候选：官方 Base64 解码优先，UTF-8 文本兜底
+    salt_candidates = [
+        base64.b64decode(data['salt']),
+        data['salt'].encode('utf-8'),
+    ]
+    # Argon2 memory 候选：MiB->KiB（×1024）优先，原始值兜底
+    argon_memory_candidates = [kdf_memory * 1024, kdf_memory]
 
-    # 校验导出密码正确性（旧版导出可能没有此字段，则靠 data 的 MAC 兜底）
-    if data.get('encKeyValidation_DO_NOT_EDIT'):
-        _decrypt_cipher_string(data['encKeyValidation_DO_NOT_EDIT'], enc_key, mac_key)
+    last_err = None
+    for salt in salt_candidates:
+        try:
+            if kdf_type == 1:
+                master_key = None
+                for mem in argon_memory_candidates:
+                    try:
+                        master_key = _derive_master_key(
+                            1, password, salt, kdf_iterations, mem, kdf_parallelism
+                        )
+                        break
+                    except EncryptedExportError:
+                        # 单次 Argon2 派生失败（如内存参数非法），尝试下一个 memory 候选
+                        continue
+                if master_key is None:
+                    raise EncryptedExportError("Argon2 派生失败")
+            else:
+                master_key = _derive_master_key(
+                    0, password, salt, kdf_iterations, kdf_memory, kdf_parallelism
+                )
 
-    plaintext = _decrypt_cipher_string(data['data'], enc_key, mac_key)
-    return json.loads(plaintext.decode('utf-8'))
+            enc_key = _hkdf_expand(master_key, 32, b'enc')
+            mac_key = _hkdf_expand(master_key, 32, b'mac')
+
+            # 校验导出密码正确性（旧版导出可能没有此字段，则靠 data 的 MAC 兜底）
+            if data.get('encKeyValidation_DO_NOT_EDIT'):
+                _decrypt_cipher_string(data['encKeyValidation_DO_NOT_EDIT'], enc_key, mac_key)
+            else:
+                _decrypt_cipher_string(data['data'], enc_key, mac_key)
+
+            plaintext = _decrypt_cipher_string(data['data'], enc_key, mac_key)
+            return json.loads(plaintext.decode('utf-8'))
+        except EncryptedExportError as e:
+            # 该 salt/参数组合不通过 MAC 校验，尝试下一种候选
+            last_err = e
+
+    # 所有候选组合均失败
+    raise EncryptedExportError("密码错误或数据已损坏（MAC 验证失败）")

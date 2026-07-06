@@ -511,6 +511,79 @@ class TestEncryptedExport(unittest.TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].name, "示例登录")
 
+    def _make_argon2_export(self, plaintext: dict, password: str) -> dict:
+        """构造一个 Argon2id 加密导出 dict（官方约定：salt 为 Base64 字符串，KDF 使用其解码后的原始字节）"""
+        import os
+        import base64
+        import hashlib
+        import hmac
+        import json
+        from argon2.low_level import hash_secret_raw, Type
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from bw_to_keepass.encrypted import _hkdf_expand
+
+        salt_str = base64.b64encode(os.urandom(16)).decode('ascii')
+        salt = base64.b64decode(salt_str)  # 官方：Base64 解码得到原始字节
+        kdf_iterations, kdf_memory, kdf_parallelism = 6, 32, 4
+        master_key = hash_secret_raw(
+            password.encode('utf-8'), salt,
+            time_cost=kdf_iterations, memory_cost=kdf_memory * 1024,
+            parallelism=kdf_parallelism, hash_len=32, type=Type.ID, version=19,
+        )
+        enc_key = _hkdf_expand(master_key, 32, b'enc')
+        mac_key = _hkdf_expand(master_key, 32, b'mac')
+
+        def enc(obj) -> str:
+            iv = os.urandom(16)
+            pt = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+            pad = 16 - (len(pt) % 16)
+            pt += bytes([pad]) * pad
+            c = Cipher(algorithms.AES(enc_key), modes.CBC(iv))
+            e = c.encryptor()
+            ct = e.update(pt) + e.finalize()
+            mac = hmac.new(mac_key, iv + ct, hashlib.sha256).digest()
+            return f"2.{base64.b64encode(iv).decode()}|{base64.b64encode(ct).decode()}|{base64.b64encode(mac).decode()}"
+
+        return {
+            "encrypted": True,
+            "passwordProtected": True,
+            "salt": salt_str,
+            "kdfType": 1,
+            "kdfIterations": kdf_iterations,
+            "kdfMemory": kdf_memory,
+            "kdfParallelism": kdf_parallelism,
+            "encKeyValidation_DO_NOT_EDIT": enc({"test": "validation"}),
+            "data": enc(plaintext),
+        }
+
+    def test_argon2_decrypt_and_parse_with_correct_password(self):
+        """Argon2id 导出（kdfType=1）使用正确密码应能解密并解析出条目"""
+        enc = self._make_argon2_export(self._sample_plaintext(), self.EXPORT_PASSWORD)
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            folders, items = parse_bitwarden_export(path, export_password=self.EXPORT_PASSWORD)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(folders), 1)
+        self.assertEqual(folders[0].name, "测试文件夹")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].name, "示例登录")
+        self.assertEqual(items[0].password, "s3cret")
+
+    def test_argon2_wrong_password_raises(self):
+        """Argon2id 导出使用错误密码应抛出 EncryptedExportError（MAC 验证失败）"""
+        enc = self._make_argon2_export(self._sample_plaintext(), self.EXPORT_PASSWORD)
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            with self.assertRaises(EncryptedExportError):
+                parse_bitwarden_export(path, export_password="wrong-password")
+        finally:
+            os.unlink(path)
+
 
 if __name__ == "__main__":
     unittest.main()
