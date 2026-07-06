@@ -2846,7 +2846,7 @@
         // 使用 Web Crypto API 实现 PBKDF2 + HKDF + AES-256-CBC + HMAC-SHA256
         // 基于 Bitwarden 的加密规范: https://bitwarden.com/help/encrypted-export/
 
-        const APP_BUILD = '20260706c';  // 构建号，用于在无 F12 环境下确认页面版本
+        const APP_BUILD = '20260706d';  // 构建号，用于在无 F12 环境下确认页面版本
 
         async function decryptBitwardenEncryptedJson(jsonData, password) {
             // 验证加密 JSON 格式
@@ -3183,7 +3183,7 @@
                     if (retries >= maxRetries) {
                         overlay.classList.remove('show');
                         input.value = '';
-                        throw new Error('密码错误次数过多（' + maxRetries + ' 次），请确认密码后重新导入');
+                        throw new Error('密码错误次数过多（' + maxRetries + ' 次），请确认密码后重新导入\n' + err.message);
                     }
                     errorEl.textContent = '❌ ' + (err.message || '解密失败，请检查密码') + '（剩余 ' + (maxRetries - retries) + ' 次）· 技术详情见浏览器控制台(F12)';
                     const row = input.closest('.modal-input-row'); if (row) row.classList.add('error');
