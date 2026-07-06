@@ -234,7 +234,13 @@ class TestConverter(unittest.TestCase):
         self.assertIn("-----END PRIVATE KEY-----", pem)
         # 以下旧字段不应存在
         self.assertNotIn("KPEX_PASSKEY_RP_ID", fields)
-        self.assertNotIn("KPEX_PASSKEY_RP_NAME", fields)
+        # KPEX_PASSKEY_RP_NAME / USER_DISPLAY_NAME / CREATION_DATE 是我们补充存储的额外字段
+        # 用于 JSON→KDBX→JSON 往返还原（KeePassXC 不存这些）
+        self.assertIn("KPEX_PASSKEY_RP_NAME", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_RP_NAME"], "GitHub")
+        self.assertIn("KPEX_PASSKEY_USER_DISPLAY_NAME", fields)
+        self.assertEqual(fields["KPEX_PASSKEY_USER_DISPLAY_NAME"], "Octocat")
+        self.assertIn("KPEX_PASSKEY_CREATION_DATE", fields)
         self.assertNotIn("KPEX_PASSKEY_USER_NAME", fields)
         self.assertNotIn("KPEX_PASSKEY_KEY_VALUE", fields)
         self.assertNotIn("KPEX_PASSKEY_ALGORITHM", fields)

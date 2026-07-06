@@ -387,6 +387,13 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
             fields[f"KPEX_PASSKEY_USER_HANDLE{idx}"] = fc.user_handle
         if fc.user_name:
             fields[f"KPEX_PASSKEY_USERNAME{idx}"] = fc.user_name
+        # 额外字段（KeePassXC 不存，我们补充存储以便往返还原）
+        if fc.rp_name and fc.rp_name != fc.rp_id:
+            fields[f"KPEX_PASSKEY_RP_NAME{idx}"] = fc.rp_name
+        if fc.user_display_name and fc.user_display_name != fc.user_name:
+            fields[f"KPEX_PASSKEY_USER_DISPLAY_NAME{idx}"] = fc.user_display_name
+        if fc.creation_date:
+            fields[f"KPEX_PASSKEY_CREATION_DATE{idx}"] = fc.creation_date
 
     # 时间戳
     if item.creation_date:

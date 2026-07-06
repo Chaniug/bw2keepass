@@ -136,6 +136,9 @@ def _extract_passkeys(entry) -> list[dict]:
         rp_id = custom_fields.get(f'KPEX_PASSKEY_RELYING_PARTY{suffix}', '')
         user_handle = custom_fields.get(f'KPEX_PASSKEY_USER_HANDLE{suffix}', '')
         user_name = custom_fields.get(f'KPEX_PASSKEY_USERNAME{suffix}', '')
+        rp_name = custom_fields.get(f'KPEX_PASSKEY_RP_NAME{suffix}', '') or rp_id
+        user_display_name = custom_fields.get(f'KPEX_PASSKEY_USER_DISPLAY_NAME{suffix}', '') or user_name
+        creation_date = custom_fields.get(f'KPEX_PASSKEY_CREATION_DATE{suffix}', '')
 
         passkeys.append({
             'credentialId': credential_id,
@@ -144,13 +147,13 @@ def _extract_passkeys(entry) -> list[dict]:
             'keyCurve': 'P-256',
             'keyValue': key_value,
             'rpId': rp_id,
-            'rpName': rp_id,  # Bitwarden 中通常与 rpId 相同
+            'rpName': rp_name,
             'userHandle': user_handle,
             'userName': user_name,
-            'userDisplayName': user_name,
+            'userDisplayName': user_display_name,
             'counter': '0',
             'discoverable': 'true',
-            'creationDate': '',
+            'creationDate': creation_date,
         })
 
     return passkeys
