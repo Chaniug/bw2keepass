@@ -2936,6 +2936,16 @@
                 }
             }
             // 所有候选组合均失败
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('[bw2keepass] 解密失败：已尝试全部 salt/memory 候选组合均未通过 MAC 校验。', {
+                    kdfType,
+                    kdfIterations,
+                    kdfMemory,
+                    saltCandidates: saltCandidates.map((s) => (s instanceof ArrayBuffer ? s.byteLength : s.length) + 'B'),
+                    argonMemoryCandidates,
+                    lastError: lastErr ? lastErr.message : null,
+                });
+            }
             throw new Error('密码错误或数据已损坏（MAC 验证失败）');
         }
 
@@ -3092,7 +3102,8 @@
                         let resolved = false;
 
                         function onConfirm() {
-                            const pw = input.value.trim();
+                            // 注意：Bitwarden 官方不会对导出密码做 trim，保持原样以与官方派生一致
+                            const pw = input.value;
                             if (!pw) {
                                 errorEl.textContent = '请输入密码';
                                 const row = input.closest('.modal-input-row'); if (row) row.classList.add('error');
