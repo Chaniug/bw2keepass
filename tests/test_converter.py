@@ -403,8 +403,11 @@ class TestEncryptedExport(unittest.TestCase):
 
     EXPORT_PASSWORD = "S3cret-Export-P@ss"
 
-    def _make_encrypted_export(self, plaintext: dict, password: str) -> dict:
-        """构造一个加密导出 dict（解密算法的逆向，供测试自洽验证）"""
+    def _make_encrypted_export(self, plaintext: dict, password: str, enc_type: int = 2) -> dict:
+        """构造一个加密导出 dict（解密算法的逆向，供测试自洽验证）
+
+        enc_type: 0=AesCbc256 无 MAC / 1=AesCbc128+HMAC / 2=AesCbc256+HMAC
+        """
         import os
         import base64
         import hashlib
@@ -426,11 +429,14 @@ class TestEncryptedExport(unittest.TestCase):
             pt = json.dumps(obj, ensure_ascii=False).encode('utf-8')
             pad = 16 - (len(pt) % 16)
             pt += bytes([pad]) * pad
-            c = Cipher(algorithms.AES(enc_key), modes.CBC(iv))
+            key = enc_key[:16] if enc_type == 1 else enc_key  # encType 1 用 128 位密钥
+            c = Cipher(algorithms.AES(key), modes.CBC(iv))
             e = c.encryptor()
             ct = e.update(pt) + e.finalize()
+            if enc_type == 0:
+                return f"0.{base64.b64encode(iv).decode()}|{base64.b64encode(ct).decode()}"
             mac = hmac.new(mac_key, iv + ct, hashlib.sha256).digest()
-            return f"2.{base64.b64encode(iv).decode()}|{base64.b64encode(ct).decode()}|{base64.b64encode(mac).decode()}"
+            return f"{enc_type}.{base64.b64encode(iv).decode()}|{base64.b64encode(ct).decode()}|{base64.b64encode(mac).decode()}"
 
         return {
             "encrypted": True,
@@ -484,6 +490,47 @@ class TestEncryptedExport(unittest.TestCase):
         try:
             with self.assertRaises(EncryptedExportError):
                 parse_bitwarden_export(path, export_password="wrong-password")
+        finally:
+            os.unlink(path)
+
+    def test_decrypt_enc_type_1_aes128(self):
+        """encType=1 (AesCbc128+HMAC) 导出应能用正确密码解密并解析"""
+        enc = self._make_encrypted_export(self._sample_plaintext(), self.EXPORT_PASSWORD, enc_type=1)
+        self.assertTrue(enc['data'].startswith('1.'))
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            folders, items = parse_bitwarden_export(path, export_password=self.EXPORT_PASSWORD)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].password, "s3cret")
+
+    def test_decrypt_enc_type_0_no_mac(self):
+        """encType=0 (AesCbc256 无 MAC) 导出应能用正确密码解密并解析"""
+        enc = self._make_encrypted_export(self._sample_plaintext(), self.EXPORT_PASSWORD, enc_type=0)
+        self.assertTrue(enc['data'].startswith('0.'))
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            folders, items = parse_bitwarden_export(path, export_password=self.EXPORT_PASSWORD)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].name, "示例登录")
+
+    def test_enc_type_unsupported_raises(self):
+        """不支持的加密类型应被透传真实错误（而非伪装成 MAC 失败）"""
+        enc = self._make_encrypted_export(self._sample_plaintext(), self.EXPORT_PASSWORD, enc_type=1)
+        enc['data'] = '99.' + enc['data'].split('.', 1)[1]  # 篡改 encType 为 99
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            with self.assertRaisesRegex(EncryptedExportError, '不支持的加密类型'):
+                parse_bitwarden_export(path, export_password=self.EXPORT_PASSWORD)
         finally:
             os.unlink(path)
 

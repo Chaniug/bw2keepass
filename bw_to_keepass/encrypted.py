@@ -14,7 +14,9 @@ UTF-8 文本。本模块两种都尝试，并以 encKeyValidation / data 的 MAC
        - Argon2id(password, salt, t, m, p)                  -> 256-bit masterKey
   2. HKDF-Expand（info="enc" / "mac"）           -> encKey / macKey  (stretchKey)
   3. 校验 encKeyValidation_DO_NOT_EDIT（验证导出密码是否正确）
-  4. 解密 data：AES-256-CBC + HMAC-SHA256(iv‖ct) 常量时间比较
+  4. 解密 data：AES-CBC + HMAC-SHA256(iv‖ct) 常量时间比较
+     支持 Bitwarden 全部加密类型：encType 0(AesCbc256 无 MAC) /
+     1(AesCbc128+HMAC) / 2(AesCbc256+HMAC，默认)
 """
 
 import base64
@@ -46,34 +48,51 @@ def _hkdf_expand(prk: bytes, length: int, info: bytes) -> bytes:
 
 
 def _parse_cipher_string(cipher_str: str):
-    """解析 Bitwarden 密文串 "encType.ivB64|ctB64|macB64" """
+    """解析 Bitwarden 密文串 "encType.ivB64|ctB64|macB64"
+
+    旧式 encType=0（AesCbc256 无 MAC）格式为 "0.ivB64|ctB64"（仅 2 段）。
+    """
     dot = cipher_str.find('.')
     if dot == -1:
         raise EncryptedExportError("无效的密文格式")
     enc_type = int(cipher_str[:dot])
     parts = cipher_str[dot + 1:].split('|')
-    if len(parts) != 3:
+    if len(parts) not in (2, 3):
         raise EncryptedExportError("无效的密文格式")
-    return enc_type, base64.b64decode(parts[0]), base64.b64decode(parts[1]), parts[2]
+    mac_b64 = parts[2] if len(parts) == 3 else ''
+    return enc_type, base64.b64decode(parts[0]), base64.b64decode(parts[1]), mac_b64
 
 
 def _decrypt_cipher_string(cipher_str: str, enc_key: bytes, mac_key: bytes) -> bytes:
-    """AES-256-CBC 解密 + HMAC-SHA256 完整性校验，返回明文原始字节"""
+    """AES-CBC 解密 + HMAC-SHA256 完整性校验，返回明文原始字节
+
+    Bitwarden 加密类型（core/Enums::EncryptionType）:
+      0 = AesCbc256 (无 MAC，旧式)        -> 256 位密钥，跳过 MAC
+      1 = AesCbc128_HmacSha256_B64        -> 128 位密钥 + HMAC
+      2 = AesCbc256_HmacSha256_B64 (默认) -> 256 位密钥 + HMAC
+    """
     enc_type, iv, ct, mac_b64 = _parse_cipher_string(cipher_str)
-    if enc_type != 2:
-        # 2 = AesCbc256_HmacSha256_B64，当前 Bitwarden 唯一使用类型
+    if enc_type == 2:
+        key_len, need_mac = 32, True
+    elif enc_type == 1:
+        key_len, need_mac = 16, True
+    elif enc_type == 0:
+        key_len, need_mac = 32, False
+    else:
         raise EncryptedExportError(f"不支持的加密类型: {enc_type}")
 
-    # HMAC 完整性验证：对 iv 原始字节拼接 ct 原始字节做 HMAC
-    mac_data = iv + ct
-    computed = hmac.new(mac_key, mac_data, hashlib.sha256).digest()
-    computed_b64 = base64.b64encode(computed).decode('ascii')
-    # 常量时间比较，防止时序攻击
-    if not hmac.compare_digest(computed_b64, mac_b64):
-        raise EncryptedExportError("密码错误或数据已损坏（MAC 验证失败）")
+    # HMAC 完整性验证（encType 0 为旧式无 MAC，跳过）
+    if need_mac:
+        mac_data = iv + ct
+        computed = hmac.new(mac_key, mac_data, hashlib.sha256).digest()
+        computed_b64 = base64.b64encode(computed).decode('ascii')
+        # 常量时间比较，防止时序攻击
+        if not hmac.compare_digest(computed_b64, mac_b64):
+            raise EncryptedExportError("密码错误或数据已损坏（MAC 验证失败）")
 
-    # AES-256-CBC 解密 + 去除 PKCS7 填充
-    cipher = Cipher(algorithms.AES(enc_key), modes.CBC(iv))
+    # AES-CBC 解密 + 去除 PKCS7 填充
+    # encType 1 用 encKey 前 16 字节作为 128 位密钥，其余用 32 字节 256 位密钥
+    cipher = Cipher(algorithms.AES(enc_key[:key_len]), modes.CBC(iv))
     decryptor = cipher.decryptor()
     padded = decryptor.update(ct) + decryptor.finalize()
     pad_len = padded[-1]
@@ -136,6 +155,7 @@ def decrypt_bitwarden_export(data: dict, password: str) -> dict:
     argon_memory_candidates = [kdf_memory * 1024, kdf_memory]
 
     last_err = None
+    fatal_err = None  # 结构性错误（不支持的加密/KDF 类型），换 salt/memory 候选无意义
     for salt in salt_candidates:
         try:
             if kdf_type == 1:
@@ -168,8 +188,16 @@ def decrypt_bitwarden_export(data: dict, password: str) -> dict:
             plaintext = _decrypt_cipher_string(data['data'], enc_key, mac_key)
             return json.loads(plaintext.decode('utf-8'))
         except EncryptedExportError as e:
+            # 结构性错误（不支持的加密/KDF 类型）换 salt/memory 候选无意义，直接透传
+            if str(e).startswith('不支持'):
+                last_err = e
+                fatal_err = e
+                break
             # 该 salt/参数组合不通过 MAC 校验，尝试下一种候选
             last_err = e
+
+    if fatal_err is not None:
+        raise fatal_err  # 透传真实的结构性错误（避免被伪装成 MAC 失败）
 
     # 所有候选组合均失败
     raise EncryptedExportError("密码错误或数据已损坏（MAC 验证失败）")
