@@ -2117,6 +2117,7 @@
             for (const { entry, url } of entryUrlMap) {
                 try {
                     const hostname = new URL(url).hostname;
+                    if (!hostname) continue;
                     if (!domainMap.has(hostname)) {
                         domainMap.set(hostname, { entries: [], iconData: null, uuid: null });
                     }
@@ -2134,36 +2135,94 @@
 
             async function fetchOne(domain) {
                 const record = domainMap.get(domain);
-                const urls = [
-                    `https://${domain}/favicon.ico`,
-                    `https://${domain}/apple-touch-icon.png`,
+
+                // 策略 1：尝试 Google Favicon Service（绕过 CORS，成功率最高）
+                const googleUrls = [
+                    `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+                    `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
                 ];
-                for (const faviconUrl of urls) {
+                for (const u of googleUrls) {
+                    if (await tryFetchIcon(record, u)) break;
+                }
+
+                // 策略 2：如果 Google 失败，尝试直接从网站获取
+                if (!record.iconData) {
+                    // 尝试解析 HTML <link> 标签获取真实 favicon 路径
                     try {
                         const controller = new AbortController();
                         const timeout = setTimeout(() => controller.abort(), 5000);
-                        const resp = await fetch(faviconUrl, {
+                        const resp = await fetch(`https://${domain}`, {
                             signal: controller.signal,
                             mode: 'cors',
                             credentials: 'omit',
                         });
                         clearTimeout(timeout);
-                        if (!resp.ok) continue;
-                        const contentType = resp.headers.get('content-type') || '';
-                        if (!contentType.includes('image/') && !contentType.includes('icon')) {
-                            // 有些服务器返回错误 content-type，但实际是图标，继续尝试
+                        if (resp.ok) {
+                            const html = await resp.text();
+                            const iconUrls = extractFaviconLinks(html, domain);
+                            for (const iconUrl of iconUrls) {
+                                if (await tryFetchIcon(record, iconUrl)) break;
+                            }
                         }
-                        const blob = await resp.blob();
-                        if (blob.size > 0 && blob.size < 1024 * 1024) { // 小于 1MB
-                            record.iconData = await blob.arrayBuffer();
-                            break;
+                    } catch (_) { /* HTML 解析失败 */ }
+
+                    // 策略 3：常见的固定路径
+                    if (!record.iconData) {
+                        const commonUrls = [
+                            `https://${domain}/favicon.ico`,
+                            `https://${domain}/apple-touch-icon.png`,
+                            `https://${domain}/favicon-32x32.png`,
+                            `https://${domain}/favicon-16x16.png`,
+                        ];
+                        for (const u of commonUrls) {
+                            if (await tryFetchIcon(record, u)) break;
                         }
-                    } catch (_) {
-                        // 获取失败，尝试下一个 URL
                     }
                 }
+
                 done++;
                 if (onProgress) onProgress(done, domains.length);
+            }
+
+            // 尝试获取一个图标 URL，成功返回 true
+            async function tryFetchIcon(record, faviconUrl) {
+                try {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 5000);
+                    const resp = await fetch(faviconUrl, {
+                        signal: controller.signal,
+                        mode: 'cors',
+                        credentials: 'omit',
+                    });
+                    clearTimeout(timeout);
+                    if (!resp.ok) return false;
+                    const blob = await resp.blob();
+                    if (blob.size === 0 || blob.size > 1024 * 1024) return false;
+                    record.iconData = await blob.arrayBuffer();
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            // 从 HTML 中提取 favicon 的 <link> 标签 URL
+            function extractFaviconLinks(html, domain) {
+                const urls = [];
+                const linkRegex = /<link\s[^>]*rel=["'](?:shortcut )?(?:icon|apple-touch-icon|mask-icon)["'][^>]*>/gi;
+                const matches = html.match(linkRegex) || [];
+                for (const tag of matches) {
+                    const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+                    if (hrefMatch) {
+                        let href = hrefMatch[1];
+                        if (href.startsWith('//')) href = 'https:' + href;
+                        else if (href.startsWith('/')) href = 'https://' + domain + href;
+                        else if (!href.startsWith('http')) continue;
+                        // SVG 图标可能导致 KDBX 显示问题，优先 PNG/ICO
+                        if (href.endsWith('.svg')) continue;
+                        urls.push(href);
+                    }
+                }
+                return urls;
             }
 
             // 分批并发执行
