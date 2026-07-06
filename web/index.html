@@ -2145,7 +2145,14 @@
                     if (await tryFetchIcon(record, u)) break;
                 }
 
-                // 策略 2：如果 Google 失败，尝试直接从网站获取
+                // 策略 1.5：如果 Google 失败，尝试 DuckDuckGo 图标服务
+                if (!record.iconData) {
+                    if (await tryFetchIcon(record, `https://icons.duckduckgo.com/ip3/${domain}.ico`)) {
+                        // DuckDuckGo 成功
+                    }
+                }
+
+                // 策略 2：如果第三方服务都失败，尝试直接从网站获取
                 if (!record.iconData) {
                     // 尝试解析 HTML <link> 标签获取真实 favicon 路径
                     try {
