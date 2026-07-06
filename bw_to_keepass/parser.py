@@ -11,6 +11,8 @@ import uuid
 from typing import Any
 from dataclasses import dataclass, field
 
+from .encrypted import decrypt_bitwarden_export, EncryptedExportRequiresPassword
+
 
 @dataclass
 class Folder:
@@ -124,35 +126,58 @@ class VaultItem:
     revision_date: str = ""
 
 
-def parse_bitwarden_export(file_path: str) -> tuple[list[Folder], list[VaultItem]]:
+def parse_bitwarden_export(
+    file_path: str,
+    export_password: str | None = None,
+) -> tuple[list[Folder], list[VaultItem]]:
     """
     解析 Bitwarden 导出文件（支持 .json 和 .zip）
 
+    当输入为「密码保护加密导出」(encrypted + passwordProtected) 时，
+    需要传入 export_password 进行解密；未传入则抛出
+    EncryptedExportRequiresPassword 提示用户提供密码。
+
+    Args:
+        file_path: 输入文件路径（.json 或 .zip）
+        export_password: Bitwarden 加密导出的解密密码（明文导出可省略）
     Returns:
         (folders, items) 元组
     """
     if file_path.lower().endswith('.zip'):
-        return _parse_zip(file_path)
+        data = _parse_zip(file_path)
     else:
-        return _parse_json(file_path)
-
-
-def _parse_json(file_path: str) -> tuple[list[Folder], list[VaultItem]]:
-    """解析 JSON 文件"""
-    with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+        data = _parse_json(file_path)
+    data = _maybe_decrypt(data, export_password)
     return _parse_data(data)
 
 
-def _parse_zip(zip_path: str) -> tuple[list[Folder], list[VaultItem]]:
-    """解析 ZIP 文件（含附件）"""
+def _maybe_decrypt(data: dict, export_password: str | None) -> dict:
+    """若为加密导出则解密；缺少密码时抛出明确异常（避免静默空库）"""
+    if data.get('encrypted') and data.get('passwordProtected'):
+        if not export_password:
+            raise EncryptedExportRequiresPassword(
+                "检测到 Bitwarden 加密导出格式。请提供导出密码："
+                "使用 --export-password 参数，或在交互提示中输入。"
+            )
+        return decrypt_bitwarden_export(data, export_password)
+    return data
+
+
+def _parse_json(file_path: str) -> dict:
+    """解析 JSON 文件，返回原始 dict"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    return data
+
+
+def _parse_zip(zip_path: str) -> dict:
+    """解析 ZIP 文件（含附件），返回内部 data.json 的原始 dict"""
     with zipfile.ZipFile(zip_path, 'r') as zf:
         # 查找 data.json
         json_files = [n for n in zf.namelist() if n.endswith('data.json')]
         if not json_files:
             raise ValueError("ZIP 文件中未找到 data.json")
-        data = json.loads(zf.read(json_files[0]).decode('utf-8'))
-    return _parse_data(data)
+        return json.loads(zf.read(json_files[0]).decode('utf-8'))
 
 
 def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:

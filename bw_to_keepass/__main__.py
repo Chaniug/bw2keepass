@@ -19,6 +19,7 @@ import os
 import json
 
 from .parser import parse_bitwarden_export
+from .encrypted import EncryptedExportRequiresPassword, EncryptedExportError
 from .writer import write_keepass, print_summary
 
 
@@ -71,6 +72,10 @@ def main():
         "--key-file", "-k",
         help="KeePass 密钥文件（可选）",
     )
+    parser.add_argument(
+        "--export-password", "-e",
+        help="Bitwarden 加密导出的解密密码（仅当输入为「密码保护加密 JSON」时需要）",
+    )
 
     args = parser.parse_args()
 
@@ -114,10 +119,10 @@ def main():
         _do_csv_export(args.input, args.output, password, args.csv_format, args.key_file)
     else:
         # 正向转换：Bitwarden → KDBX
-        _do_forward_convert(args.input, args.output, password, args.name)
+        _do_forward_convert(args.input, args.output, password, args.name, args.export_password)
 
 
-def _do_forward_convert(input_path: str, output_path: str, password: str, db_name: str):
+def _do_forward_convert(input_path: str, output_path: str, password: str, db_name: str, export_password: str | None = None):
     """Bitwarden → KeePass 正向转换"""
     ext = os.path.splitext(input_path)[1].lower()
     if ext not in ('.json', '.zip'):
@@ -125,7 +130,17 @@ def _do_forward_convert(input_path: str, output_path: str, password: str, db_nam
         sys.exit(1)
 
     print(f"\n正在解析: {input_path}")
-    folders, items = parse_bitwarden_export(input_path)
+    try:
+        folders, items = parse_bitwarden_export(input_path, export_password=export_password)
+    except EncryptedExportRequiresPassword:
+        # 检测到加密导出但未提供密码：交互索取（避免静默空库）
+        if export_password:
+            raise
+        export_password = getpass.getpass("检测到 Bitwarden 加密导出，请输入导出密码: ")
+        folders, items = parse_bitwarden_export(input_path, export_password=export_password)
+    except EncryptedExportError as e:
+        print(f"错误: 加密导出解密失败: {e}", file=sys.stderr)
+        sys.exit(1)
     print(f"找到 {len(folders)} 个文件夹, {len(items)} 个条目")
 
     print(f"\n正在生成 KeePass 数据库...")

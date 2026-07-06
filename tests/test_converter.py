@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from bw_to_keepass.parser import parse_bitwarden_export, VaultItem, Folder
+from bw_to_keepass.encrypted import EncryptedExportError, EncryptedExportRequiresPassword
 from bw_to_keepass.converter import (
     get_entry_title,
     get_entry_username,
@@ -395,6 +396,120 @@ class TestCSVExporter(unittest.TestCase):
         """测试通用 CSV 有 Passkey 标记列"""
         from bw_to_keepass.csv_exporter import CSV_COLUMNS
         self.assertIn('HasPasskey', CSV_COLUMNS)
+
+
+class TestEncryptedExport(unittest.TestCase):
+    """测试 Bitwarden 加密导出（密码保护 JSON）的解密与解析"""
+
+    EXPORT_PASSWORD = "S3cret-Export-P@ss"
+
+    def _make_encrypted_export(self, plaintext: dict, password: str) -> dict:
+        """构造一个加密导出 dict（解密算法的逆向，供测试自洽验证）"""
+        import os
+        import base64
+        import hashlib
+        import hmac
+        import json
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from bw_to_keepass.encrypted import _hkdf_expand
+
+        salt = base64.b64encode(os.urandom(16)).decode('ascii')  # base64 字符串
+        kdf_iterations = 100000
+        master_key = hashlib.pbkdf2_hmac(
+            'sha256', password.encode('utf-8'), salt.encode('utf-8'), kdf_iterations, dklen=32
+        )
+        enc_key = _hkdf_expand(master_key, 32, b'enc')
+        mac_key = _hkdf_expand(master_key, 32, b'mac')
+
+        def enc(obj) -> str:
+            iv = os.urandom(16)
+            pt = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+            pad = 16 - (len(pt) % 16)
+            pt += bytes([pad]) * pad
+            c = Cipher(algorithms.AES(enc_key), modes.CBC(iv))
+            e = c.encryptor()
+            ct = e.update(pt) + e.finalize()
+            mac = hmac.new(mac_key, iv + ct, hashlib.sha256).digest()
+            return f"2.{base64.b64encode(iv).decode()}|{base64.b64encode(ct).decode()}|{base64.b64encode(mac).decode()}"
+
+        return {
+            "encrypted": True,
+            "passwordProtected": True,
+            "salt": salt,
+            "kdfType": 0,
+            "kdfIterations": kdf_iterations,
+            "encKeyValidation_DO_NOT_EDIT": enc({"test": "validation"}),
+            "data": enc(plaintext),
+        }
+
+    def _sample_plaintext(self) -> dict:
+        return {
+            "folders": [{"id": "f1", "name": "测试文件夹"}],
+            "items": [{
+                "id": "i1", "type": 1, "name": "示例登录", "folderId": "f1",
+                "login": {
+                    "username": "user@example.com",
+                    "password": "s3cret",
+                    "totp": "JBSWY3DPEHPK3PXP",
+                    "uris": [{"uri": "https://example.com", "match": None}],
+                },
+            }],
+        }
+
+    def test_decrypt_and_parse_with_correct_password(self):
+        """正确密码应能解密并解析出条目"""
+        enc = self._make_encrypted_export(self._sample_plaintext(), self.EXPORT_PASSWORD)
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            folders, items = parse_bitwarden_export(path, export_password=self.EXPORT_PASSWORD)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(folders), 1)
+        self.assertEqual(folders[0].name, "测试文件夹")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].name, "示例登录")
+        self.assertEqual(items[0].username, "user@example.com")
+        self.assertEqual(items[0].password, "s3cret")
+        self.assertEqual(items[0].totp, "JBSWY3DPEHPK3PXP")
+        self.assertEqual(items[0].uris[0].uri, "https://example.com")
+
+    def test_wrong_password_raises(self):
+        """错误密码应抛出 EncryptedExportError（MAC 验证失败）"""
+        enc = self._make_encrypted_export(self._sample_plaintext(), self.EXPORT_PASSWORD)
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            with self.assertRaises(EncryptedExportError):
+                parse_bitwarden_export(path, export_password="wrong-password")
+        finally:
+            os.unlink(path)
+
+    def test_missing_password_raises_requires_password(self):
+        """未提供密码时应抛出 EncryptedExportRequiresPassword，而非静默空库"""
+        enc = self._make_encrypted_export(self._sample_plaintext(), self.EXPORT_PASSWORD)
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(enc, f, ensure_ascii=False)
+            path = f.name
+        try:
+            with self.assertRaises(EncryptedExportRequiresPassword):
+                parse_bitwarden_export(path)
+        finally:
+            os.unlink(path)
+
+    def test_plaintext_export_unaffected(self):
+        """明文导出不传密码仍应正常解析（向后兼容）"""
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
+            json.dump(self._sample_plaintext(), f, ensure_ascii=False)
+            path = f.name
+        try:
+            folders, items = parse_bitwarden_export(path)
+        finally:
+            os.unlink(path)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].name, "示例登录")
 
 
 if __name__ == "__main__":
