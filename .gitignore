@@ -26,3 +26,7 @@ Thumbs.db
 *.json
 *.zip
 !tests/fixtures/*.json
+
+# Local working memory / agent state (don't commit)
+.codebuddy/
+.workbuddy/
