@@ -3151,7 +3151,7 @@
                         input.value = '';
                         throw new Error('密码错误次数过多（' + maxRetries + ' 次），请确认密码后重新导入');
                     }
-                    errorEl.textContent = '❌ ' + (err.message || '解密失败，请检查密码') + '（剩余 ' + (maxRetries - retries) + ' 次尝试）';
+                    errorEl.textContent = '❌ ' + (err.message || '解密失败，请检查密码') + '（剩余 ' + (maxRetries - retries) + ' 次）· 技术详情见浏览器控制台(F12)';
                     const row = input.closest('.modal-input-row'); if (row) row.classList.add('error');
                     resetUI();
                     input.focus();
