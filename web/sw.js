@@ -1,12 +1,12 @@
 // Pass2KDBX Service Worker
 // 版本号变更时，旧缓存会被自动清理（activate 事件中处理）
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const CACHE_NAME = `pass2kdbx-${CACHE_VERSION}`;
 const ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://cdn.jsdelivr.net/npm/kdbxweb@2.2.0/dist/kdbxweb.min.js',
+  'https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js',
 ];
 
 self.addEventListener('install', (event) => {

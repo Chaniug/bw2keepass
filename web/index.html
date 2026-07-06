@@ -482,7 +482,7 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.2.0/dist/kdbxweb.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/argon2.umd.min.js" onerror="console.warn('hash-wasm 加载失败，回退 AES-KDF')"></script>
         <script>
         // hash-wasm 加载完成后注册 Argon2 实现
@@ -820,7 +820,7 @@
                 const data = await selectedFile.arrayBuffer();
                 let text;
                 if (ext === 'zip') {
-                    const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js')).default;
+                    const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
                     const zip = await JSZip.loadAsync(data);
                     const jsonFile = Object.keys(zip.files).find(n => n.endsWith('data.json') || n.endsWith('.json'));
                     if (!jsonFile) return;
