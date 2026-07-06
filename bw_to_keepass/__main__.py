@@ -74,7 +74,13 @@ def main():
     )
     parser.add_argument(
         "--export-password", "-e",
-        help="Bitwarden 加密导出的解密密码（仅当输入为「密码保护加密 JSON」时需要）",
+        help="反向导出时：将输出的 Bitwarden JSON 加密为该密码保护的加密导出（KDBX→加密 JSON）",
+    )
+    parser.add_argument(
+        "--salt-mode",
+        choices=['utf8', 'base64'],
+        default='utf8',
+        help="加密导出的 salt 处理方式：utf8=用 salt 字符串的 UTF-8 字节做 KDF（默认，对齐常见 Bitwarden 导出）；base64=用 salt 的 base64 解码字节（Bitwarden 文档标准，可移植性更好）",
     )
 
     args = parser.parse_args()
@@ -112,8 +118,9 @@ def main():
             sys.exit(0)
 
     if args.reverse:
-        # 反向转换：KDBX → Bitwarden JSON
-        _do_reverse_convert(args.input, args.output, password, args.key_file)
+        # 反向转换：KDBX → Bitwarden JSON（可选加密导出）
+        _do_reverse_convert(args.input, args.output, password, args.key_file,
+                            args.export_password, args.salt_mode)
     elif args.csv:
         # CSV 导出
         _do_csv_export(args.input, args.output, password, args.csv_format, args.key_file)
@@ -157,14 +164,16 @@ def _do_forward_convert(input_path: str, output_path: str, password: str, db_nam
     print("可使用 KeePass 2.x 或 KeePassXC 打开此文件。\n")
 
 
-def _do_reverse_convert(input_path: str, output_path: str, password: str, key_file: str | None):
-    """KDBX → Bitwarden JSON 反向转换"""
+def _do_reverse_convert(input_path: str, output_path: str, password: str, key_file: str | None,
+                         export_password: str | None = None, salt_mode: str = 'utf8'):
+    """KDBX → Bitwarden JSON 反向转换（可选加密导出）"""
     ext = os.path.splitext(input_path)[1].lower()
     if ext != '.kdbx':
         print(f"错误: 反向转换需要 .kdbx 文件，不支持 '{ext}'", file=sys.stderr)
         sys.exit(1)
 
     from .reverse_converter import convert_kdbx_to_bitwarden
+    from .encrypted import encrypt_bitwarden_export
 
     print(f"\n正在加载 KDBX 数据库: {input_path}")
     try:
@@ -185,10 +194,17 @@ def _do_reverse_convert(input_path: str, output_path: str, password: str, key_fi
         if item.get('fido2Credentials'):
             passkey_count += len(item['fido2Credentials'])
 
-    # 写入 JSON
+    # 写入 JSON（可选加密为密码保护导出）
     print(f"\n正在生成 Bitwarden JSON...")
+    if export_password:
+        out = encrypt_bitwarden_export(data, export_password, salt_mode=salt_mode)
+        mode_desc = "加密（密码保护）导出"
+    else:
+        out = data
+        mode_desc = "明文导出"
+
     with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(out, f, ensure_ascii=False, indent=2)
 
     print("\n" + "=" * 50)
     print("  反向转换完成！")
@@ -200,7 +216,11 @@ def _do_reverse_convert(input_path: str, output_path: str, password: str, key_fi
         print(f"  ├─ Passkey 凭据: {passkey_count}")
     print("=" * 50)
     print(f"\n文件已保存至: {os.path.abspath(output_path)}")
-    print("可在 Bitwarden 中通过 文件 → 导入数据 导入此 JSON 文件。\n")
+    if export_password:
+        print(f"已加密为 Bitwarden 密码保护导出（salt_mode={salt_mode}）。")
+        print(f"导入 Bitwarden 时选择「Bitwarden (密码保护) JSON」，并输入导出密码。\n")
+    else:
+        print("可在 Bitwarden 中通过 文件 → 导入数据 导入此 JSON 文件。\n")
 
 
 def _do_csv_export(input_path: str, output_path: str, password: str, csv_format: str, key_file: str | None):

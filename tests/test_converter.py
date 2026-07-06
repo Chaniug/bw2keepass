@@ -631,6 +631,55 @@ class TestEncryptedExport(unittest.TestCase):
         finally:
             os.unlink(path)
 
+    def test_encrypt_roundtrip_pbkdf2_both_salt_modes(self):
+        """encrypt_bitwarden_export 加密后再解密，明文应完全一致（utf8 / base64 两种 salt 模式）"""
+        from bw_to_keepass.encrypted import encrypt_bitwarden_export, decrypt_bitwarden_export
+
+        plain = self._sample_plaintext()
+        for salt_mode in ('utf8', 'base64'):
+            env = encrypt_bitwarden_export(plain, self.EXPORT_PASSWORD, salt_mode=salt_mode)
+            self.assertTrue(env['encrypted'] and env['passwordProtected'])
+            back = decrypt_bitwarden_export(env, self.EXPORT_PASSWORD)
+            self.assertEqual(back, plain)
+
+    def test_encrypt_wrong_password_raises(self):
+        """用错误密码解密加密导出应抛出 EncryptedExportError"""
+        from bw_to_keepass.encrypted import encrypt_bitwarden_export, decrypt_bitwarden_export
+
+        env = encrypt_bitwarden_export(self._sample_plaintext(), self.EXPORT_PASSWORD, salt_mode='utf8')
+        with self.assertRaises(EncryptedExportError):
+            decrypt_bitwarden_export(env, "definitely-wrong")
+
+    def test_encrypt_envelope_structure(self):
+        """加密导出信封顶层字段应与 Bitwarden 密码保护导出一致"""
+        from bw_to_keepass.encrypted import encrypt_bitwarden_export
+
+        env = encrypt_bitwarden_export(self._sample_plaintext(), self.EXPORT_PASSWORD, salt_mode='utf8')
+        expected = {
+            'encrypted', 'passwordProtected', 'salt', 'kdfType', 'kdfIterations',
+            'kdfMemory', 'kdfParallelism', 'encKeyValidation_DO_NOT_EDIT', 'data',
+        }
+        self.assertEqual(set(env.keys()), expected)
+        self.assertEqual(env['kdfType'], 0)
+        self.assertIsNone(env['kdfMemory'])
+        self.assertIsNone(env['kdfParallelism'])
+
+    def test_encrypt_argon2_roundtrip(self):
+        """Argon2id 加密导出往返应一致（需 argon2-cffi）"""
+        argon2 = __import__('argon2', fromlist=['low_level'])
+        from bw_to_keepass.encrypted import encrypt_bitwarden_export, decrypt_bitwarden_export
+
+        plain = self._sample_plaintext()
+        env = encrypt_bitwarden_export(
+            plain, self.EXPORT_PASSWORD, kdf_type=1, kdf_iterations=3,
+            kdf_memory=16, kdf_parallelism=4, salt_mode='utf8',
+        )
+        self.assertEqual(env['kdfType'], 1)
+        self.assertEqual(env['kdfMemory'], 16)
+        self.assertEqual(env['kdfParallelism'], 4)
+        back = decrypt_bitwarden_export(env, self.EXPORT_PASSWORD)
+        self.assertEqual(back, plain)
+
 
 if __name__ == "__main__":
     unittest.main()

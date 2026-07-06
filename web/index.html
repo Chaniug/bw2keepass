@@ -505,11 +505,11 @@
             <div class="card-title" id="passwordTitle">🔑 设置数据库密码</div>
             <div class="card-desc" id="passwordDesc">此密码将用于加密数据库</div>
 
-            <div class="input-group" style="margin-bottom: 0.75rem;">
+            <div class="input-group" style="margin-bottom: 0.75rem;" id="dbNameRow">
                 <input type="text" id="dbName" aria-label="数据库名称" placeholder="数据库名称（可选）" value="My Vault" autocomplete="off">
             </div>
 
-            <div class="input-group">
+            <div class="input-group" id="dbPasswordRow">
                 <input type="password" id="dbPassword" aria-label="数据库密码" placeholder="输入数据库密码" autocomplete="new-password">
                 <button class="toggle-password" id="togglePassword" title="显示或隐藏密码" aria-label="显示或隐藏密码">👁️</button>
             </div>
@@ -539,6 +539,28 @@
                         勾选后将联网获取条目的网站图标（favicon）并存入 KDBX，按域名去重复用。
                     </span>
                 </label>
+            </div>
+
+            <!-- 加密导出选项（仅 → Bitwarden 方向） -->
+            <div class="option-row" id="encryptOptionRow" style="display: none;">
+                <input type="checkbox" id="encryptExport">
+                <label for="encryptExport">
+                    加密导出（密码保护）<span class="option-tag">Bitwarden 加密格式</span>
+                    <span class="option-hint">
+                        勾选后输出 Bitwarden 密码保护加密 JSON，需设置下方「导出密码」。可被 Bitwarden 或本工具重新解密导入。
+                    </span>
+                </label>
+            </div>
+            <div id="encryptExportFields" style="display: none; margin-top: 0.75rem;">
+                <div class="input-group">
+                    <input type="password" id="exportPassword" aria-label="导出密码" placeholder="设置加密导出密码" autocomplete="new-password">
+                </div>
+                <div class="input-group" style="margin-top: 0.5rem;">
+                    <select id="saltMode" aria-label="salt 处理方式" style="width: 100%; padding: 0.7rem 0.9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text);">
+                        <option value="utf8">salt 模式: UTF-8（默认，对齐常见 Bitwarden 导出）</option>
+                        <option value="base64">salt 模式: Base64（Bitwarden 文档标准，可移植性更好）</option>
+                    </select>
+                </div>
             </div>
 
             <div class="btn-group" style="margin-top: 1.5rem;">
@@ -822,6 +844,8 @@
                 passwordDesc.textContent = '此密码将用于加密您的 KeePass 数据库';
                 document.getElementById('step2Label').textContent = '密码';
                 document.getElementById('faviconOptionRow').style.display = '';
+                document.getElementById('encryptOptionRow').style.display = 'none';
+                resetEncryptUI();
             } else {
                 uploadTitle.textContent = '📁 上传密码管理器导出文件';
                 uploadDesc.textContent = '支持 KDBX / CSV / 1PUX / JSON 等格式';
@@ -840,7 +864,18 @@
                 passwordDesc.textContent = '仅 KDBX 文件需要密码，其他格式将自动跳过';
                 document.getElementById('step2Label').textContent = '解密';
                 document.getElementById('faviconOptionRow').style.display = 'none';
+                document.getElementById('encryptOptionRow').style.display = '';
             }
+        }
+
+        // 重置加密导出相关 UI 状态
+        function resetEncryptUI() {
+            const ee = document.getElementById('encryptExport');
+            const ef = document.getElementById('encryptExportFields');
+            if (ee) ee.checked = false;
+            if (ef) ef.style.display = 'none';
+            const ep = document.getElementById('exportPassword');
+            if (ep) ep.value = '';
         }
 
         // ============ File Handling ============
@@ -920,19 +955,46 @@
         // ============ Step Navigation ============
         nextStepBtn.addEventListener('click', async () => {
             const ext = selectedFile.name.split('.').pop().toLowerCase();
-            // Skip password step for non-KDBX files in to-bitwarden direction
-            if (currentDir === 'to-bitwarden' && ext !== 'kdbx') {
-                // Auto-start conversion without password
-                startConversion();
-                return;
-            }
             uploadCard.style.display = 'none';
             passwordCard.classList.add('show');
             updateSteps(2);
-            dbPassword.focus();
+            configureBitwardenPasswordCard(ext);
+            if (currentDir === 'to-bitwarden') {
+                if (ext === 'kdbx') dbPassword.focus();
+                else if (exportPasswordEl) exportPasswordEl.focus();
+            } else {
+                dbPassword.focus();
+            }
+            updateConvertBtnState();
             // 预扫描文件检测是否有 Passkey
             checkForPasskeys();
         });
+
+        // 按方向与文件类型配置密码/选项卡的可见性与文案
+        function configureBitwardenPasswordCard(ext) {
+            const dbNameRowEl = document.getElementById('dbNameRow');
+            const dbPasswordRowEl = document.getElementById('dbPasswordRow');
+            if (currentDir === 'to-kdbx') {
+                passwordTitle.textContent = '🔑 设置 KeePass 数据库密码';
+                passwordDesc.textContent = '此密码将用于加密您的 KeePass 数据库';
+                dbNameRowEl.style.display = '';
+                dbPasswordRowEl.style.display = '';
+                return;
+            }
+            // to-bitwarden
+            document.getElementById('encryptOptionRow').style.display = '';
+            if (ext === 'kdbx') {
+                passwordTitle.textContent = '🔑 输入 KeePass 数据库密码';
+                passwordDesc.textContent = '输入 KDBX 文件的主密码以读取内容';
+                dbNameRowEl.style.display = 'none';
+                dbPasswordRowEl.style.display = '';
+            } else {
+                passwordTitle.textContent = '⚙️ 导出选项';
+                passwordDesc.textContent = '可勾选「加密导出」设置密码保护；不勾选则直接生成明文 JSON';
+                dbNameRowEl.style.display = 'none';
+                dbPasswordRowEl.style.display = 'none';
+            }
+        }
 
         backBtn.addEventListener('click', () => {
             passwordCard.classList.remove('show');
@@ -956,6 +1018,16 @@
         });
 
         dbPassword.addEventListener('input', updatePasswordStrength);
+
+        // 加密导出选项联动
+        const encryptExportEl = document.getElementById('encryptExport');
+        const encryptExportFieldsEl = document.getElementById('encryptExportFields');
+        const exportPasswordEl = document.getElementById('exportPassword');
+        encryptExportEl.addEventListener('change', () => {
+            encryptExportFieldsEl.style.display = encryptExportEl.checked ? '' : 'none';
+            updateConvertBtnState();
+        });
+        if (exportPasswordEl) exportPasswordEl.addEventListener('input', updateConvertBtnState);
 
         function updatePasswordStrength() {
             const val = dbPassword.value;
@@ -981,8 +1053,26 @@
             updateConvertBtnState();
         }
 
-        // 仅密码步骤（passwordCard 可见）会触发；此时无论方向都需密码 ≥ 1 位方可转换
+        // 密码步骤（passwordCard 可见）触发；按方向与文件类型决定可转换条件
         function updateConvertBtnState() {
+            if (currentDir === 'to-kdbx') {
+                convertBtn.disabled = dbPassword.value.length < 1;
+                return;
+            }
+            if (currentDir === 'to-bitwarden') {
+                const ext = (selectedFile ? selectedFile.name.split('.').pop().toLowerCase() : '');
+                if (ext === 'kdbx') {
+                    convertBtn.disabled = dbPassword.value.length < 1;
+                    return;
+                }
+                // 非 KDBX：仅需导出密码（若勾选加密），否则可直接转换
+                if (encryptExportEl.checked) {
+                    convertBtn.disabled = exportPasswordEl.value.length < 1;
+                } else {
+                    convertBtn.disabled = false;
+                }
+                return;
+            }
             convertBtn.disabled = dbPassword.value.length < 1;
         }
 
@@ -1047,6 +1137,11 @@
             const ext = selectedFile.name.split('.').pop().toLowerCase();
             const needsPassword = (currentDir === 'to-kdbx') || (currentDir === 'to-bitwarden' && ext === 'kdbx');
             if (needsPassword && !dbPassword.value) return;
+            // 加密导出：必须提供导出密码
+            if (currentDir === 'to-bitwarden' && encryptExportEl.checked && !exportPasswordEl.value) {
+                showToast('请设置加密导出密码', 'error');
+                return;
+            }
 
             uploadCard.style.display = 'none';
             passwordCard.classList.remove('show');
@@ -1324,6 +1419,16 @@
             await convertVaultToBitwarden(vault);
         }
 
+        // 若勾选加密导出，将明文 Bitwarden 导出加密为密码保护信封；否则返回明文 JSON
+        async function maybeEncryptBW(bwExport) {
+            if (currentDir === 'to-bitwarden' && encryptExportEl.checked) {
+                const saltMode = document.getElementById('saltMode').value || 'utf8';
+                const env = await encryptBitwardenExport(bwExport, exportPasswordEl.value, { saltMode: saltMode });
+                return { data: JSON.stringify(env, null, 2), encrypted: true };
+            }
+            return { data: JSON.stringify(bwExport, null, 2), encrypted: false };
+        }
+
         async function convertVaultToBitwarden(vault) {
             progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 Bitwarden JSON...`;
 
@@ -1347,14 +1452,15 @@
                 items: bwItems
             };
 
-            generatedData = JSON.stringify(bwExport, null, 2);
+            const out = await maybeEncryptBW(bwExport);
+            generatedData = out.data;
             outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.json';
 
             progressCard.classList.remove('show');
             successCard.classList.add('show');
             updateSteps(3); step3.classList.add('done');
-            downloadBtn.textContent = '💾 下载 Bitwarden JSON';
-            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${bwFolders.length} 个文件夹`;
+            downloadBtn.textContent = out.encrypted ? '💾 下载加密 Bitwarden JSON' : '💾 下载 Bitwarden JSON';
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${bwFolders.length} 个文件夹` + (out.encrypted ? '（已加密）' : '');
 
             // Summary
             const typeCount = {};
@@ -1500,7 +1606,8 @@
                 items: bwItems
             };
 
-            generatedData = JSON.stringify(bwExport, null, 2);
+            const out = await maybeEncryptBW(bwExport);
+            generatedData = out.data;
             outputFileName = selectedFile.name.replace(/\.kdbx$/i, '') + '.json';
 
             // 统计 passkey 数量
@@ -1517,10 +1624,10 @@
             progressCard.classList.remove('show');
             successCard.classList.add('show');
             updateSteps(3); step3.classList.add('done');
-            downloadBtn.textContent = '💾 下载 Bitwarden JSON';
+            downloadBtn.textContent = out.encrypted ? '💾 下载加密 Bitwarden JSON' : '💾 下载 Bitwarden JSON';
 
             let passkeyInfo = passkeyCount > 0 ? ` · ${passkeyCount} 个 Passkey 已保留` : '';
-            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${folders.length} 个文件夹${passkeyInfo}`;
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${folders.length} 个文件夹${passkeyInfo}` + (out.encrypted ? '（已加密）' : '');
 
             // Summary
             const typeCount = {};
@@ -2846,7 +2953,7 @@
         // 使用 Web Crypto API 实现 PBKDF2 + HKDF + AES-256-CBC + HMAC-SHA256
         // 基于 Bitwarden 的加密规范: https://bitwarden.com/help/encrypted-export/
 
-        const APP_BUILD = '20260706e';  // 构建号，用于在无 F12 环境下确认页面版本
+        const APP_BUILD = '20260706f';  // 构建号，用于在无 F12 环境下确认页面版本
 
         async function decryptBitwardenEncryptedJson(jsonData, password) {
             // 验证加密 JSON 格式
@@ -3076,6 +3183,108 @@
         // 验证是否为 Bitwarden 加密 JSON 格式
         function isBitwardenEncryptedJson(json) {
             return !!(json && json.encrypted && json.passwordProtected && json.salt && json.data);
+        }
+
+        // ============ 加密（明文 → Bitwarden 密码保护加密导出）============
+        // 与 decryptBitwardenEncryptedJson 完全对称，沿用上面的 PBKDF2/Argon2/HKDF 实现。
+
+        // 按 KDF 派生主密钥（与解密侧一致；saltMode=utf8 时用 salt 字符串 UTF-8 字节）
+        async function deriveMasterKeyWeb(password, saltBytes, kdfType, iterations, memory, parallelism) {
+            if (kdfType === 1) {
+                if (typeof hashwasm === 'undefined') {
+                    throw new Error('当前环境未加载 hash-wasm，无法使用 Argon2 加密，请检查网络后重试');
+                }
+                const derived = await hashwasm.argon2id({
+                    password: password,
+                    salt: new Uint8Array(saltBytes),
+                    parallelism: parallelism,
+                    iterations: iterations,
+                    memorySize: memory * 1024,   // Bitwarden 以 MiB 存储，转 KiB
+                    hashLength: 32,
+                    outputType: 'binary',
+                });
+                return new Uint8Array(derived);
+            }
+            const pwKey = await crypto.subtle.importKey(
+                'raw', new TextEncoder().encode(password),
+                { name: 'PBKDF2' }, false, ['deriveBits']
+            );
+            const bits = await crypto.subtle.deriveBits(
+                { name: 'PBKDF2', salt: saltBytes, iterations: iterations, hash: 'SHA-256' },
+                pwKey, 256
+            );
+            return new Uint8Array(bits);
+        }
+
+        // AES-CBC 加密 + HMAC-SHA256，返回密文串 "encType.ivB64|ctB64|macB64"（encType 默认 2）
+        async function encryptCipherString(plaintextBytes, encKey, macKey, encType) {
+            encType = (encType === undefined) ? 2 : encType;
+            let keyLen, needMac;
+            if (encType === 2) { keyLen = 32; needMac = true; }
+            else if (encType === 1) { keyLen = 16; needMac = true; }
+            else if (encType === 0) { keyLen = 32; needMac = false; }
+            else throw new Error('不支持的加密类型: ' + encType);
+
+            const iv = crypto.getRandomValues(new Uint8Array(16));
+            const aesKey = await crypto.subtle.importKey(
+                'raw', encKey.slice(0, keyLen), { name: 'AES-CBC' }, false, ['encrypt']
+            );
+            const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: iv }, aesKey, plaintextBytes);
+
+            let macB64 = '';
+            if (needMac) {
+                const macData = new Uint8Array(iv.byteLength + ct.byteLength);
+                macData.set(new Uint8Array(iv), 0);
+                macData.set(new Uint8Array(ct), iv.byteLength);
+                const hk = await crypto.subtle.importKey(
+                    'raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+                );
+                const sig = await crypto.subtle.sign('HMAC', hk, macData);
+                macB64 = arrayBufferToBase64(sig);
+            }
+            return encType + '.' + arrayBufferToBase64(iv) + '|' + arrayBufferToBase64(ct) + (needMac ? '|' + macB64 : '');
+        }
+
+        // 将明文 Bitwarden 导出加密为密码保护信封
+        async function encryptBitwardenExport(plaintextObj, password, opts) {
+            opts = opts || {};
+            const kdfType = opts.kdfType || 0;
+            const kdfIterations = opts.kdfIterations || 600000;
+            const kdfMemory = opts.kdfMemory || 64;
+            const kdfParallelism = opts.kdfParallelism || 4;
+            const saltMode = opts.saltMode || 'utf8';
+            const validationPlaintext = opts.validationPlaintext || 'Bitwarden';
+
+            // 随机 16 字节 salt，以 base64 字符串存储
+            const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+            const saltField = arrayBufferToBase64(saltBytes);
+            const kdfSalt = (saltMode === 'utf8') ? new TextEncoder().encode(saltField) : base64ToArrayBuffer(saltField);
+
+            const master = await deriveMasterKeyWeb(password, kdfSalt, kdfType, kdfIterations, kdfMemory, kdfParallelism);
+            const encKey = await hkdfExpand(master, 32, 'enc');
+            const macKey = await hkdfExpand(master, 32, 'mac');
+
+            const dataPlain = new TextEncoder().encode(JSON.stringify(plaintextObj));
+            const dataCs = await encryptCipherString(dataPlain, encKey, macKey, 2);
+            const valCs = await encryptCipherString(new TextEncoder().encode(validationPlaintext), encKey, macKey, 2);
+
+            const envelope = {
+                encrypted: true,
+                passwordProtected: true,
+                salt: saltField,
+                kdfType: kdfType,
+                kdfIterations: kdfIterations,
+                encKeyValidation_DO_NOT_EDIT: valCs,
+                data: dataCs,
+            };
+            if (kdfType === 1) {
+                envelope.kdfMemory = kdfMemory;
+                envelope.kdfParallelism = kdfParallelism;
+            } else {
+                envelope.kdfMemory = null;
+                envelope.kdfParallelism = null;
+            }
+            return envelope;
         }
 
         // 弹窗 + 解密流程封装

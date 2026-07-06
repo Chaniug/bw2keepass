@@ -23,6 +23,7 @@ import base64
 import hashlib
 import hmac
 import json
+import secrets
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -201,3 +202,125 @@ def decrypt_bitwarden_export(data: dict, password: str) -> dict:
 
     # 所有候选组合均失败
     raise EncryptedExportError("密码错误或数据已损坏（MAC 验证失败）")
+
+
+# ============================================================================
+# 加密（KDBX 等明文 -> Bitwarden 密码保护加密导出 JSON）
+# 与 decrypt_bitwarden_export 完全对称，遵循 Bitwarden 加密导出规范。
+# ============================================================================
+
+_BLOCK = 16  # AES 块大小
+
+
+def _pkcs7_pad(data: bytes, block: int = _BLOCK) -> bytes:
+    """PKCS7 填充"""
+    pad_len = block - (len(data) % block)
+    return data + bytes([pad_len]) * pad_len
+
+
+def _encrypt_cipher_string(plaintext: bytes, enc_key: bytes, mac_key: bytes,
+                           enc_type: int = 2) -> str:
+    """AES-CBC 加密 + HMAC-SHA256，返回 Bitwarden 密文串 "encType.ivB64|ctB64|macB64"
+
+    encType: 2 = AesCbc256_HmacSha256（256 位密钥 + MAC，默认）
+    """
+    if enc_type == 2:
+        key_len, need_mac = 32, True
+    elif enc_type == 1:
+        key_len, need_mac = 16, True
+    elif enc_type == 0:
+        key_len, need_mac = 32, False
+    else:
+        raise EncryptedExportError(f"不支持的加密类型: {enc_type}")
+
+    iv = secrets.token_bytes(_BLOCK)
+    cipher = Cipher(algorithms.AES(enc_key[:key_len]), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+    ct = encryptor.update(_pkcs7_pad(plaintext)) + encryptor.finalize()
+
+    if need_mac:
+        mac = hmac.new(mac_key, iv + ct, hashlib.sha256).digest()
+        mac_b64 = base64.b64encode(mac).decode('ascii')
+    else:
+        mac_b64 = ''
+
+    return f"{enc_type}.{base64.b64encode(iv).decode('ascii')}|{base64.b64encode(ct).decode('ascii')}|{mac_b64}"
+
+
+def encrypt_bitwarden_export(
+    plaintext: dict,
+    password: str,
+    *,
+    kdf_type: int = 0,
+    kdf_iterations: int = 600000,
+    kdf_memory: int = 64,          # MiB（仅 Argon2 使用）
+    kdf_parallelism: int = 4,      # 仅 Argon2 使用
+    salt_mode: str = 'utf8',       # 'utf8' = 用 salt 字符串的 UTF-8 字节做 KDF（对齐真实导出）；
+                                   # 'base64' = 用 salt 的 base64 解码字节（Bitwarden 文档标准）
+    validation_plaintext: str = 'Bitwarden',
+) -> dict:
+    """将明文 Bitwarden 导出（含 folders/items 的 dict）加密为密码保护导出信封
+
+    Args:
+        plaintext: 明文 Bitwarden 导出 dict（会被 json 序列化后整体加密进 data 字段）
+        password: 加密（导出）密码
+        kdf_type: 0=PBKDF2-SHA256, 1=Argon2id
+        kdf_iterations: KDF 迭代次数（PBKDF2）或时间成本（Argon2）
+        kdf_memory: Argon2 内存成本（MiB）
+        kdf_parallelism: Argon2 并行度
+        salt_mode: 'utf8' 或 'base64'，见上
+        validation_plaintext: encKeyValidation_DO_NOT_EDIT 的明文（默认 "Bitwarden"）
+
+    Returns:
+        Bitwarden 密码保护加密导出 JSON dict，可直接 json.dump 落盘，可被 Bitwarden
+        或本工具 decrypt_bitwarden_export 解密。
+    """
+    if kdf_type not in (0, 1):
+        raise EncryptedExportError(f"不支持的 KDF 类型: {kdf_type}")
+
+    # 生成随机 salt（16 字节），以 base64 字符串形式存储
+    salt_bytes = secrets.token_bytes(_BLOCK)
+    salt_field = base64.b64encode(salt_bytes).decode('ascii')
+    if salt_mode == 'utf8':
+        kdf_salt = salt_field.encode('utf-8')
+    elif salt_mode == 'base64':
+        kdf_salt = base64.b64decode(salt_field)
+    else:
+        raise EncryptedExportError(f"不支持的 salt_mode: {salt_mode}")
+
+    # KDF 派生主密钥
+    master_key = _derive_master_key(
+        kdf_type, password, kdf_salt, kdf_iterations, kdf_memory * 1024, kdf_parallelism
+    )
+
+    # HKDF-Expand 拉伸出 encKey / macKey
+    enc_key = _hkdf_expand(master_key, 32, b'enc')
+    mac_key = _hkdf_expand(master_key, 32, b'mac')
+
+    # data 字段：整个明文导出 JSON 加密
+    data_plain = json.dumps(plaintext, ensure_ascii=False).encode('utf-8')
+    data_cs = _encrypt_cipher_string(data_plain, enc_key, mac_key, enc_type=2)
+
+    # encKeyValidation_DO_NOT_EDIT：校验明文加密（用于导入时验证密码）
+    val_cs = _encrypt_cipher_string(
+        validation_plaintext.encode('utf-8'), enc_key, mac_key, enc_type=2
+    )
+
+    envelope = {
+        'encrypted': True,
+        'passwordProtected': True,
+        'salt': salt_field,
+        'kdfType': kdf_type,
+        'kdfIterations': kdf_iterations,
+        'encKeyValidation_DO_NOT_EDIT': val_cs,
+        'data': data_cs,
+    }
+    # PBKDF2 不填 memory/parallelism（与真实导出一致）；Argon2 填实际值
+    if kdf_type == 1:
+        envelope['kdfMemory'] = kdf_memory
+        envelope['kdfParallelism'] = kdf_parallelism
+    else:
+        envelope['kdfMemory'] = None
+        envelope['kdfParallelism'] = None
+
+    return envelope
