@@ -2846,11 +2846,17 @@
         // 使用 Web Crypto API 实现 PBKDF2 + HKDF + AES-256-CBC + HMAC-SHA256
         // 基于 Bitwarden 的加密规范: https://bitwarden.com/help/encrypted-export/
 
+        const APP_BUILD = '20260706c';  // 构建号，用于在无 F12 环境下确认页面版本
+
         async function decryptBitwardenEncryptedJson(jsonData, password) {
             // 验证加密 JSON 格式
             if (!jsonData.encrypted || !jsonData.passwordProtected || !jsonData.salt || !jsonData.data) {
                 throw new Error('不是有效的 Bitwarden 加密导出格式');
             }
+
+            // 取 data 密文的 encType（用于无 F12 环境下的可见诊断）
+            let dataEncType = '?';
+            try { dataEncType = parseCipherString(jsonData.data).encType; } catch (_) {}
 
             const enc = new TextEncoder();
             const kdfType = jsonData.kdfType || 0;
@@ -2954,7 +2960,18 @@
                     lastError: lastErr ? lastErr.message : null,
                 });
             }
-            throw new Error('密码错误或数据已损坏（MAC 验证失败）');
+            // 可见诊断（无 F12 也可读）：build/kdf/iter/mem/encType/hw/salt候选长度/末次错误
+            const diag = [
+                'build=' + APP_BUILD,
+                'kdf=' + kdfType,
+                'iter=' + kdfIterations,
+                'mem=' + kdfMemory,
+                'encType=' + dataEncType,
+                'hw=' + (typeof hashwasm !== 'undefined' ? 'Y' : 'N'),
+                'saltB=' + saltCandidates.map((s) => (s instanceof ArrayBuffer ? s.byteLength : s.length)).join(','),
+                'err=' + (lastErr ? lastErr.message : '?'),
+            ].join(' ');
+            throw new Error('密码错误或数据已损坏（MAC 验证失败）\n[诊断] ' + diag);
         }
 
         // HKDF-Expand (RFC 5869): 从 PRK 派生子密钥，info 为上下文字符串（Bitwarden 用 "enc"/"mac"）
