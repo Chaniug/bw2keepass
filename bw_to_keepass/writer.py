@@ -4,6 +4,8 @@ KeePass 数据库写入器
 使用 pykeepass 库创建 KDBX 数据库并写入条目。
 """
 
+import os
+import logging
 from pykeepass import create_database
 from .parser import VaultItem, Folder
 from .converter import (
@@ -16,6 +18,8 @@ from .converter import (
     build_custom_fields,
     sanitize_path,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def write_keepass(
@@ -36,7 +40,18 @@ def write_keepass(
         db_name: 数据库名称
     """
     # 创建新的 KDBX 数据库
-    kp = create_database(output_path, password=password)
+    # 失败时清理残留文件，避免损坏的部分写入文件误导用户
+    try:
+        kp = create_database(output_path, password=password)
+    except Exception as e:
+        # create_database 可能已创建部分文件，清理之
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+        logger.error("创建 KDBX 数据库失败: %s", e)
+        raise
 
     # 设置数据库名称和描述
     try:
@@ -97,7 +112,17 @@ def write_keepass(
             unknown_count += 1
 
     # 保存数据库
-    kp.save()
+    try:
+        kp.save()
+    except Exception as e:
+        # 保存失败时清理可能损坏的输出文件
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+        logger.error("保存 KDBX 数据库失败: %s", e)
+        raise
 
     return type_counts, unknown_count
 

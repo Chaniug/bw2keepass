@@ -242,6 +242,68 @@
         .toast.show { transform: translateX(-50%) translateY(0); }
         .toast.error { border-color: var(--danger); }
 
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+            z-index: 200; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 2rem 2rem 1.5rem; max-width: 420px; width: 90%; box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+            transform: translateY(20px); transition: transform 0.25s ease;
+        }
+        .modal-overlay.show .modal-card { transform: translateY(0); }
+        .modal-icon { font-size: 2rem; text-align: center; margin-bottom: 0.75rem; }
+        .modal-title { font-size: 1.1rem; font-weight: 600; text-align: center; margin-bottom: 0.5rem; }
+        .modal-desc { font-size: 0.82rem; color: var(--text-secondary); text-align: center; margin-bottom: 1.25rem; line-height: 1.5; }
+        .modal-input-row {
+            display: flex; align-items: center; background: var(--bg); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); overflow: hidden; transition: border-color 0.2s;
+        }
+        .modal-input-row:focus-within { border-color: var(--accent); }
+        .modal-input {
+            flex: 1; background: transparent; border: none; color: var(--text); font-size: 0.95rem;
+            padding: 0.7rem 0.9rem; outline: none; font-family: inherit;
+        }
+        .modal-input::placeholder { color: var(--text-secondary); opacity: 0.5; }
+        .modal-toggle-pw {
+            background: transparent; border: none; color: var(--text-secondary); cursor: pointer;
+            padding: 0 0.75rem; font-size: 1rem; transition: color 0.2s;
+        }
+        .modal-toggle-pw:hover { color: var(--text); }
+        .modal-error {
+            font-size: 0.78rem; color: var(--danger); margin-top: 0.5rem; min-height: 1.2rem;
+            text-align: center;
+        }
+        .modal-actions {
+            display: flex; gap: 0.75rem; margin-top: 1.25rem;
+        }
+        .modal-btn {
+            flex: 1; padding: 0.65rem 1rem; border-radius: var(--radius-sm); font-size: 0.88rem;
+            font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s;
+            font-family: inherit;
+        }
+        .modal-btn-cancel {
+            background: transparent; border-color: var(--border); color: var(--text-secondary);
+        }
+        .modal-btn-cancel:hover { border-color: var(--text-secondary); color: var(--text); }
+        .modal-btn-confirm {
+            background: var(--accent); color: #fff;
+        }
+        .modal-btn-confirm:hover { background: var(--accent-hover); box-shadow: 0 0 12px var(--accent-glow); }
+        .modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+        .modal-loading {
+            text-align: center; font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .spinner {
+            width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         /* Footer */
         .footer { text-align: center; margin-top: 2rem; font-size: 0.78rem; color: var(--text-secondary); }
         .footer a { color: var(--accent); text-decoration: none; }
@@ -352,6 +414,17 @@
                 </label>
             </div>
 
+            <!-- 网站图标选项 -->
+            <div class="option-row" id="faviconOptionRow">
+                <input type="checkbox" id="fetchFavicon">
+                <label for="fetchFavicon">
+                    获取网站图标<span class="option-tag">实验</span>
+                    <span class="option-hint">
+                        勾选后将尝试获取条目的网站图标（favicon），并存入 KDBX 中。按域名去重，相同域名复用同一图标。需要联网，数据不会上传。
+                    </span>
+                </label>
+            </div>
+
             <div class="btn-group" style="margin-top: 1.5rem;">
                 <button class="btn btn-outline" id="backBtn">← 返回</button>
                 <button class="btn btn-primary" id="convertBtn" disabled>开始转换</button>
@@ -388,7 +461,28 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
+    <!-- 加密 JSON 密码弹窗 -->
+    <div class="modal-overlay" id="encPwOverlay">
+        <div class="modal-card" id="encPwModal">
+            <div class="modal-icon">🔐</div>
+            <div class="modal-title">检测到加密 JSON 导出</div>
+            <div class="modal-desc">此文件受密码保护，请输入导出时设置的密码来解密。</div>
+            <div class="modal-input-row">
+                <input type="password" class="modal-input" id="encPwInput" placeholder="输入加密密码..." autocomplete="off">
+                <button class="modal-toggle-pw" id="encPwToggle" type="button" title="显示密码">👁️</button>
+            </div>
+            <div class="modal-error" id="encPwError"></div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="encPwCancel">取消</button>
+                <button class="modal-btn modal-btn-confirm" id="encPwConfirm">解密并继续</button>
+            </div>
+            <div class="modal-loading" id="encPwLoading" style="display:none;">
+                <span class="spinner"></span> 正在解密...
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.2.0/dist/kdbxweb.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/argon2.umd.min.js" onerror="console.warn('hash-wasm 加载失败，回退 AES-KDF')"></script>
         <script>
         // hash-wasm 加载完成后注册 Argon2 实现
@@ -410,7 +504,7 @@
         else window.addEventListener('load', function() { setTimeout(initArgon2, 100); });
         </script>
     <script>
-        const { Kdbx, Credentials, ProtectedValue, Consts } = kdbxweb;
+        const { Kdbx, Credentials, ProtectedValue, Consts, KdbxUuid } = kdbxweb;
 
         // ============ Polyfill: File.arrayBuffer() for older WebView ============
         if (typeof File !== 'undefined' && File.prototype && !File.prototype.arrayBuffer) {
@@ -522,6 +616,7 @@
         let generatedData = null;
         let generatedKdbxInfo = '';
         let generatedPasskeyData = null; // { passkeys: [...], zipBlob: Blob }
+        let generatedCsvData = null;  // CSV 导出数据（提前声明避免 TDZ 隐患）
         let outputFileName = 'output.kdbx';
         const TYPE_NAMES = { 1: 'Login', 2: 'SecureNote', 3: 'Card', 4: 'Identity', 5: 'SSHKey' };
         const TYPE_NAME_TO_ID = { 'Login': 1, 'SecureNote': 2, 'Card': 3, 'Identity': 4, 'SSHKey': 5 };
@@ -725,8 +820,8 @@
                 const data = await selectedFile.arrayBuffer();
                 let text;
                 if (ext === 'zip') {
-                    const jszip = new JSZip();
-                    const zip = await jszip.loadAsync(data);
+                    const JSZip = (await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js')).default;
+                    const zip = await JSZip.loadAsync(data);
                     const jsonFile = Object.keys(zip.files).find(n => n.endsWith('data.json') || n.endsWith('.json'));
                     if (!jsonFile) return;
                     text = await zip.file(jsonFile).async('string');
@@ -776,6 +871,10 @@
                 uploadCard.style.display = '';
                 updateSteps(1);
                 console.error('Conversion error:', err);
+                if (err.message === '用户取消') {
+                    // 用户取消弹窗，不显示错误，静默返回
+                    return;
+                }
                 let msg = err.message || '未知错误';
                 if (err.code === 'InvalidKey') msg = '密码错误，请检查 KeePass 数据库密码';
                 else if (err.code === 'BadSignature') msg = '无效的 KDBX 文件';
@@ -804,8 +903,10 @@
             } else {
                 const text = await selectedFile.text();
                 const jsonData = JSON.parse(text);
-                if (jsonData.encrypted && jsonData.passwordProtected) {
-                    vault = parseBitwardenEncrypted(jsonData);
+                if (isBitwardenEncryptedJson(jsonData)) {
+                    const encResult = await promptAndDecryptEncryptedJson(jsonData);
+                    vault = parseBitwardenJson(encResult);
+                    progressStats.textContent = `检测到 Bitwarden 加密 JSON · 找到 ${vault.items.length} 个条目`;
                 } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
                     vault = parse1PUXJSON(jsonData);
                     progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
@@ -844,6 +945,7 @@
 
             let entryCount = 0;
             const passkeys = []; // Collect passkeys for .passkey file export
+            const entryUrlMap = []; // Collect entries with HTTP URLs for favicon fetching
             for (const item of vault.items) {
                 if (item.deleted) continue;
                 const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
@@ -856,7 +958,12 @@
                     const isAndroidUri = uri => uri && (uri.startsWith('androidapp://') || uri.startsWith('android://'));
                     const webUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')))
                         || item.login.uris.find(u => u.uri && !isAndroidUri(u.uri));
-                    if (webUri) entry.fields.set('URL', webUri.uri);
+                    if (webUri) {
+                        entry.fields.set('URL', webUri.uri);
+                        if (webUri.uri.startsWith('http://') || webUri.uri.startsWith('https://')) {
+                            entryUrlMap.push({ entry, url: webUri.uri });
+                        }
+                    }
                 }
                 const notes = buildNotes(item);
                 if (notes) entry.fields.set('Notes', notes);
@@ -878,6 +985,16 @@
                 }
                 entryCount++;
                 progressStats.textContent = `已处理 ${entryCount}/${vault.items.length} 个条目...`;
+            }
+
+            // ============ Fetch favicons (optional) ============
+            const fetchFavicon = document.getElementById('fetchFavicon');
+            let faviconCount = 0;
+            if (fetchFavicon && fetchFavicon.checked && entryUrlMap.length > 0) {
+                progressStats.textContent = `正在获取网站图标...`;
+                faviconCount = await fetchAndSetFavicons(db, entryUrlMap, (done, total) => {
+                    progressStats.textContent = `获取图标中 ${done}/${total}...`;
+                });
             }
 
             progressStats.textContent = '正在加密并生成 KDBX 文件...';
@@ -912,7 +1029,8 @@
             updateSteps(3); step3.classList.add('done');
             outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
             const passkeyInfo = passkeys.length > 0 ? ` · 包含 ${passkeys.length} 个 Passkey` : '';
-            successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹${passkeyInfo}`;
+            const faviconInfo = faviconCount > 0 ? ` · ${faviconCount} 个网站图标` : '';
+            successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹${passkeyInfo}${faviconInfo}`;
             successDetails.textContent += `\n📦 ${generatedKdbxInfo}`;
             downloadBtn.textContent = '💾 下载 KDBX 文件';
             if (generatedPasskeyData) showPasskeyDownloadBtn();
@@ -949,8 +1067,10 @@
             } else {
                 const text = await selectedFile.text();
                 const jsonData = JSON.parse(text);
-                if (jsonData.encrypted && jsonData.passwordProtected) {
-                    vault = parseBitwardenEncrypted(jsonData);
+                if (isBitwardenEncryptedJson(jsonData)) {
+                    const encResult = await promptAndDecryptEncryptedJson(jsonData);
+                    vault = parseBitwardenJson(encResult);
+                    progressStats.textContent = `检测到 Bitwarden 加密 JSON · 找到 ${vault.items.length} 个条目`;
                 } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
                     vault = parse1PUXJSON(jsonData);
                     progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
@@ -1375,7 +1495,7 @@
         }
 
         // ============ CSV 导出 ============
-        let generatedCsvData = null;
+        // generatedCsvData 已在顶部声明（与其他全局状态变量一起）
 
         function buildCSVFromBwItems(bwItems, folders) {
             // 构建文件夹 ID → 名称映射
@@ -1786,6 +1906,9 @@
             const separateCheckbox = document.getElementById('separatePasskey');
             if (passkeyRow) passkeyRow.style.display = 'none';
             if (separateCheckbox) separateCheckbox.checked = false;
+            // Reset favicon option
+            const faviconCheckbox = document.getElementById('fetchFavicon');
+            if (faviconCheckbox) faviconCheckbox.checked = false;
             uploadCard.style.display = '';
             updateSteps(1);
             // Remove passkey download button if exists
@@ -1987,6 +2110,91 @@
             return tags;
         }
 
+        // ============ Favicon Fetcher ============
+        async function fetchAndSetFavicons(db, entryUrlMap, onProgress) {
+            // 1. 按域名去重，构建 domain → entries 映射
+            const domainMap = new Map();
+            for (const { entry, url } of entryUrlMap) {
+                try {
+                    const hostname = new URL(url).hostname;
+                    if (!domainMap.has(hostname)) {
+                        domainMap.set(hostname, { entries: [], iconData: null, uuid: null });
+                    }
+                    domainMap.get(hostname).entries.push(entry);
+                } catch (_) { /* 无效 URL 跳过 */ }
+            }
+
+            const domains = Array.from(domainMap.keys());
+            if (domains.length === 0) return 0;
+
+            // 2. 并发获取 favicon（限制并发数避免浏览器限制）
+            const CONCURRENCY = 8;
+            let done = 0;
+            let iconCount = 0;
+
+            async function fetchOne(domain) {
+                const record = domainMap.get(domain);
+                const urls = [
+                    `https://${domain}/favicon.ico`,
+                    `https://${domain}/apple-touch-icon.png`,
+                ];
+                for (const faviconUrl of urls) {
+                    try {
+                        const controller = new AbortController();
+                        const timeout = setTimeout(() => controller.abort(), 5000);
+                        const resp = await fetch(faviconUrl, {
+                            signal: controller.signal,
+                            mode: 'cors',
+                            credentials: 'omit',
+                        });
+                        clearTimeout(timeout);
+                        if (!resp.ok) continue;
+                        const contentType = resp.headers.get('content-type') || '';
+                        if (!contentType.includes('image/') && !contentType.includes('icon')) {
+                            // 有些服务器返回错误 content-type，但实际是图标，继续尝试
+                        }
+                        const blob = await resp.blob();
+                        if (blob.size > 0 && blob.size < 1024 * 1024) { // 小于 1MB
+                            record.iconData = await blob.arrayBuffer();
+                            break;
+                        }
+                    } catch (_) {
+                        // 获取失败，尝试下一个 URL
+                    }
+                }
+                done++;
+                if (onProgress) onProgress(done, domains.length);
+            }
+
+            // 分批并发执行
+            for (let i = 0; i < domains.length; i += CONCURRENCY) {
+                const batch = domains.slice(i, i + CONCURRENCY);
+                await Promise.all(batch.map(fetchOne));
+            }
+
+            // 3. 将获取到的图标注册到 db.meta.customIcons，并为条目设置 customIcon
+            for (const [domain, record] of domainMap) {
+                if (!record.iconData) continue;
+                try {
+                    const uuid = KdbxUuid.random();
+                    record.uuid = uuid;
+                    db.meta.customIcons.set(uuid.id, {
+                        data: record.iconData,
+                        name: domain,
+                        lastModified: new Date(),
+                    });
+                    for (const entry of record.entries) {
+                        entry.customIcon = uuid;
+                    }
+                    iconCount++;
+                } catch (_) {
+                    // 注册失败，跳过此图标
+                }
+            }
+
+            return iconCount;
+        }
+
         function buildSummaryTable(vault) {
             const typeCount = {};
             for (const item of vault.items) {
@@ -2006,19 +2214,51 @@
             const items = [], folders = [];
             const firstLine = text.split('\n')[0] || '';
             const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.split(',').length > firstLine.split(';').length ? ',' : ';');
-            const lines = text.trim().split(/\r?\n/);
-            if (lines.length < 2) return { folders, items };
-            const headers = parseCSVLine(lines[0], delimiter);
+            // 使用状态机解析 CSV，正确处理字段内换行符（RFC 4180 兼容）
+            const rows = parseCSVText(text, delimiter);
+            if (rows.length < 2) return { folders, items };
+            const headers = rows[0];
             const headerMap = {};
             headers.forEach((h, i) => { headerMap[h.trim().toLowerCase()] = i; });
             const format = detectCSVFormat(headerMap, fileName);
-            for (let i = 1; i < lines.length; i++) {
-                const row = parseCSVLine(lines[i], delimiter);
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
                 if (row.length === 0 || (row.length === 1 && !row[0])) continue;
                 const item = format.parseRow(row, headerMap, i);
                 if (item && item.name) items.push(item);
             }
             return { folders, items };
+        }
+
+        // 基于字符状态机的 CSV 解析器，支持字段内换行符、双引号转义
+        function parseCSVText(text, delimiter) {
+            const rows = [];
+            let row = [], field = '', inQuotes = false, i = 0;
+            while (i < text.length) {
+                const ch = text[i];
+                if (inQuotes) {
+                    if (ch === '"') {
+                        if (i + 1 < text.length && text[i + 1] === '"') { field += '"'; i += 2; continue; }
+                        inQuotes = false; i++; continue;
+                    }
+                    field += ch; i++; continue;
+                }
+                if (ch === '"') { inQuotes = true; i++; continue; }
+                if (ch === delimiter) { row.push(field.trim()); field = ''; i++; continue; }
+                if (ch === '\r') { i++; continue; }  // 跳过 \r
+                if (ch === '\n') {
+                    row.push(field.trim()); field = '';
+                    if (row.length > 1 || (row.length === 1 && row[0])) rows.push(row);
+                    row = []; i++; continue;
+                }
+                field += ch; i++;
+            }
+            // 处理最后一行
+            if (field || row.length) {
+                row.push(field.trim());
+                if (row.length > 1 || (row.length === 1 && row[0])) rows.push(row);
+            }
+            return rows;
         }
 
         function parseCSVLine(line, delimiter) {
@@ -2246,11 +2486,323 @@
             return parsed;
         }
 
-        function parseBitwardenEncrypted(json) {
-            if (json.encrypted && json.data) {
-                throw new Error('检测到 Bitwarden 加密导出格式。请在 Bitwarden 中使用「无加密 JSON (.json)」格式重新导出。');
+        // ============ Bitwarden 加密 JSON 解密 ============
+        // 使用 Web Crypto API 实现 PBKDF2 + HKDF + AES-256-CBC + HMAC-SHA256
+        // 基于 Bitwarden 的加密规范: https://bitwarden.com/help/encrypted-export/
+
+        async function decryptBitwardenEncryptedJson(jsonData, password) {
+            // 验证加密 JSON 格式
+            if (!jsonData.encrypted || !jsonData.passwordProtected || !jsonData.salt || !jsonData.data) {
+                throw new Error('不是有效的 Bitwarden 加密导出格式');
             }
+
+            const kdfType = jsonData.kdfType || 0;
+            const kdfIterations = jsonData.kdfIterations || 100000;
+            const salt = jsonData.salt; // Base64 字符串, Bitwarden 用 UTF-8 编码作为 PBKDF2 salt
+
+            // 1. PBKDF2 密钥派生
+            const enc = new TextEncoder();
+            const passwordKey = await crypto.subtle.importKey(
+                'raw', enc.encode(password),
+                { name: 'PBKDF2' }, false, ['deriveBits']
+            );
+            const masterKey = await crypto.subtle.deriveBits(
+                { name: 'PBKDF2', salt: enc.encode(salt), iterations: kdfIterations, hash: 'SHA-256' },
+                passwordKey, 256
+            );
+
+            // 2. HKDF-Expand 密钥拉伸
+            const stretchedKey = await hkdfExpand(new Uint8Array(masterKey), 64);
+            const encKey = stretchedKey.slice(0, 32);
+            const macKey = stretchedKey.slice(32, 64);
+
+            // 3. 解密 encKeyValidation 验证密码正确性（旧版导出可能没有此字段）
+            if (jsonData.encKeyValidation_DO_NOT_EDIT) {
+                await decryptCipherString(jsonData.encKeyValidation_DO_NOT_EDIT, encKey, macKey);
+            }
+
+            // 4. 解密主数据
+            const dataBuffer = await decryptCipherString(jsonData.data, encKey, macKey);
+            const decryptedText = new TextDecoder().decode(dataBuffer);
+            return JSON.parse(decryptedText);
+        }
+
+        // HKDF-Expand (RFC 5869): 从主密钥派生多个子密钥
+        async function hkdfExpand(prk, length) {
+            const hashLen = 32; // SHA-256 = 32 bytes
+            const n = Math.ceil(length / hashLen);
+            const result = new Uint8Array(n * hashLen);
+            let t = new Uint8Array(0);
+
+            for (let i = 1; i <= n; i++) {
+                const input = new Uint8Array(t.length + 1);
+                input.set(t, 0);
+                input[input.length - 1] = i;
+                const key = await crypto.subtle.importKey('raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+                const sig = await crypto.subtle.sign('HMAC', key, input);
+                t = new Uint8Array(sig);
+                result.set(t, (i - 1) * hashLen);
+            }
+            return result.slice(0, length);
+        }
+
+        // 解析 Bitwarden 密文字符串: "encType.ivB64|ctB64|macB64"
+        function parseCipherString(cipherStr) {
+            const dotIdx = cipherStr.indexOf('.');
+            if (dotIdx === -1) throw new Error('无效的密文格式');
+            const encType = parseInt(cipherStr.substring(0, dotIdx), 10);
+            const parts = cipherStr.substring(dotIdx + 1).split('|');
+            if (parts.length !== 3) throw new Error('无效的密文格式');
+            return {
+                encType,
+                iv: base64ToArrayBuffer(parts[0]),
+                ct: base64ToArrayBuffer(parts[1]),
+                mac: parts[2] // 保持 base64 字符串，用于比较
+            };
+        }
+
+        // Base64 解码 → ArrayBuffer
+        function base64ToArrayBuffer(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        // ArrayBuffer → Base64
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+
+        // AES-CBC 解密 + HMAC 验证
+        async function decryptCipherString(cipherStr, encKey, macKey) {
+            const { encType, iv, ct, mac } = parseCipherString(cipherStr);
+            // encType 2 = AesCbc256_HmacSha256_B64
+            if (encType !== 2) throw new Error('不支持的加密类型: ' + encType);
+
+            // HMAC 完整性验证
+            const macData = new Uint8Array(iv.byteLength + ct.byteLength);
+            macData.set(new Uint8Array(iv), 0);
+            macData.set(new Uint8Array(ct), iv.byteLength);
+
+            const hmacKey = await crypto.subtle.importKey('raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            const computedSig = await crypto.subtle.sign('HMAC', hmacKey, macData);
+            const computedMac = arrayBufferToBase64(computedSig);
+
+            // 常量时间比较（防止时序攻击）
+            if (!constantTimeEqual(computedMac, mac)) {
+                throw new Error('密码错误或数据已损坏（MAC 验证失败）');
+            }
+
+            // AES-256-CBC 解密
+            const aesKey = await crypto.subtle.importKey('raw', encKey, { name: 'AES-CBC' }, false, ['decrypt']);
+            const plaintext = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, aesKey, ct);
+            return plaintext;
+        }
+
+        // 常量时间字符串比较
+        function constantTimeEqual(a, b) {
+            if (a.length !== b.length) return false;
+            let result = 0;
+            for (let i = 0; i < a.length; i++) {
+                result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+            }
+            return result === 0;
+        }
+
+        // 弹出密码输入框，等待用户输入或取消
+        function promptEncryptedJsonPassword() {
+            return new Promise((resolve, reject) => {
+                const overlay = document.getElementById('encPwOverlay');
+                const input = document.getElementById('encPwInput');
+                const confirmBtn = document.getElementById('encPwConfirm');
+                const cancelBtn = document.getElementById('encPwCancel');
+                const errorEl = document.getElementById('encPwError');
+                const loadingEl = document.getElementById('encPwLoading');
+                const toggleBtn = document.getElementById('encPwToggle');
+
+                let resolved = false;
+
+                function cleanup() {
+                    overlay.classList.remove('show');
+                    input.value = '';
+                    errorEl.textContent = '';
+                    loadingEl.style.display = 'none';
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = '解密并继续';
+                }
+
+                function setLoading(loading) {
+                    loadingEl.style.display = loading ? 'flex' : 'none';
+                    confirmBtn.disabled = loading;
+                    confirmBtn.textContent = loading ? '解密中...' : '解密并继续';
+                    input.disabled = loading;
+                    cancelBtn.disabled = loading;
+                    errorEl.textContent = '';
+                }
+
+                function onConfirm() {
+                    const pw = input.value.trim();
+                    if (!pw) {
+                        errorEl.textContent = '请输入密码';
+                        return;
+                    }
+                    if (resolved) return;
+                    resolved = true;
+                    setLoading(true);
+                    resolve({ password: pw, setLoading, setError: (msg) => {
+                        errorEl.textContent = msg;
+                        setLoading(false);
+                        resolved = false;
+                    }, cleanup });
+                }
+
+                function onCancel() {
+                    if (resolved) return;
+                    resolved = true;
+                    cleanup();
+                    reject(new Error('用户取消'));
+                }
+
+                overlay.classList.add('show');
+                input.value = '';
+                errorEl.textContent = '';
+                loadingEl.style.display = 'none';
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '解密并继续';
+                input.disabled = false;
+                cancelBtn.disabled = false;
+                input.focus();
+
+                // 显示/隐藏密码
+                let pwVisible = false;
+                toggleBtn.onclick = () => {
+                    pwVisible = !pwVisible;
+                    input.type = pwVisible ? 'text' : 'password';
+                    toggleBtn.textContent = pwVisible ? '🙈' : '👁️';
+                };
+
+                confirmBtn.onclick = onConfirm;
+                cancelBtn.onclick = onCancel;
+                input.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); if (e.key === 'Escape') onCancel(); };
+                overlay.onclick = (e) => { if (e.target === overlay) onCancel(); };
+            });
+        }
+
+        // 验证是否为 Bitwarden 加密 JSON 格式
+        function isBitwardenEncryptedJson(json) {
+            return !!(json && json.encrypted && json.passwordProtected && json.salt && json.data);
+        }
+
+        // 旧的占位函数（保留兼容，实际不再调用）
+        function parseBitwardenEncrypted(json) {
+            // 此函数不应再被直接调用，现在通过 decryptBitwardenEncryptedJson 处理
             return { folders: [], items: [] };
+        }
+
+        // 弹窗 + 解密流程封装
+        async function promptAndDecryptEncryptedJson(jsonData) {
+            const overlay = document.getElementById('encPwOverlay');
+            const input = document.getElementById('encPwInput');
+            const confirmBtn = document.getElementById('encPwConfirm');
+            const cancelBtn = document.getElementById('encPwCancel');
+            const errorEl = document.getElementById('encPwError');
+            const loadingEl = document.getElementById('encPwLoading');
+            const toggleBtn = document.getElementById('encPwToggle');
+
+            let pwVisible = false;
+
+            function resetUI() {
+                errorEl.textContent = '';
+                loadingEl.style.display = 'none';
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '解密并继续';
+                input.disabled = false;
+                cancelBtn.disabled = false;
+                input.type = 'password';
+                pwVisible = false;
+                toggleBtn.textContent = '👁️';
+            }
+
+            function setLoading(loading) {
+                loadingEl.style.display = loading ? 'flex' : 'none';
+                confirmBtn.disabled = loading;
+                confirmBtn.textContent = loading ? '解密中...' : '解密并继续';
+                input.disabled = loading;
+                cancelBtn.disabled = loading;
+                errorEl.textContent = '';
+            }
+
+            // 初始化弹窗
+            overlay.classList.add('show');
+            input.value = '';
+            resetUI();
+            input.focus();
+
+            let retries = 0;
+            const maxRetries = 3;
+
+            while (retries < maxRetries) {
+                try {
+                    const password = await new Promise((resolve, reject) => {
+                        let resolved = false;
+
+                        function onConfirm() {
+                            const pw = input.value.trim();
+                            if (!pw) {
+                                errorEl.textContent = '请输入密码';
+                                return;
+                            }
+                            if (resolved) return;
+                            resolved = true;
+                            setLoading(true);
+                            resolve(pw);
+                        }
+
+                        function onCancel() {
+                            if (resolved) return;
+                            resolved = true;
+                            reject(new Error('用户取消'));
+                        }
+
+                        confirmBtn.onclick = onConfirm;
+                        cancelBtn.onclick = onCancel;
+                        input.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); if (e.key === 'Escape') onCancel(); };
+                        overlay.onclick = (e) => { if (e.target === overlay) onCancel(); };
+                        toggleBtn.onclick = () => {
+                            pwVisible = !pwVisible;
+                            input.type = pwVisible ? 'text' : 'password';
+                            toggleBtn.textContent = pwVisible ? '🙈' : '👁️';
+                        };
+                    });
+
+                    // 用户输入了密码，尝试解密
+                    const decrypted = await decryptBitwardenEncryptedJson(jsonData, password);
+                    overlay.classList.remove('show');
+                    input.value = '';
+                    return decrypted;
+                } catch (err) {
+                    if (err.message === '用户取消') {
+                        overlay.classList.remove('show');
+                        input.value = '';
+                        throw err;
+                    }
+                    // 解密失败（密码错误等）
+                    retries++;
+                    if (retries >= maxRetries) {
+                        overlay.classList.remove('show');
+                        input.value = '';
+                        throw new Error('密码错误次数过多（' + maxRetries + ' 次），请确认密码后重新导入');
+                    }
+                    errorEl.textContent = '❌ ' + (err.message || '解密失败，请检查密码') + '（剩余 ' + (maxRetries - retries) + ' 次尝试）';
+                    resetUI();
+                    input.focus();
+                    input.select();
+                }
+            }
         }
 
         async function readZipFile(file) {

@@ -175,6 +175,11 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
             continue
 
         item_type = item_data.get('type', 1)
+        # 类型校验：确保 item_type 是整数
+        try:
+            item_type = int(item_type)
+        except (TypeError, ValueError):
+            item_type = 1  # 默认为 Login 类型
         folder_name = folder_map.get(item_data.get('folderId', ''), '')
 
         item = VaultItem(
@@ -199,6 +204,13 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
             _parse_identity(item, item_data)
         elif item_type == 5:
             _parse_ssh_key(item, item_data)
+        else:
+            # 未知类型：记录警告，仍作为通用条目保留
+            import logging
+            logging.getLogger(__name__).warning(
+                "未知 Bitwarden item type: %s (id=%s, name=%s)",
+                item_type, item.id, item.name
+            )
 
         # 自定义字段
         for field_data in item_data.get('fields', []):

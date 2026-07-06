@@ -246,7 +246,8 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     fido2_credentials = _extract_passkeys(entry)
 
     # 提取自定义字段（排除内部字段和 passkey 字段）
-    skip_prefixes = (
+    # 使用精确匹配避免误过滤（如 'otp' 前缀会误匹配 'otpauth'、'otp_settings' 等用户自定义字段）
+    skip_exact = {
         'BitwardenType', 'BitwardenID', 'TOTP Seed', 'TOTP Settings',
         'otp', 'AndroidApp', 'AndroidApp Signature', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
         '_TAGS', 'CardBrand', 'CardNumber', 'CardExpiry',
@@ -254,7 +255,8 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
         'IdentityTitle', 'IdentityFirstName', 'IdentityLastName',
         'IdentityEmail', 'IdentityPhone', 'IdentitySSN',
         'IdentityPassport', 'IdentityLicense',
-    )
+    }
+    skip_prefixes = ('KPEX_PASSKEY_', 'KP2A_URL')
     skip_full = set()
     for i in range(2, 20):
         skip_full.add(f'URI_{i}')
@@ -264,7 +266,7 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
 
     fields = []
     for key, value in custom_fields.items():
-        if key in skip_full:
+        if key in skip_full or key in skip_exact:
             continue
         if any(key.startswith(sp) for sp in skip_prefixes):
             continue
