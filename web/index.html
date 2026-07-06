@@ -2846,7 +2846,7 @@
         // 使用 Web Crypto API 实现 PBKDF2 + HKDF + AES-256-CBC + HMAC-SHA256
         // 基于 Bitwarden 的加密规范: https://bitwarden.com/help/encrypted-export/
 
-        const APP_BUILD = '20260706d';  // 构建号，用于在无 F12 环境下确认页面版本
+        const APP_BUILD = '20260706e';  // 构建号，用于在无 F12 环境下确认页面版本
 
         async function decryptBitwardenEncryptedJson(jsonData, password) {
             // 验证加密 JSON 格式
@@ -2980,7 +2980,7 @@
             const n = Math.ceil(length / hashLen);
             const result = new Uint8Array(n * hashLen);
             let t = new Uint8Array(0);
-            const infoBytes = info ? enc.encode(info) : new Uint8Array(0);
+            const infoBytes = info ? new TextEncoder().encode(info) : new Uint8Array(0);
 
             for (let i = 1; i <= n; i++) {
                 const input = new Uint8Array(t.length + infoBytes.length + 1);
