@@ -151,7 +151,7 @@ def export_kdbx_to_csv(
         # 非内部自定义字段（JSON）
         skip_keys = {
             'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otp',
-            'AndroidApp',
+            'AndroidApp', 'AndroidApp Signature',
             'CreationDate', 'RevisionDate', 'BitwardenID',
             'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
             'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
@@ -267,7 +267,7 @@ def export_kdbx_to_csv_string(
 
         skip_keys = {
             'BitwardenType', 'TOTP Seed', 'TOTP Settings', 'otp',
-            'AndroidApp',
+            'AndroidApp', 'AndroidApp Signature',
             'CreationDate', 'RevisionDate', 'BitwardenID',
             'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
             'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',

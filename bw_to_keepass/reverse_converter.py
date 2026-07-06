@@ -225,12 +225,20 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
             val = custom_fields[key]
             if val and val not in [u['uri'] for u in uris]:
                 uris.append({'uri': val, 'match': None})
-    # AndroidApp 字段 → 还原 androidapp:// URI
+    # AndroidApp + AndroidApp Signature 字段 → 还原 android URI
     for key in sorted(custom_fields.keys()):
         if key == 'AndroidApp' or (key.startswith('AndroidApp') and key[10:].isdigit()):
             pkg = custom_fields[key]
             if pkg:
-                uri = f"androidapp://{pkg}"
+                # 查找对应的签名
+                sig_key = key.replace('AndroidApp', 'AndroidApp Signature')
+                sig = custom_fields.get(sig_key, '')
+                if sig:
+                    # 还原为 android://fingerprint@package
+                    fp_hex = sig.replace(':', '').lower()
+                    uri = f"android://{fp_hex}@{pkg}"
+                else:
+                    uri = f"androidapp://{pkg}"
                 if uri not in [u['uri'] for u in uris]:
                     uris.append({'uri': uri, 'match': None})
 
@@ -240,7 +248,7 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     # 提取自定义字段（排除内部字段和 passkey 字段）
     skip_prefixes = (
         'BitwardenType', 'BitwardenID', 'TOTP Seed', 'TOTP Settings',
-        'otp', 'AndroidApp', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
+        'otp', 'AndroidApp', 'AndroidApp Signature', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
         '_TAGS', 'CardBrand', 'CardNumber', 'CardExpiry',
         'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
         'IdentityTitle', 'IdentityFirstName', 'IdentityLastName',

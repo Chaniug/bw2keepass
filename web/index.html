@@ -852,9 +852,10 @@
                 if (item.login?.username) entry.fields.set('UserName', item.login.username);
                 if (item.login?.password) entry.fields.set('Password', ProtectedValue.fromString(item.login.password));
                 if (item.login?.uris?.length) {
-                    // 优先 http(s)，其次非 androidapp:// 的当 URL（如 account.coolapk.com）
+                    // 优先 http(s)，其次非 android URI 的当 URL（如 account.coolapk.com）
+                    const isAndroidUri = uri => uri && (uri.startsWith('androidapp://') || uri.startsWith('android://'));
                     const webUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')))
-                        || item.login.uris.find(u => u.uri && !u.uri.startsWith('androidapp://'));
+                        || item.login.uris.find(u => u.uri && !isAndroidUri(u.uri));
                     if (webUri) entry.fields.set('URL', webUri.uri);
                 }
                 const notes = buildNotes(item);
@@ -1248,11 +1249,20 @@
                     const extraUri = getText(`URI_${i}`);
                     if (extraUri) item.login.uris.push({ uri: extraUri, match: null });
                 }
-                // AndroidApp 字段 → 还原 androidapp:// URI
+                // AndroidApp + Signature 字段 → 还原 android URI
                 for (let i = 0; i <= 10; i++) {
                     const key = i === 0 ? 'AndroidApp' : `AndroidApp${i + 1}`;
                     const pkg = getText(key);
-                    if (pkg) item.login.uris.push({ uri: `androidapp://${pkg}`, match: null });
+                    if (pkg) {
+                        const sigKey = i === 0 ? 'AndroidApp Signature' : `AndroidApp Signature${i + 1}`;
+                        const sig = getText(sigKey);
+                        if (sig) {
+                            const fpHex = sig.replace(/:/g, '').toLowerCase();
+                            item.login.uris.push({ uri: `android://${fpHex}@${pkg}`, match: null });
+                        } else {
+                            item.login.uris.push({ uri: `androidapp://${pkg}`, match: null });
+                        }
+                    }
                 }
             }
 
@@ -1293,7 +1303,7 @@
             const skipFields = new Set([
                 'Title', 'UserName', 'Password', 'URL', 'Notes',
                 'BitwardenType', 'TOTP Seed', 'TOTP', 'otp',
-                'AndroidApp',
+                'AndroidApp', 'AndroidApp Signature',
                 'CardBrand', 'CardNumber', 'CardExpiry',
                 'CreationDate', 'RevisionDate',
                 'SSHFingerprint', '_TAGS'
@@ -1891,29 +1901,49 @@
                 fields['TOTP Settings'] = '30;6';
                 fields['otp'] = otpauthUrl;
             }
-            // androidapp:// URI → KeePassDX AndroidApp 字段（无论 URI 数量）
+            // android URI → KeePassDX AndroidApp + AndroidApp Signature 字段
             if (item.login?.uris?.length) {
+                const isAndroidUri = uri => uri.startsWith('androidapp://') || uri.startsWith('android://');
+                const parseAndroidUri = uri => {
+                    if (uri.startsWith('androidapp://')) return { pkg: uri.slice(13), sig: '' };
+                    if (uri.startsWith('android://')) {
+                        const rest = uri.slice(9);
+                        if (rest.includes('@')) {
+                            const at = rest.lastIndexOf('@');
+                            const fpHex = rest.substring(0, at);
+                            const pkg = rest.substring(at + 1);
+                            const sig = fpHex.match(/.{2}/g).join(':').toUpperCase();
+                            return { pkg, sig };
+                        }
+                        return { pkg: rest, sig: '' };
+                    }
+                    return null;
+                };
                 let appIdx = 0;
                 const seenUris = new Set();
                 for (const u of item.login.uris) {
                     const uri = u.uri || '';
                     if (!uri || seenUris.has(uri)) continue;
                     seenUris.add(uri);
-                    if (uri.startsWith('androidapp://')) {
-                        const pkg = uri.slice('androidapp://'.length);
-                        if (pkg) {
+                    if (isAndroidUri(uri)) {
+                        const parsed = parseAndroidUri(uri);
+                        if (parsed && parsed.pkg) {
                             const key = appIdx === 0 ? 'AndroidApp' : `AndroidApp${appIdx + 1}`;
-                            fields[key] = pkg;
+                            fields[key] = parsed.pkg;
+                            if (parsed.sig) {
+                                const sigKey = appIdx === 0 ? 'AndroidApp Signature' : `AndroidApp Signature${appIdx + 1}`;
+                                fields[sigKey] = parsed.sig;
+                            }
                             appIdx++;
                         }
                     }
                 }
-                // 使用 KP2A_URL 格式存储备用 URL（兼容 KeePass2Android / KeePassXC），排除 androidapp:// 和主 URL
+                // 使用 KP2A_URL 格式存储备用 URL，排除 android URI 和主 URL
                 const mainUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')));
                 let urlIdx = 0;
                 for (const u of item.login.uris) {
                     const uri = u.uri || '';
-                    if (!uri || uri.startsWith('androidapp://') || (mainUri && uri === mainUri.uri)) continue;
+                    if (!uri || isAndroidUri(uri) || (mainUri && uri === mainUri.uri)) continue;
                     if (uri.startsWith('http://') || uri.startsWith('https://')) {
                         urlIdx++;
                         const key = urlIdx === 1 ? 'KP2A_URL' : `KP2A_URL_${urlIdx}`;

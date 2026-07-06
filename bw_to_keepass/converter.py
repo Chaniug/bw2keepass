@@ -46,16 +46,39 @@ def get_entry_password(item: VaultItem) -> str:
     return ""
 
 
+def _is_android_uri(uri: str) -> bool:
+    """判断是否为安卓应用 URI（androidapp:// 或 android://）"""
+    return uri.startswith("androidapp://") or uri.startswith("android://")
+
+
+def _parse_android_uri(uri: str) -> tuple[str, str]:
+    """解析安卓 URI，返回 (包名, 签名指纹)
+    androidapp://com.example.app → ("com.example.app", "")
+    android://SHA256HEX@com.example.app → ("com.example.app", "00:01:02:...")
+    """
+    if uri.startswith("androidapp://"):
+        return uri[len("androidapp://"):], ""
+    if uri.startswith("android://"):
+        rest = uri[len("android://"):]
+        if "@" in rest:
+            fingerprint_hex, package = rest.rsplit("@", 1)
+            # 转为冒号分隔格式（KeePassDX AndroidApp Signature 规范）
+            fingerprint = ":".join(fingerprint_hex[i:i+2] for i in range(0, len(fingerprint_hex), 2))
+            return package, fingerprint.upper()
+        return rest, ""
+    return "", ""
+
+
 def get_entry_url(item: VaultItem) -> str:
-    """获取 KeePass 条目 URL，优先 http(s) 协议，跳过 androidapp://，无前缀的当 URL 处理"""
+    """获取 KeePass 条目 URL，优先 http(s) 协议，跳过 android URI，无前缀的当 URL 处理"""
     if item.type == 1 and item.uris:
         # 第一轮：优先 http(s)
         for u in item.uris:
             if u.uri and (u.uri.startswith("http://") or u.uri.startswith("https://")):
                 return u.uri
-        # 第二轮：非 androidapp:// 的当 URL（如 account.coolapk.com）
+        # 第二轮：非 android URI 的当 URL（如 account.coolapk.com）
         for u in item.uris:
-            if u.uri and not u.uri.startswith("androidapp://"):
+            if u.uri and not _is_android_uri(u.uri):
                 return u.uri
     return ""
 
@@ -126,10 +149,10 @@ def get_entry_notes(item: VaultItem) -> str:
         if ssh_parts:
             parts.insert(0, "[SSH 密钥]\n" + "\n".join(ssh_parts))
 
-    # 附加 URI（多个 URL 时，排除 androidapp:// — 已写入 AndroidApp 字段）
+    # 附加 URI（多个 URL 时，排除 android URI — 已写入 AndroidApp 字段）
     if item.type == 1 and len(item.uris) > 1:
         extra_web_uris = [u.uri for u in item.uris
-                          if u.uri and not u.uri.startswith("androidapp://")
+                          if u.uri and not _is_android_uri(u.uri)
                           and u.uri != get_entry_url(item)]
         if extra_web_uris:
             uri_lines = ["\n[其他 URI]"]
@@ -289,14 +312,17 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
             # KeePassXC/OTP 插件格式
             fields["TOTP Seed"] = item.totp
             fields["otp"] = f"otpauth://totp/{item.name}?secret={item.totp}"
-        # androidapp:// URI → KeePassDX AndroidApp 字段
+        # android URI → KeePassDX AndroidApp + AndroidApp Signature 字段
         app_idx = 0
         for u in item.uris:
-            if u.uri and u.uri.startswith("androidapp://"):
-                package = u.uri[len("androidapp://"):]
+            if u.uri and _is_android_uri(u.uri):
+                package, fingerprint = _parse_android_uri(u.uri)
                 if package:
                     key = "AndroidApp" if app_idx == 0 else f"AndroidApp{app_idx + 1}"
                     fields[key] = package
+                    if fingerprint:
+                        sig_key = "AndroidApp Signature" if app_idx == 0 else f"AndroidApp Signature{app_idx + 1}"
+                        fields[sig_key] = fingerprint
                     app_idx += 1
 
     # 卡片额外字段
