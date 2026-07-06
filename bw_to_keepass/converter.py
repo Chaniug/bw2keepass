@@ -339,7 +339,13 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
         identity_map = {
             "IdentityTitle": item.identity_title,
             "IdentityFirstName": item.identity_first_name,
+            "IdentityMiddleName": item.identity_middle_name,
             "IdentityLastName": item.identity_last_name,
+            "IdentityAddress1": item.identity_address1,
+            "IdentityCity": item.identity_city,
+            "IdentityState": item.identity_state,
+            "IdentityPostalCode": item.identity_postal_code,
+            "IdentityCountry": item.identity_country,
             "IdentityEmail": item.identity_email,
             "IdentityPhone": item.identity_phone,
             "IdentitySSN": item.identity_ssn,

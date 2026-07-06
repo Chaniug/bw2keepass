@@ -1369,6 +1369,16 @@
                     const extraUri = getText(`URI_${i}`);
                     if (extraUri) item.login.uris.push({ uri: extraUri, match: null });
                 }
+                // KP2A_URL / KP2A_URL_2 ... → 还原为多 URI
+                const seenUris = new Set(item.login.uris.map(u => u.uri));
+                for (let i = 0; i <= 20; i++) {
+                    const key = i === 0 ? 'KP2A_URL' : `KP2A_URL_${i + 1}`;
+                    const val = getText(key);
+                    if (val && !seenUris.has(val)) {
+                        item.login.uris.push({ uri: val, match: null });
+                        seenUris.add(val);
+                    }
+                }
                 // AndroidApp + Signature 字段 → 还原 android URI
                 for (let i = 0; i <= 10; i++) {
                     const key = i === 0 ? 'AndroidApp' : `AndroidApp${i + 1}`;
@@ -1426,7 +1436,12 @@
                 'AndroidApp', 'AndroidApp Signature',
                 'CardBrand', 'CardNumber', 'CardExpiry',
                 'CreationDate', 'RevisionDate',
-                'SSHFingerprint', '_TAGS'
+                'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
+                'IdentityTitle', 'IdentityFirstName', 'IdentityMiddleName', 'IdentityLastName',
+                'IdentityAddress1', 'IdentityCity', 'IdentityState', 'IdentityPostalCode',
+                'IdentityCountry', 'IdentityEmail', 'IdentityPhone', 'IdentitySSN',
+                'IdentityPassport', 'IdentityLicense',
+                '_TAGS'
             ]);
             const uriFields = new Set();
             for (let i = 2; i <= 10; i++) uriFields.add(`URI_${i}`);
@@ -1435,6 +1450,7 @@
                 if (skipFields.has(key)) continue;
                 if (uriFields.has(key)) continue;
                 if (key.startsWith('KPEX_PASSKEY_')) continue;
+                if (key.startsWith('KP2A_URL')) continue;  // KP2A_URL 已作为多 URI 还原到 login.uris
 
                 const text = typeof value === 'string' ? value : (typeof value.getText === 'function' ? value.getText() : String(value));
                 if (text && key !== '_TAGS') {
@@ -1446,6 +1462,31 @@
             const tags = getText('_TAGS');
             if (tags) {
                 item.fields.push({ name: 'Tags', value: tags, type: 0 });
+            }
+
+            // Identity detection (type=4)
+            if (getText('IdentityTitle') || getText('IdentityFirstName') || getText('IdentityLastName') || getText('IdentityEmail')) {
+                if (item.type === 1) item.type = 4;  // 从默认 Login 改判为 Identity
+                item.identity = {
+                    title: getText('IdentityTitle') || '',
+                    firstName: getText('IdentityFirstName') || '',
+                    middleName: getText('IdentityMiddleName') || '',
+                    lastName: getText('IdentityLastName') || '',
+                    address1: getText('IdentityAddress1') || '',
+                    address2: '',
+                    address3: '',
+                    city: getText('IdentityCity') || '',
+                    state: getText('IdentityState') || '',
+                    postalCode: getText('IdentityPostalCode') || '',
+                    country: getText('IdentityCountry') || '',
+                    company: '',
+                    email: getText('IdentityEmail') || '',
+                    phone: getText('IdentityPhone') || '',
+                    ssn: getText('IdentitySSN') || '',
+                    passportNumber: getText('IdentityPassport') || '',
+                    licenseNumber: getText('IdentityLicense') || '',
+                };
+                item.login = null;
             }
 
             // SSH Key detection
@@ -2078,6 +2119,28 @@
                 if (item.card.brand) fields['CardBrand'] = item.card.brand;
                 if (item.card.number) fields['CardNumber'] = item.card.number;
                 if (item.card.expMonth) fields['CardExpiry'] = `${item.card.expMonth}/${item.card.expYear}`;
+            }
+            // Identity 字段存储到自定义属性
+            if (item.identity) {
+                const idMap = {
+                    'IdentityTitle': item.identity.title,
+                    'IdentityFirstName': item.identity.firstName,
+                    'IdentityMiddleName': item.identity.middleName,
+                    'IdentityLastName': item.identity.lastName,
+                    'IdentityAddress1': item.identity.address1,
+                    'IdentityCity': item.identity.city,
+                    'IdentityState': item.identity.state,
+                    'IdentityPostalCode': item.identity.postalCode,
+                    'IdentityCountry': item.identity.country,
+                    'IdentityEmail': item.identity.email,
+                    'IdentityPhone': item.identity.phone,
+                    'IdentitySSN': item.identity.ssn,
+                    'IdentityPassport': item.identity.passportNumber,
+                    'IdentityLicense': item.identity.licenseNumber,
+                };
+                for (const [k, v] of Object.entries(idMap)) {
+                    if (v) fields[k] = v;
+                }
             }
             if (item.sshKey?.fingerprint) fields['SSHFingerprint'] = item.sshKey.fingerprint;
             for (const cf of item.customFields) {
