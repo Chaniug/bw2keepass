@@ -2869,6 +2869,7 @@
             const argonMemoryCandidates = [kdfMemory * 1024, kdfMemory];
 
             let lastErr = null;
+            let fatalErr = null;  // 结构性错误（不支持的加密/KDF 类型等），换 salt/memory 候选无意义
             for (const saltBytes of saltCandidates) {
                 try {
                     let masterKey;
@@ -2931,10 +2932,17 @@
                     const decryptedText = new TextDecoder().decode(dataBuffer);
                     return JSON.parse(decryptedText);
                 } catch (e) {
+                    // 结构性错误（不支持的加密/KDF 类型、未加载 hash-wasm 等）换 salt/memory 候选无意义，直接透传
+                    if (e && e.message && (e.message.indexOf('不支持') === 0 || e.message.indexOf('未加载') === 0)) {
+                        lastErr = e;
+                        fatalErr = e;
+                        break;
+                    }
                     // 该 salt/参数组合不通过 MAC 校验，尝试下一种候选
                     lastErr = e;
                 }
             }
+            if (fatalErr) throw fatalErr;  // 透传真实的结构性错误（避免被伪装成 MAC 失败）
             // 所有候选组合均失败
             if (typeof console !== 'undefined' && console.error) {
                 console.error('[bw2keepass] 解密失败：已尝试全部 salt/memory 候选组合均未通过 MAC 校验。', {
@@ -2971,19 +2979,20 @@
         }
 
         // 解析 Bitwarden 密文字符串: "encType.ivB64|ctB64|macB64"
+        // 旧式 encType=0（AesCbc256 无 MAC）格式为 "0.ivB64|ctB64"（仅 2 段）
         function parseCipherString(cipherStr) {
             const dotIdx = cipherStr.indexOf('.');
             if (dotIdx === -1) throw new Error('无效的密文格式');
             const encType = parseInt(cipherStr.substring(0, dotIdx), 10);
             const parts = cipherStr.substring(dotIdx + 1).split('|');
-            if (parts.length !== 3) throw new Error('无效的密文格式');
+            if (parts.length !== 3 && parts.length !== 2) throw new Error('无效的密文格式');
             return {
                 encType,
                 iv: base64ToArrayBuffer(parts[0]),
                 ct: base64ToArrayBuffer(parts[1]),
                 ivB64: parts[0],
                 ctB64: parts[1],
-                mac: parts[2] // 保持 base64 字符串，用于比较
+                mac: parts.length === 3 ? parts[2] : '' // 保持 base64 字符串，用于比较
             };
         }
 
@@ -3004,27 +3013,35 @@
         }
 
         // AES-CBC 解密 + HMAC 验证
+        // Bitwarden 加密类型（见 core/Enums::EncryptionType）:
+        //   0 = AesCbc256 (无 MAC，旧式)         -> 256 位密钥，跳过 MAC
+        //   1 = AesCbc128_HmacSha256_B64         -> 128 位密钥 + HMAC
+        //   2 = AesCbc256_HmacSha256_B64 (默认)  -> 256 位密钥 + HMAC
         async function decryptCipherString(cipherStr, encKey, macKey) {
-            const { encType, iv, ct, ivB64, ctB64, mac } = parseCipherString(cipherStr);
-            // encType 2 = AesCbc256_HmacSha256_B64
-            if (encType !== 2) throw new Error('不支持的加密类型: ' + encType);
+            const { encType, iv, ct, mac } = parseCipherString(cipherStr);
 
-            // HMAC 完整性验证（Bitwarden 规范：对 iv 原始字节拼接 ct 原始字节做 HMAC）
-            const macData = new Uint8Array(iv.byteLength + ct.byteLength);
-            macData.set(new Uint8Array(iv), 0);
-            macData.set(new Uint8Array(ct), iv.byteLength);
+            let keyLen, needMac;
+            if (encType === 2) { keyLen = 32; needMac = true; }
+            else if (encType === 1) { keyLen = 16; needMac = true; }
+            else if (encType === 0) { keyLen = 32; needMac = false; }
+            else throw new Error('不支持的加密类型: ' + encType);
 
-            const hmacKey = await crypto.subtle.importKey('raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-            const computedSig = await crypto.subtle.sign('HMAC', hmacKey, macData);
-            const computedMac = arrayBufferToBase64(computedSig);
-
-            // 常量时间比较（防止时序攻击）
-            if (!constantTimeEqual(computedMac, mac)) {
-                throw new Error('密码错误或数据已损坏（MAC 验证失败）');
+            // HMAC 完整性验证（encType 0 为旧式无 MAC，跳过）
+            if (needMac) {
+                const macData = new Uint8Array(iv.byteLength + ct.byteLength);
+                macData.set(new Uint8Array(iv), 0);
+                macData.set(new Uint8Array(ct), iv.byteLength);
+                const hmacKey = await crypto.subtle.importKey('raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+                const computedSig = await crypto.subtle.sign('HMAC', hmacKey, macData);
+                const computedMac = arrayBufferToBase64(computedSig);
+                if (!constantTimeEqual(computedMac, mac)) {
+                    throw new Error('密码错误或数据已损坏（MAC 验证失败）');
+                }
             }
 
-            // AES-256-CBC 解密
-            const aesKey = await crypto.subtle.importKey('raw', encKey, { name: 'AES-CBC' }, false, ['decrypt']);
+            // AES-CBC 解密（encType 1 用前 16 字节作为 128 位密钥，其余用 32 字节 256 位密钥）
+            const aesKeyBytes = encKey.slice(0, keyLen);
+            const aesKey = await crypto.subtle.importKey('raw', aesKeyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
             const plaintext = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, aesKey, ct);
             return plaintext;
         }
