@@ -306,12 +306,13 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
 
     # 登录额外信息
     if item.type == 1:
-        if item.username:
-            fields["UserName"] = item.username  # KeePass 标准字段
+        # 注意：username 已作为 KeePass 标准字段写入 entry.username，无需再以
+        # 自定义字段 "UserName" 存储——pykeepass 的 UserName 是保留键，
+        # set_custom_property 会抛 AssertionError 导致整个转换崩溃。
         if item.totp:
-            # KeePassXC/OTP 插件格式
+            # 仅存 TOTP Seed（反向优先读此项）。注意不能写 "otp" 自定义字段：
+            # pykeepass 把 otp 列为保留键，set_custom_property 会抛 AssertionError。
             fields["TOTP Seed"] = item.totp
-            fields["otp"] = f"otpauth://totp/{item.name}?secret={item.totp}"
         # android URI → KeePassDX AndroidApp + AndroidApp Signature 字段
         app_idx = 0
         for u in item.uris:
@@ -324,6 +325,18 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
                         sig_key = "AndroidApp Signature" if app_idx == 0 else f"AndroidApp Signature{app_idx + 1}"
                         fields[sig_key] = fingerprint
                     app_idx += 1
+        # 多 URI：除主 URL 和 android URI 外的额外 web URI 写入 URI_2..URI_19，
+        # 供反向转换还原（get_entry_notes 仅把它们放进备注文本，无法还原）。
+        primary_url = get_entry_url(item)
+        uri_idx = 2
+        for u in item.uris:
+            if not u.uri:
+                continue
+            if u.uri == primary_url or _is_android_uri(u.uri):
+                continue
+            if uri_idx <= 19:
+                fields[f"URI_{uri_idx}"] = u.uri
+                uri_idx += 1
 
     # 卡片额外字段
     if item.type == 3:

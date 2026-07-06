@@ -191,6 +191,9 @@ class TestConverter(unittest.TestCase):
         self.assertIn("BitwardenType", fields)
         self.assertEqual(fields["BitwardenType"], "Login")
         self.assertIn("TOTP Seed", fields)
+        # 注意：不再写 "otp" / "UserName" 自定义字段（pykeepass 保留键，会崩溃）
+        self.assertNotIn("otp", fields)
+        self.assertNotIn("UserName", fields)
         self.assertIn("2FA Recovery Code", fields)
         # androidapp:// URI 应映射为 AndroidApp 字段
         self.assertEqual(fields.get("AndroidApp"), "com.github.android")
