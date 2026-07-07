@@ -123,21 +123,64 @@ public class MainActivity extends Activity {
         }
     }
 
-    // 将取到的主色扩展为一组 Material 变量并注入前端
+    // 将取到的壁纸主色扩展为一组 MD3 变量并注入前端
     private void injectColor(int argb) {
         int r = Color.red(argb), g = Color.green(argb), b = Color.blue(argb);
-        // 提亮/降暗派生 hover 与 glow
-        int hover = lighten(argb, 0.12f);
-        // container：主色 + 透明度混合到深色背景（前端用 rgba，这里给出带 alpha 的 hex）
-        String accent = String.format("#%02x%02x%02x", r, g, b);
-        String accentHover = String.format("#%02x%02x%02x", Color.red(hover), Color.green(hover), Color.blue(hover));
-        String glow = String.format("rgba(%d, %d, %d, 0.32)", r, g, b);
+        // onPrimary：在深色 surface 上，主色足够亮时可用近黑文字；这里统一取深紫底文字
+        int onPrimary = mix(argb, 0x141318, 0.78f);
+        // primaryContainer：主色混入深色背景（深色表面上的低对比容器）
+        int primaryContainer = mix(argb, 0x141318, 0.55f);
+        int onPrimaryContainer = mix(argb, 0xffffff, 0.82f);
+        // secondary / tertiary：由主色色相派生（略偏移 + 降饱和），用于丰富界面层次
+        int secondary = desaturate(shiftHue(argb, 28), 0.18f);
+        int onSecondaryContainer = mix(secondary, 0xffffff, 0.82f);
+        int secondaryContainer = mix(secondary, 0x141318, 0.55f);
+        int tertiary = desaturate(shiftHue(argb, -42), 0.22f);
+        // 统一注入 MD3 变量（与前端 Pass2KDBXDynamic.apply 的键对应）
         String js = String.format(
             "if (window.Pass2KDBXDynamic && window.Pass2KDBXDynamic.apply) {"
-            + " window.Pass2KDBXDynamic.apply({accent:'%s', accentHover:'%s', accentGlow:'%s'}); }",
-            accent, accentHover, glow);
+            + " window.Pass2KDBXDynamic.apply({"
+            + "primary:'%s', onPrimary:'%s', primaryContainer:'%s', onPrimaryContainer:'%s',"
+            + "secondary:'%s', secondaryContainer:'%s', onSecondaryContainer:'%s',"
+            + "tertiary:'%s'}); }",
+            hex(argb), hex(onPrimary), hex(primaryContainer), hex(onPrimaryContainer),
+            hex(secondary), hex(secondaryContainer), hex(onSecondaryContainer), hex(tertiary));
         webView.evaluateJavascript(js, null);
-        Log.i(TAG, "Dynamic color injected: " + accent);
+        Log.i(TAG, "Dynamic color injected (MD3): " + hex(argb));
+    }
+
+    // 向目标色混合（factor=0 取 color，1 取 target）
+    private static int mix(int color, int target, float factor) {
+        int r = (int) (Color.red(color) + (Color.red(target) - Color.red(color)) * factor);
+        int g = (int) (Color.green(color) + (Color.green(target) - Color.green(color)) * factor);
+        int b = (int) (Color.blue(color) + (Color.blue(target) - Color.blue(color)) * factor);
+        return Color.argb(255, clamp(r), clamp(g), clamp(b));
+    }
+
+    // 向白色混合（提亮）
+    private static int lighten(int color, float factor) {
+        return mix(color, 0xffffff, factor);
+    }
+
+    // 降低饱和度
+    private static int desaturate(int color, float factor) {
+        float[] hsl = new float[3];
+        Color.colorToHSV(color, hsl);
+        hsl[1] = hsl[1] * (1f - factor);
+        return Color.HSVToColor(hsl);
+    }
+
+    // 色相偏移（degree）
+    private static int shiftHue(int color, int degree) {
+        float[] hsl = new float[3];
+        Color.colorToHSV(color, hsl);
+        hsl[0] = (hsl[0] + degree + 360) % 360;
+        return Color.HSVToColor(hsl);
+    }
+
+    private static int clamp(int v) { return Math.max(0, Math.min(255, v)); }
+    private static String hex(int argb) {
+        return String.format("#%02x%02x%02x", Color.red(argb), Color.green(argb), Color.blue(argb));
     }
 
     // 提亮颜色（向白色混合）

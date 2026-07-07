@@ -15,16 +15,21 @@ app/
     ├── res/
     │   ├── values/styles.xml      # AppTheme（深色）
     │   └── drawable/ic_launcher.xml
-    └── assets/                    # 前端固化副本（来源 web/，A 方案）
-        └── index.html 等
+    └── assets/                    # 前端（独立 MD3 实现，非 web/ 副本）
+        ├── index.html             # Material Design 3 原生风格界面
+        ├── engine.js             # 纯转换逻辑（无 DOM，供 WebView 调用）
+        └── vendor/               # 本地化依赖（离线可用）
+            ├── kdbxweb.min.js
+            ├── argon2.umd.min.js
+            └── jszip.min.js
 ```
 
 ## 与网页版的关系
 
-- `assets/` 是 **`web/` 的固化副本**（A 方案），首次由 `web/` 复制而来。
-- **网页版 `web/` 原文件保持不动**；App 后续单独迭代时只改 `app/src/main/assets/` 下的副本。
-- 副本中已移除 `serviceWorker` 注册（`file://` 协议不支持 SW，无需 PWA 离线）。
-- 若网页版有重大更新需要同步进 App，请手动复制并重新核对差异（后续可加同步脚本）。
+- **App 前端已从网页版独立**：`assets/index.html` 是一套**全新的 Material Design 3（MD3）界面**，目标是有别于网页端的「现代化安卓 App」观感（大圆角、surface 分层、Material 开关/分段控件、FAB、Snackbar、Bottom Sheet、动态取色）。
+- **逻辑层复用**：转换核心抽离为 `assets/engine.js`（无 DOM 的纯函数），通过 `window.Pass2KDBXEngine.run(opts)` 暴露，UI 仅负责交互与渲染，保持与网页版**功能对等**（Bitwarden/KeePass/1Password/CSV、Passkey 分离、favicon、加密导出等）。
+- **依赖本地化**：`kdbxweb` / `hash-wasm(Argon2)` / `JSZip` 已下载至 `assets/vendor/`，WebView 在 `file://` 下**完全离线**运行，不再依赖 CDN。
+- **已移除 web 专用产物**：`sw.js`、`CNAME`、`manifest.json`、`debug-test.html` 等与 WebView 无关的文件不再随 App 打包。
 
 ## 工程参数
 
@@ -35,11 +40,11 @@ app/
 
 ## UI 与设计
 
-- **Material You 风格**：圆润大圆角（24px）、实色分层 surface、柔和长阴影、主色驱动一切元素。
-- **深色 / 浅色兼容**：默认跟随系统 `prefers-color-scheme`；右上角按钮可手动切换并 localStorage 记忆；切换时同步 `meta theme-color`（影响安卓状态栏/导航栏配色）。
-- **动态取色（Android 12+）**：`MainActivity` 通过 `WallpaperManager.getWallpaperColors()` 读取壁纸主色，在 `onPageFinished` 用 `evaluateJavascript` 调用前端 `window.Pass2KDBXDynamic.apply({accent, accentHover, accentGlow})`，前端把主色写入 CSS 变量 `--accent*`，并据亮度自动算出 `--on-accent`（主色上的文字色），打 `data-dynamic="true"` 标记。
-  - **降级**：Android < 12 不支持壁纸取色，自动沿用默认主色（`--accent` 紫色基线），UI 不受影响。
-- 前端为 `web/index.html` 的固化副本（见上文「与网页版的关系」），UI 改动只落在 `app/src/main/assets/`。
+- **Material Design 3（MD3）**：大圆角（卡片 28px / 控件胶囊）、surface 分层（surface / surface-1 / surface-2）、柔和 elevation 阴影、主色驱动按钮/开关/分段控件/FAB/Snackbar/Bottom Sheet，整体为现代化安卓 App 观感。
+- **深色 / 浅色兼容**：默认跟随系统；App 内部「关于」面板的主题选项可手动选 系统/浅色/深色 并记忆，切换时同步 `meta theme-color`（影响安卓状态栏/导航栏配色）。
+- **动态取色（Android 12+）**：`MainActivity` 通过 `WallpaperManager.getWallpaperColors()` 读取壁纸主色，扩展为全套 MD3 变量（primary / onPrimary / primaryContainer / secondary / tertiary …），在 `onPageFinished` 用 `evaluateJavascript` 调用前端 `window.Pass2KDBXDynamic.apply({primary, onPrimary, primaryContainer, ...})`，前端写入 `--md-*` CSS 变量并打 `data-dynamic="true"` 标记。
+  - **降级**：Android < 12 不支持壁纸取色，沿用默认 MD3 紫色基线，UI 不受影响。
+- 前端为**独立 MD3 实现**（见上文「与网页版的关系」），UI 改动只落在 `app/src/main/assets/`。
 
 ## 本地构建
 

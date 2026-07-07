@@ -59,11 +59,11 @@
 Android APK 已从「CI 内联脚本临时拼装」升级为仓库内**固化、可独立演进**的真实工程，位于 **`app/`** 目录（详见 [`app/README.md`](app/README.md)）。
 
 - **独立发布线**：APK 走专属 tag（前缀 `app-v*`，如 `app-v1.0`）与独立 Release 标题「Pass2KDBX Android App」，**不再与网页版 `apk-latest` 混用**。
-- **独立前端副本**：`app/src/main/assets/` 是 `web/` 的固化副本（A 方案），首次由 `web/` 复制而来。网页端 `web/` 原文件保持不动，App 后续单独迭代只改 `assets/` 副本。
+- **独立 MD3 前端**：`app/src/main/assets/` 是一套**全新的 Material Design 3 界面**（非 `web/` 副本），转换核心抽离为 `engine.js`，依赖库本地化（`vendor/`）以离线运行；功能与网页版对等。
 - **本地可构建**：提供 [`app/build-apk-local.sh`](app/build-apk-local.sh)，配置好 Android SDK 后可在本机直接复现 CI 构建，无需等待 CI。
 - **签名一致**：使用 CI 缓存的固定 keystore，保证每次构建签名一致、可覆盖安装。
 
-> 当前 App 仍处于开发阶段（前端尚未脱离网页版独立成型），但工程结构已独立，可单独维护与发布。
+> App 工程结构已独立，并拥有区别于网页版的自有 MD3 界面，可单独维护、演进与发布。
 
 ---
 
@@ -192,7 +192,7 @@ bw2keepass/
 │       ├── AndroidManifest.xml
 │       ├── java/cc/valk/pass2kdbx/MainActivity.java  # WebView 壳 + 下载接口
 │       ├── res/             # styles.xml / ic_launcher.xml
-│       └── assets/          # 前端固化副本（来自 web/，可独立演进）
+│       └── assets/          # 独立 MD3 前端（index.html + engine.js + vendor/）
 ├── tests/                   # 测试（47 个用例）
 ├── .github/workflows/       # GitHub Actions
 │   ├── build-apk.yml       # 自动构建 Android APK（独立 app-v* 发布线）
@@ -206,7 +206,7 @@ bw2keepass/
 ## 🔒 隐私说明
 
 - **网页版**：所有数据在浏览器本地处理，不发送到任何服务器
-- **Android APK**：纯 WebView 包装网页代码，无后端，无数据收集
+- **Android APK**：WebView 运行独立 MD3 前端（本地化依赖，离线可用），无后端，无数据收集
 - **CLI 工具**：本地运行，无网络请求
 
 ---

@@ -61,8 +61,8 @@ jobs:
 
       - name: Build APK
         env:
-          VERSION_CODE: 1
-          VERSION_NAME: 1.0
+          VERSION_CODE: 2
+          VERSION_NAME: 2.0
         run: |
           BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
           PLATFORM=$ANDROID_HOME/platforms/android-34
