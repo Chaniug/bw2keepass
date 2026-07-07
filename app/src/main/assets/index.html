@@ -400,23 +400,37 @@
         .stat-label { font: var(--md-label); font-weight: 400; color: var(--md-on-surface-variant); margin-top: 0.25rem; }
         .download-list { display: flex; flex-direction: column; gap: 0.6rem; }
         .download-item {
-            display: flex; align-items: center; gap: 0.75rem; width: 100%;
-            background: var(--md-surface-2); color: var(--md-on-surface);
-            border: 1px solid var(--md-outline-variant); border-radius: var(--md-corner-m);
-            padding: 0.85rem 1rem; cursor: pointer; text-align: left;
+            display: flex; align-items: center; gap: 0.85rem; width: 100%;
+            background: color-mix(in srgb, var(--md-primary-container) 30%, var(--md-surface-2));
+            color: var(--md-on-surface);
+            border: 1px solid color-mix(in srgb, var(--md-outline-variant) 65%, var(--md-primary) 22%);
+            border-radius: var(--md-corner-m);
+            padding: 0.7rem 0.8rem; cursor: pointer; text-align: left;
             font: var(--md-label); font-weight: 700;
             transition: background .15s ease, border-color .15s ease, transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .15s ease;
         }
         .download-item:hover {
-            background: color-mix(in srgb, var(--md-surface-2) 72%, var(--md-primary) 8%);
-            border-color: color-mix(in srgb, var(--md-outline-variant) 55%, var(--md-primary) 35%);
+            background: color-mix(in srgb, var(--md-primary-container) 44%, var(--md-surface-2));
+            border-color: color-mix(in srgb, var(--md-primary) 45%, var(--md-outline-variant));
             transform: translateY(-1px); box-shadow: var(--md-elevation-1);
         }
-        .download-item:active { background: var(--md-surface-3); transform: scale(.99); }
+        .download-item:active { background: var(--md-primary-container); transform: scale(.99); }
         .download-item:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
-        .download-item .di-icon { font-size: 1.3rem; }
+        /* 文件类型图标做成实心圆形 chip，提升可读性 */
+        .download-item .di-icon {
+            flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+            display: grid; place-items: center; font-size: 1.25rem;
+            background: color-mix(in srgb, var(--md-primary) 16%, var(--md-surface-1));
+        }
         .download-item .di-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .download-item .di-note { font: var(--md-label); font-weight: 400; color: var(--md-error); font-size: 0.72rem; margin-top: 0.15rem; }
+        /* 尾部下载 CTA：明确的「下载」主色胶囊，强调可点击 */
+        .download-item .di-cta {
+            flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.3rem;
+            padding: 0.35rem 0.7rem; border-radius: var(--md-corner-full);
+            background: var(--md-primary); color: var(--md-on-primary);
+            font: var(--md-label); font-weight: 700; font-size: 0.82rem;
+        }
 
         /* ===================== Snackbar ===================== */
         .snackbar {
@@ -1008,7 +1022,7 @@
                 item.className = 'download-item';
                 const isKdbx = d.name.endsWith('.kdbx');
                 const icon = isKdbx ? '🔐' : (d.name.endsWith('.csv') ? '📊' : (d.name.endsWith('.zip') ? '🗂️' : '📦'));
-                item.innerHTML = `<span class="di-icon">${icon}</span><div style="flex:1;min-width:0;"><div class="di-name">${d.name}</div>${d.csvNote ? `<div class="di-note">⚠️ ${d.csvNote}</div>` : ''}</div><span>⬇️</span>`;
+                item.innerHTML = `<span class="di-icon">${icon}</span><div style="flex:1;min-width:0;"><div class="di-name">${d.name}</div>${d.csvNote ? `<div class="di-note">⚠️ ${d.csvNote}</div>` : ''}</div><span class="di-cta">⬇️ 下载</span>`;
                 item.addEventListener('click', () => downloadBlob(d.data, d.name, d.mime));
                 downloadList.appendChild(item);
             });
