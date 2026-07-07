@@ -183,15 +183,6 @@ public class MainActivity extends Activity {
         return String.format("#%02x%02x%02x", Color.red(argb), Color.green(argb), Color.blue(argb));
     }
 
-    // 提亮颜色（向白色混合）
-    private static int lighten(int color, float factor) {
-        int r = Color.red(color), g = Color.green(color), b = Color.blue(color);
-        r = (int) (r + (255 - r) * factor);
-        g = (int) (g + (255 - g) * factor);
-        b = (int) (b + (255 - b) * factor);
-        return Color.argb(255, r, g, b);
-    }
-
     // 同步系统深浅模式给前端（仅提示，前端自行决定是否跟随）
     private void applySystemDarkMode(WebView view) {
         int nightMode = getResources().getConfiguration().uiMode
