@@ -1,0 +1,3433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <script>
+        // 仅在非 file: 协议（网页端 https/http）下注入 CSP。
+        // APK 走 file:///android_asset/... 时不注入，避免老版本 WebView 对 file:// 页面
+        // 应用 CSP 时误伤内联样式/资源导致白屏；文件读取走 FileReader/JSZip/AndroidFileSaver，
+        // 不经过网络，不受 CSP 约束。
+        if (location.protocol !== 'file:') {
+            document.write('<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' \'unsafe-inline\' https://cdn.jsdelivr.net; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data: https: blob:; font-src \'self\' data:; connect-src \'self\' https://cdn.jsdelivr.net https:; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'">');
+        }
+    </script>
+    <title>Pass2KDBX - 密码管理器格式互转</title>
+    <meta name="description" content="Bitwarden 与 KeePass 格式互转工具，支持 Passkey 完整迁移。纯浏览器端处理，数据不上传服务器。">
+    <meta name="theme-color" content="#6c5ce7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pass2KDBX">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-hover: #22252f;
+            --border: #2a2d37;
+            --text: #e1e4ea;
+            --text-secondary: #8b8fa7;
+            --accent: #6c5ce7;
+            --accent-hover: #7f6ff0;
+            --accent-glow: rgba(108, 92, 231, 0.3);
+            --success: #00cec9;
+            --danger: #ff6b6b;
+            --warning: #f0a500;
+            --bw-blue: #175ddc;
+            --strength-1: #ff6b6b;
+            --strength-2: #feca57;
+            --strength-3: #54a0ff;
+            --strength-4: #5f27cd;
+            --strength-5: #00cec9;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --glass-bg: rgba(255, 255, 255, 0.10);
+            --glass-bg-strong: rgba(255, 255, 255, 0.16);
+            --glass-border: rgba(255, 255, 255, 0.16);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+            --glass-blur: blur(22px) saturate(160%);
+            --glass-hi: rgba(255, 255, 255, 0.28);
+        }
+
+        /* ===== 亮色主题（CSS 变量覆盖，布局不变） ===== */
+        [data-theme="light"] {
+            --bg: #f4f5f9;
+            --surface: #ffffff;
+            --surface-hover: #eef0f6;
+            --border: #d8dbe6;
+            --text: #1a1d27;
+            --text-secondary: #5b6072;
+            --accent-glow: rgba(108, 92, 231, 0.18);
+            --success: #00a8a3;
+            --danger: #e74c3c;
+            --warning: #d99400;
+            --strength-1: #e74c3c;
+            --strength-2: #d99400;
+            --strength-3: #2f7de1;
+            --strength-4: #6c5ce7;
+            --strength-5: #00a8a3;
+            --glass-bg: rgba(255, 255, 255, 0.5);
+            --glass-bg-strong: rgba(255, 255, 255, 0.68);
+            --glass-border: rgba(255, 255, 255, 0.7);
+            --glass-shadow: 0 8px 32px rgba(31, 41, 80, 0.16);
+            --glass-blur: blur(20px) saturate(150%);
+            --glass-hi: rgba(255, 255, 255, 0.85);
+        }
+        [data-theme="light"] body::before {
+            background:
+                radial-gradient(circle at 15% 20%, rgba(108, 92, 231, 0.26) 0%, transparent 45%),
+                radial-gradient(circle at 85% 15%, rgba(0, 206, 201, 0.20) 0%, transparent 48%),
+                radial-gradient(circle at 80% 85%, rgba(253, 121, 168, 0.18) 0%, transparent 50%),
+                radial-gradient(circle at 20% 90%, rgba(47, 125, 225, 0.16) 0%, transparent 48%);
+        }
+
+        /* 主题切换按钮（右上角悬浮） */
+        .theme-toggle {
+            position: fixed; top: calc(1rem + env(safe-area-inset-top)); right: calc(1rem + env(safe-area-inset-right)); z-index: 50;
+            width: 42px; height: 42px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; cursor: pointer;
+            background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); color: var(--text);
+            box-shadow: var(--glass-shadow);
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            transition: all 0.3s;
+        }
+        .theme-toggle:hover {
+            border-color: var(--accent); color: var(--accent);
+            box-shadow: 0 0 18px var(--accent-glow); transform: rotate(20deg);
+        }
+        body, .card, .header, .footer, .toast, .modal-card { transition: background-color 0.3s, color 0.3s, border-color 0.3s; }
+
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(108, 92, 231, 0.50) 0%, transparent 45%),
+                radial-gradient(circle at 85% 15%, rgba(0, 206, 201, 0.40) 0%, transparent 48%),
+                radial-gradient(circle at 80% 85%, rgba(253, 121, 168, 0.38) 0%, transparent 50%),
+                radial-gradient(circle at 20% 90%, rgba(47, 125, 225, 0.32) 0%, transparent 48%);
+            z-index: -1;
+            animation: bgShift 26s ease-in-out infinite;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(2%, -1%); }
+            66% { transform: translate(-1%, 2%); }
+        }
+
+        .container { width: 100%; max-width: 720px; }
+
+        /* Header */
+        .header { text-align: center; margin-bottom: 2.75rem; }
+        .logo {
+            display: inline-flex; align-items: center; gap: 0.65rem;
+            font-size: 2.15rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.9rem;
+            text-shadow: 0 2px 22px rgba(0,0,0,0.35);
+        }
+        .logo-icon { font-size: 2.4rem; filter: drop-shadow(0 4px 14px var(--accent-glow)); }
+        .logo-accent {
+            background: linear-gradient(135deg, var(--accent), var(--success));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .subtitle { color: var(--text-secondary); font-size: 0.92rem; line-height: 1.6; max-width: 28rem; margin: 0 auto; text-shadow: 0 1px 14px rgba(0,0,0,0.3); }
+        .privacy-pill {
+            display: inline-flex; align-items: center; gap: 0.4rem; margin-top: 1rem;
+            font-size: 0.72rem; font-weight: 500; color: var(--text-secondary);
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); border-radius: 2rem;
+            padding: 0.32rem 0.8rem;
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+        }
+
+        /* Direction Switcher */
+        .direction-switch {
+            display: flex; gap: 0; margin-bottom: 1.75rem;
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); border-radius: 2rem;
+            padding: 0.3rem; width: fit-content; margin-left: auto; margin-right: auto;
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            box-shadow: var(--glass-shadow);
+        }
+        .dir-btn {
+            padding: 0.6rem 1.5rem; border-radius: 1.8rem; font-size: 0.85rem; font-weight: 600;
+            font-family: inherit; border: none; cursor: pointer; transition: all 0.25s;
+            background: transparent; color: var(--text-secondary); white-space: nowrap;
+        }
+        .dir-btn.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #fff;
+            box-shadow: 0 3px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.25);
+        }
+        .dir-btn:hover:not(.active) { color: var(--text); background: var(--glass-bg-strong); }
+        .dir-arrow { display: flex; align-items: center; color: var(--text-secondary); font-size: 0.9rem; padding: 0 0.2rem; }
+
+        /* Steps */
+        .steps { display: flex; justify-content: center; align-items: center; gap: 0.25rem; margin-bottom: 2rem; }
+        .step { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); transition: color 0.3s; }
+        .step.active { color: var(--text); font-weight: 500; }
+        .step.done { color: var(--success); }
+        .step-num {
+            width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 0.78rem; font-weight: 700; border: 2px solid var(--glass-border); transition: all 0.3s; background: var(--glass-bg);
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+        }
+        .step.active .step-num { border-color: var(--accent); background: var(--accent); color: #fff; box-shadow: 0 2px 10px var(--accent-glow); }
+        .step.done .step-num { border-color: var(--success); background: var(--success); color: #fff; }
+        .step-arrow { color: var(--border); margin: 0 0.4rem; }
+
+        /* Card */
+        .card {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi);
+            border-radius: var(--radius); padding: 2.25rem; margin-bottom: 1.5rem;
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255,255,255,0.06);
+            transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+        }
+        .card:hover { border-color: var(--glass-hi); box-shadow: 0 14px 44px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.12); transform: translateY(-2px); }
+        .card-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.4rem; letter-spacing: -0.01em; }
+        .card-desc { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6; }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 1.5px dashed var(--glass-border); border-radius: var(--radius); padding: 3rem 2rem;
+            text-align: center; cursor: pointer; transition: all 0.3s;
+            background: var(--glass-bg);
+        }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: var(--glass-bg-strong); }
+        .upload-zone.drag-over { border-style: solid; box-shadow: 0 0 30px var(--accent-glow); }
+        .upload-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 72px; height: 72px; margin: 0 auto 1.1rem; border-radius: 50%;
+            background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi);
+            font-size: 2rem; box-shadow: var(--glass-shadow);
+        }
+        .upload-text { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text); }
+        .upload-hint { font-size: 0.8rem; color: var(--text-secondary); }
+        .file-input { display: none; }
+
+        .fmt-badge {
+            display: inline-block; font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 1rem;
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); color: var(--text-secondary); white-space: nowrap;
+        }
+
+        /* File Info */
+        .file-info { display: none; align-items: center; gap: 1rem; padding: 1rem; background: var(--glass-bg); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); border-radius: var(--radius-sm); margin-top: 1rem; }
+        .file-info.show { display: flex; }
+        .file-icon { font-size: 2rem; flex-shrink: 0; }
+        .file-details { flex: 1; min-width: 0; }
+        .file-name { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.15rem; }
+        .file-remove {
+            background: none; border: 1px solid var(--border); color: var(--text-secondary);
+            width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1rem;
+            display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0;
+        }
+        .file-remove:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* Password */
+        .password-section { display: none; }
+        .password-section.show { display: block; animation: fadeUp 0.4s ease; }
+        .input-group { position: relative; }
+        .input-group input {
+            width: 100%; padding: 0.85rem 1rem; padding-right: 3rem;
+            background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
+            color: var(--text); font-size: 0.95rem; font-family: inherit; transition: border-color 0.3s; outline: none;
+        }
+        .input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .input-group input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+        .toggle-password {
+            position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.1rem; padding: 0.25rem;
+        }
+        .password-strength { height: 4px; border-radius: 2px; margin-top: 0.6rem; background: var(--border); overflow: hidden; }
+        .password-strength-bar { height: 100%; border-radius: 2px; transition: width 0.3s, background 0.3s; width: 0; }
+        .password-options { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-secondary); }
+        .password-options button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.8rem; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
+        .password-options button:hover { color: var(--accent-hover); }
+
+        /* Checkbox / Option */
+        .option-row {
+            display: flex; align-items: flex-start; gap: 0.6rem; margin-top: 1.25rem;
+            padding: 0.85rem 1rem; background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 0.75rem; font-size: 0.82rem; line-height: 1.5;
+            color: var(--text-secondary); transition: border-color 0.2s;
+        }
+        .option-row:hover { border-color: var(--accent); background: var(--glass-bg-strong); }
+        .option-row input[type="checkbox"] {
+            width: 1rem; height: 1rem; margin-top: 0.15rem; flex-shrink: 0;
+            accent-color: var(--accent); cursor: pointer;
+        }
+        .option-row label { cursor: pointer; }
+        .option-row .option-hint {
+            display: block; font-size: 0.75rem; color: var(--text-secondary);
+            opacity: 0.7; margin-top: 0.2rem;
+        }
+        .option-row .option-tag {
+            display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.45rem;
+            border-radius: 0.3rem; background: var(--accent); color: #fff;
+            margin-left: 0.35rem; vertical-align: middle; font-weight: 500;
+        }
+
+        /* Progress */
+        .progress-section { display: none; text-align: center; padding: 2rem; }
+        .progress-section.show { display: block; animation: fadeUp 0.4s ease; }
+        .spinner {
+            width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .progress-text { color: var(--text-secondary); font-size: 0.9rem; }
+        .progress-stats { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary); }
+
+        /* Success */
+        .success-section { display: none; text-align: center; padding: 2rem; }
+        .success-section.show { display: block; animation: fadeUp 0.4s ease; }
+        .success-icon { font-size: 4rem; margin-bottom: 1rem; display: block; filter: drop-shadow(0 0 18px rgba(0, 206, 201, 0.55)); animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .success-title { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.35rem; }
+        .success-details { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+            padding: 0.8rem 1.85rem; border-radius: var(--radius-sm); font-size: 0.95rem;
+            font-weight: 600; font-family: inherit; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; text-decoration: none;
+        }
+        .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #fff; box-shadow: 0 2px 10px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.25); }
+        .btn-primary:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: 0 6px 22px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.3); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-outline { background: var(--glass-bg); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); color: var(--text); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-success { background: var(--success); color: #000; }
+        .btn-success:hover { box-shadow: 0 4px 20px rgba(0, 206, 201, 0.3); transform: translateY(-1px); }
+        .btn-group { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+        .btn:active:not(:disabled) { transform: translateY(1px); }
+
+        /* Summary Table */
+        .summary-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+        .summary-table th, .summary-table td { padding: 0.6rem 0.75rem; text-align: left; }
+        .summary-table th { color: var(--text-secondary); font-weight: 500; border-bottom: 1px solid var(--border); }
+        .summary-table td { border-bottom: 1px solid rgba(42, 45, 55, 0.5); }
+        .summary-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .summary-table tbody tr:nth-child(even) td { background: rgba(128, 128, 128, 0.06); }
+        [data-theme="light"] .summary-table tbody tr:nth-child(even) td { background: rgba(0, 0, 0, 0.03); }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: calc(2rem + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(100px);
+            background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); padding: 0.75rem 1.5rem;
+            border-radius: 2rem; font-size: 0.85rem; box-shadow: var(--glass-shadow); color: var(--text);
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.error { border-color: var(--danger); }
+
+        /* 键盘可见焦点（无障碍） */
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+        .modal-input:focus-visible { outline: none; }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(10, 11, 18, 0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            z-index: 200; display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+        }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-card {
+            background: var(--glass-bg-strong); border: 1px solid var(--glass-border); border-top: 1px solid var(--glass-hi); border-radius: var(--radius);
+            padding: 2rem 2rem 1.5rem; max-width: 420px; width: 90%; box-shadow: var(--glass-shadow);
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            transform: translateY(20px); transition: transform 0.25s ease;
+        }
+        .modal-overlay.show .modal-card { transform: translateY(0); }
+        .modal-icon { font-size: 2rem; text-align: center; margin-bottom: 0.75rem; }
+        .modal-title { font-size: 1.1rem; font-weight: 600; text-align: center; margin-bottom: 0.5rem; }
+        .modal-desc { font-size: 0.82rem; color: var(--text-secondary); text-align: center; margin-bottom: 1.25rem; line-height: 1.5; }
+        .modal-input-row {
+            display: flex; align-items: center; background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm); overflow: hidden; transition: border-color 0.2s;
+        }
+        .modal-input-row:focus-within { border-color: var(--accent); }
+        .modal-input-row.error { border-color: var(--danger); }
+        .modal-input-row.error:focus-within { border-color: var(--danger); }
+        .modal-input {
+            flex: 1; background: transparent; border: none; color: var(--text); font-size: 0.95rem;
+            padding: 0.7rem 0.9rem; outline: none; font-family: inherit;
+        }
+        .modal-input::placeholder { color: var(--text-secondary); opacity: 0.5; }
+        .modal-toggle-pw {
+            background: transparent; border: none; color: var(--text-secondary); cursor: pointer;
+            padding: 0 0.75rem; font-size: 1rem; transition: color 0.2s;
+        }
+        .modal-toggle-pw:hover { color: var(--text); }
+        .modal-error {
+            font-size: 0.78rem; color: var(--danger); margin-top: 0.5rem; min-height: 1.2rem;
+            text-align: center;
+        }
+        .modal-actions {
+            display: flex; gap: 0.75rem; margin-top: 1.25rem;
+        }
+        .modal-btn {
+            flex: 1; padding: 0.65rem 1rem; border-radius: var(--radius-sm); font-size: 0.88rem;
+            font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.2s;
+            font-family: inherit;
+        }
+        .modal-btn-cancel {
+            background: transparent; border-color: var(--border); color: var(--text-secondary);
+        }
+        .modal-btn-cancel:hover { border-color: var(--text-secondary); color: var(--text); }
+        .modal-btn-confirm {
+            background: var(--accent); color: #fff;
+        }
+        .modal-btn-confirm:hover { background: var(--accent-hover); box-shadow: 0 0 12px var(--accent-glow); }
+        .modal-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+        .modal-loading {
+            text-align: center; font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .spinner {
+            width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent);
+            border-radius: 50%; animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Footer */
+        .footer { text-align: center; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--text-secondary); }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .card { padding: 1.25rem; }
+            .upload-zone { padding: 2rem 1rem; }
+            .btn-group { flex-direction: column; }
+            .btn { width: 100%; }
+            .steps { flex-wrap: wrap; }
+            .direction-switch { width: 100%; }
+            .dir-btn { flex: 1; text-align: center; font-size: 0.78rem; padding: 0.5rem 0.8rem; }
+        }
+        @media (max-width: 768px) {
+            .container { padding: 1.5rem 0.75rem; }
+            .card { padding: 1.5rem; }
+            .btn-group { gap: 0.75rem; }
+            .modal-card { width: 92%; max-width: 92%; }
+        }
+        @media (max-width: 600px) {
+            .direction-switch { width: 100%; }
+            .dir-btn { flex: 1; text-align: center; }
+            .btn { padding: 0.8rem 1rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+            body::before { animation: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🔐</span>
+                <span>Pass<span class="logo-accent">2</span>KDBX</span>
+            </div>
+            <p class="subtitle">密码管理器格式双向互转</p>
+            <span class="privacy-pill">🛡️ 全程本地处理，数据不上传</span>
+        </header>
+
+        <!-- Direction Switcher -->
+        <div class="direction-switch" id="directionSwitch">
+            <button class="dir-btn active" data-dir="to-kdbx">📥 → KDBX</button>
+            <button class="dir-btn" data-dir="to-bitwarden">📤 → Bitwarden</button>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps">
+            <div class="step active" id="step1"><span class="step-num">1</span> 上传文件</div>
+            <span class="step-arrow">→</span>
+            <div class="step" id="step2"><span class="step-num">2</span> <span id="step2Label">密码</span></div>
+            <span class="step-arrow">→</span>
+            <div class="step" id="step3"><span class="step-num">3</span> 下载</div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card" id="uploadCard">
+            <div class="card-title" id="uploadTitle">📁 上传密码管理器导出文件</div>
+            <div class="card-desc" id="uploadDesc">自动识别文件格式，支持多种密码管理器导出</div>
+            <div class="upload-zone" id="uploadZone">
+                <span class="upload-icon">⬆️</span>
+                <div class="upload-text">点击上传或拖拽文件到此处</div>
+                <div class="upload-hint" id="uploadHint">.json / .csv / .zip / .1pux · 最大 100MB</div>
+            </div>
+            <input type="file" class="file-input" id="fileInput">
+            <div id="uploadBadges" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center;">
+                <span class="fmt-badge" title="Bitwarden 密码管理器的导出格式">🔐 Bitwarden JSON/ZIP</span>
+                <span class="fmt-badge" title="1Password 的 .1pux 导出格式">🔑 1Password 1PUX</span>
+                <span class="fmt-badge" title="通用逗号分隔值表格">📊 CSV 通用</span>
+                <span class="fmt-badge" title="Google Chrome 导出的 CSV">🌐 Chrome CSV</span>
+                <span class="fmt-badge" title="Mozilla Firefox 导出的 CSV">🦊 Firefox CSV</span>
+            </div>
+            
+            <div class="file-info" id="fileInfo">
+                <span class="file-icon">📄</span>
+                <div class="file-details">
+                    <div class="file-name" id="fileName"></div>
+                    <div class="file-meta" id="fileMeta"></div>
+                </div>
+                <button class="file-remove" id="fileRemove" title="移除文件" aria-label="移除文件">✕</button>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1.25rem;">
+                <button class="btn btn-primary" id="nextStepBtn" disabled>下一步 →</button>
+            </div>
+        </div>
+
+        <!-- Password Card -->
+        <div class="card password-section" id="passwordCard">
+            <div class="card-title" id="passwordTitle">🔑 设置数据库密码</div>
+            <div class="card-desc" id="passwordDesc">此密码将用于加密数据库</div>
+
+            <div class="input-group" style="margin-bottom: 0.75rem;" id="dbNameRow">
+                <input type="text" id="dbName" aria-label="数据库名称" placeholder="数据库名称（可选）" value="My Vault" autocomplete="off">
+            </div>
+
+            <div class="input-group" id="dbPasswordRow">
+                <input type="password" id="dbPassword" aria-label="数据库密码" placeholder="输入数据库密码" autocomplete="new-password">
+                <button class="toggle-password" id="togglePassword" title="显示或隐藏密码" aria-label="显示或隐藏密码">👁️</button>
+            </div>
+            <div class="password-strength"><div class="password-strength-bar" id="passwordStrengthBar"></div></div>
+            <div class="password-options">
+                <span id="strengthLabel">输入密码</span>
+                <button id="generatePassword" title="生成随机密码" aria-label="生成随机密码">🎲 生成随机密码</button>
+            </div>
+
+            <!-- Passkey 分离选项 -->
+            <div class="option-row" id="passkeyOptionRow" style="display: none;">
+                <input type="checkbox" id="separatePasskey">
+                <label for="separatePasskey">
+                    同时分离导出 Passkey 文件<span class="option-tag">备选</span>
+                    <span class="option-hint" id="passkeyOptionHint">
+                        额外生成 .passkey 文件，可通过 KeePassXC → 数据库 → 导入 Passkey 单独导入（KDBX 已内含 Passkey，此为备用）。
+                    </span>
+                </label>
+            </div>
+
+            <!-- 网站图标选项 -->
+            <div class="option-row" id="faviconOptionRow">
+                <input type="checkbox" id="fetchFavicon">
+                <label for="fetchFavicon">
+                    获取网站图标<span class="option-tag">实验</span>
+                    <span class="option-hint">
+                        勾选后将联网获取条目的网站图标（favicon）并存入 KDBX，按域名去重复用。
+                    </span>
+                </label>
+            </div>
+
+            <!-- 加密导出选项（仅 → Bitwarden 方向） -->
+            <div class="option-row" id="encryptOptionRow" style="display: none;">
+                <input type="checkbox" id="encryptExport">
+                <label for="encryptExport">
+                    加密导出（密码保护）<span class="option-tag">Bitwarden 加密格式</span>
+                    <span class="option-hint">
+                        勾选后输出 Bitwarden 密码保护加密 JSON，需设置下方「导出密码」。可被 Bitwarden 或本工具重新解密导入。
+                    </span>
+                </label>
+            </div>
+            <div id="encryptExportFields" style="display: none; margin-top: 0.75rem;">
+                <div class="input-group">
+                    <input type="password" id="exportPassword" aria-label="导出密码" placeholder="设置加密导出密码" autocomplete="new-password">
+                </div>
+                <div class="input-group" style="margin-top: 0.5rem;">
+                    <select id="saltMode" aria-label="salt 处理方式" style="width: 100%; padding: 0.7rem 0.9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text);">
+                        <option value="utf8">salt 模式: UTF-8（默认，与 Bitwarden 官方一致，可被 Bitwarden 导入）</option>
+                        <option value="base64">salt 模式: Base64（仅本工具内部互转，Bitwarden 官方无法解密导入）</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 1.5rem;">
+                <button class="btn btn-outline" id="backBtn">← 返回</button>
+                <button class="btn btn-primary" id="convertBtn" disabled>开始转换</button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="card progress-section" id="progressCard">
+            <div class="spinner"></div>
+            <div class="progress-text">正在转换中...</div>
+            <div class="progress-stats" id="progressStats"></div>
+        </div>
+
+        <!-- Success -->
+        <div class="card success-section" id="successCard">
+            <span class="success-icon">✅</span>
+            <div class="success-title">转换完成！</div>
+            <div class="success-details" id="successDetails"></div>
+            <table class="summary-table" id="summaryTable"></table>
+            <div class="btn-group" style="margin-top: 1.25rem;">
+                <button class="btn btn-outline" id="newConvertBtn">🔄 转换新文件</button>
+                <button class="btn btn-success" id="downloadBtn" title="下载文件" aria-label="下载文件">💾 下载文件</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <a href="https://github.com/Chaniug/bw2keepass" target="_blank" rel="noopener">GitHub</a>
+            <span style="margin: 0 0.5rem; color: var(--border);">·</span>
+            <span id="appVersion">v2.2</span>
+        </footer>
+    </div>
+
+    <button class="theme-toggle" id="themeToggle" title="切换亮/暗主题" aria-label="切换主题">🌙</button>
+
+    <div class="toast" id="toast"></div>
+
+
+    <!-- 加密 JSON 密码弹窗 -->
+    <div class="modal-overlay" id="encPwOverlay" role="dialog" aria-modal="true" aria-labelledby="encPwTitle">
+        <div class="modal-card" id="encPwModal">
+            <div class="modal-icon">🔐</div>
+            <div class="modal-title" id="encPwTitle">检测到加密 JSON 导出</div>
+            <div class="modal-desc">此文件受密码保护，请输入导出时设置的密码来解密。</div>
+            <div class="modal-input-row">
+                <input type="password" class="modal-input" id="encPwInput" placeholder="输入加密密码..." autocomplete="off">
+                <button class="modal-toggle-pw" id="encPwToggle" type="button" title="显示密码">👁️</button>
+            </div>
+            <div class="modal-error" id="encPwError"></div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="encPwCancel">取消</button>
+                <button class="modal-btn modal-btn-confirm" id="encPwConfirm">解密并继续</button>
+            </div>
+            <div class="modal-loading" id="encPwLoading" style="display:none;">
+                <span class="spinner"></span> 正在解密...
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/hash-wasm@4.11.0/dist/argon2.umd.min.js" onerror="console.warn('hash-wasm 加载失败，回退 AES-KDF')"></script>
+        <script>
+        // hash-wasm 加载完成后注册 Argon2 实现
+        let argon2Ready = false;
+        function initArgon2() {
+            if (typeof hashwasm === 'undefined' || typeof kdbxweb === 'undefined') return;
+            try {
+                hashwasm.argon2d({ password: 't', salt: new Uint8Array([1,2,3,4,5,6,7,8]), memorySize: 64, iterations: 1, parallelism: 1, hashLength: 32, outputType: 'binary' }).then(function() {
+                    kdbxweb.CryptoEngine.setArgon2Impl(function(password, salt, memory, iterations, hashLength, parallelism, type, version) {
+                        var opts = { password: new Uint8Array(password), salt: new Uint8Array(salt), memorySize: memory, iterations: iterations, parallelism: parallelism, hashLength: hashLength, outputType: 'binary' };
+                        if (type === 2) return hashwasm.argon2id(opts);
+                        return hashwasm.argon2d(opts);
+                    });
+                    argon2Ready = true;
+                }).catch(function(e) { console.warn('Argon2 不可用，回退 AES-KDF', e); });
+            } catch (e) { console.warn('Argon2 初始化失败', e); }
+        }
+        if (typeof hashwasm !== 'undefined') initArgon2();
+        else window.addEventListener('load', function() { setTimeout(initArgon2, 100); });
+        </script>
+    <script>
+        const { Kdbx, Credentials, ProtectedValue, Consts, KdbxUuid } = kdbxweb;
+
+        // ============ 应用版本号（单一来源，避免页脚硬编码漂移）============
+        const APP_VERSION = '2.2';
+
+        // ============ JSZip 预加载（Passkey ZIP 解析用）============
+        let preloadedJsZip = null;
+        function preloadJsZip() {
+            if (preloadedJsZip) return Promise.resolve(preloadedJsZip);
+            return import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js')
+                .then((m) => { preloadedJsZip = m; return m; })
+                .catch(() => null);
+        }
+        window.addEventListener('load', () => { preloadJsZip(); });
+
+        // 注入应用版本号到页脚
+        (function injectVersion() {
+            const el = document.getElementById('appVersion');
+            if (el) el.textContent = 'v' + APP_VERSION;
+        })();
+
+        // ============ 主题切换（默认跟随系统，localStorage 记忆）============
+        (function initTheme() {
+            const toggle = document.getElementById('themeToggle');
+            if (!toggle) return;
+            const stored = localStorage.getItem('pass2kdbx-theme');
+            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            const initial = stored || (prefersLight ? 'light' : 'dark');
+            applyTheme(initial);
+            toggle.addEventListener('click', () => {
+                const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+                applyTheme(next);
+                localStorage.setItem('pass2kdbx-theme', next);
+            });
+            function applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                toggle.textContent = theme === 'light' ? '☀️' : '🌙';
+            }
+        })();
+
+
+        // ============ Polyfill: File.arrayBuffer() for older WebView ============
+        if (typeof File !== 'undefined' && File.prototype && !File.prototype.arrayBuffer) {
+            File.prototype.arrayBuffer = function() {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+                    reader.readAsArrayBuffer(this);
+                });
+            };
+        }
+        // Polyfill: Blob.arrayBuffer() (some WebView versions)
+        if (typeof Blob !== 'undefined' && Blob.prototype && !Blob.prototype.arrayBuffer) {
+            Blob.prototype.arrayBuffer = function() {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+                    reader.readAsArrayBuffer(this);
+                });
+            };
+        }
+        // 全局错误捕获，防止未处理异常导致白屏
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.error || e.message);
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('Unhandled rejection:', e.reason);
+        });
+
+        // ============ 文件下载辅助（兼容 WebView） ============
+        async function downloadBlob(blob, fileName, mimeType) {
+            // 优先用 Android 接口（WebView 环境）
+            if (window.AndroidFileSaver) {
+                try {
+                    const buf = await blob.arrayBuffer();
+                    const bytes = new Uint8Array(buf);
+                    // 转 base64（分块避免栈溢出）
+                    let binary = '';
+                    const chunkSize = 0x8000;
+                    for (let i = 0; i < bytes.length; i += chunkSize) {
+                        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+                    }
+                    const base64 = btoa(binary);
+                    window.AndroidFileSaver.saveFile(base64, fileName, mimeType || 'application/octet-stream');
+                    showToast('文件已保存到 Downloads 目录');
+                    return;
+                } catch (e) {
+                    console.error('AndroidFileSaver error:', e);
+                    // 失败则回退到标准方式
+                }
+            }
+            // 标准浏览器：用 a.download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast('文件已下载');
+        }
+
+        // ============ DOM Elements ============
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileMeta = document.getElementById('fileMeta');
+        const fileRemove = document.getElementById('fileRemove');
+        const nextStepBtn = document.getElementById('nextStepBtn');
+        const uploadCard = document.getElementById('uploadCard');
+        const passwordCard = document.getElementById('passwordCard');
+        const progressCard = document.getElementById('progressCard');
+        const successCard = document.getElementById('successCard');
+        const dbPassword = document.getElementById('dbPassword');
+        const dbName = document.getElementById('dbName');
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordStrengthBar = document.getElementById('passwordStrengthBar');
+        const strengthLabel = document.getElementById('strengthLabel');
+        const generatePasswordBtn = document.getElementById('generatePassword');
+        const convertBtn = document.getElementById('convertBtn');
+        const backBtn = document.getElementById('backBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const newConvertBtn = document.getElementById('newConvertBtn');
+        const progressStats = document.getElementById('progressStats');
+        // 进度文本节流：避免上千条目时每条 DOM 赋值导致频繁重排
+        let _lastProgressTs = 0;
+        function throttledSetProgress(text, force = false) {
+            const now = Date.now();
+            if (!force && now - _lastProgressTs < 120) return;
+            _lastProgressTs = now;
+            progressStats.textContent = text;
+        }
+        const successDetails = document.getElementById('successDetails');
+        const summaryTable = document.getElementById('summaryTable');
+        const toast = document.getElementById('toast');
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
+
+        // Dynamic labels
+        const uploadTitle = document.getElementById('uploadTitle');
+        const uploadDesc = document.getElementById('uploadDesc');
+        const uploadHint = document.getElementById('uploadHint');
+        const uploadBadges = document.getElementById('uploadBadges');
+        const passwordTitle = document.getElementById('passwordTitle');
+        const passwordDesc = document.getElementById('passwordDesc');
+        const directionSwitch = document.getElementById('directionSwitch');
+
+        // ============ State ============
+        let currentDir = 'to-kdbx'; // 'to-kdbx' | 'to-bitwarden'
+        let selectedFile = null;
+        let parsedData = null;
+        let generatedData = null;
+        let generatedKdbxInfo = '';
+        let generatedPasskeyData = null; // { passkeys: [...], zipBlob: Blob }
+        let generatedCsvData = null;  // CSV 导出数据（提前声明避免 TDZ 隐患）
+        let outputFileName = 'output.kdbx';
+        const TYPE_NAMES = { 1: 'Login', 2: 'SecureNote', 3: 'Card', 4: 'Identity', 5: 'SSHKey' };
+        const TYPE_NAME_TO_ID = { 'Login': 1, 'SecureNote': 2, 'Card': 3, 'Identity': 4, 'SSHKey': 5 };
+
+        // ============ Direction Switch ============
+        directionSwitch.addEventListener('click', (e) => {
+            const btn = e.target.closest('.dir-btn');
+            if (!btn) return;
+            const dir = btn.dataset.dir;
+            if (dir === currentDir) return;
+
+            currentDir = dir;
+            directionSwitch.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Reset state
+            resetAll();
+
+            // Update UI for direction
+            updateDirectionUI();
+        });
+
+        function updateDirectionUI() {
+            if (currentDir === 'to-kdbx') {
+                uploadTitle.textContent = '📁 上传密码管理器导出文件';
+                uploadDesc.textContent = '自动识别文件格式，支持多种密码管理器导出';
+                uploadHint.textContent = '.json / .csv / .zip / .1pux · 最大 100MB';
+                uploadBadges.style.display = '';
+                uploadBadges.innerHTML = `
+                    <span class="fmt-badge" title="Bitwarden 密码管理器的导出格式">🔐 Bitwarden JSON/ZIP</span>
+                    <span class="fmt-badge" title="1Password 的 .1pux 导出格式">🔑 1Password 1PUX</span>
+                    <span class="fmt-badge" title="通用逗号分隔值表格">📊 CSV 通用</span>
+                    <span class="fmt-badge" title="Google Chrome 导出的 CSV">🌐 Chrome CSV</span>
+                    <span class="fmt-badge" title="Mozilla Firefox 导出的 CSV">🦊 Firefox CSV</span>
+                `;
+                fileInput.setAttribute('accept', '.json,.csv,.zip,.1pux');
+                passwordTitle.textContent = '🔑 设置 KeePass 数据库密码';
+                passwordDesc.textContent = '此密码将用于加密您的 KeePass 数据库';
+                document.getElementById('step2Label').textContent = '密码';
+                document.getElementById('faviconOptionRow').style.display = '';
+                document.getElementById('encryptOptionRow').style.display = 'none';
+                resetEncryptUI();
+            } else {
+                uploadTitle.textContent = '📁 上传密码管理器导出文件';
+                uploadDesc.textContent = '支持 KDBX / CSV / 1PUX / JSON 等格式';
+                uploadHint.textContent = '.kdbx / .json / .csv / .zip / .1pux · 最大 100MB';
+                uploadBadges.style.display = '';
+                uploadBadges.innerHTML = `
+                    <span class="fmt-badge" title="KeePass 的密码库格式">🔐 KeePass KDBX</span>
+                    <span class="fmt-badge" title="1Password 的 .1pux 导出格式">🔑 1Password 1PUX</span>
+                    <span class="fmt-badge" title="通用逗号分隔值表格">📊 CSV 通用</span>
+                    <span class="fmt-badge" title="Google Chrome 导出的 CSV">🌐 Chrome CSV</span>
+                    <span class="fmt-badge" title="Mozilla Firefox 导出的 CSV">🦊 Firefox CSV</span>
+                    <span class="fmt-badge" title="Bitwarden 的 JSON 导出格式">📦 Bitwarden JSON</span>
+                `;
+                fileInput.setAttribute('accept', '.kdbx,.json,.csv,.zip,.1pux');
+                passwordTitle.textContent = '🔑 输入 KeePass 数据库密码';
+                passwordDesc.textContent = '仅 KDBX 文件需要密码，其他格式将自动跳过';
+                document.getElementById('step2Label').textContent = '解密';
+                document.getElementById('faviconOptionRow').style.display = 'none';
+                document.getElementById('encryptOptionRow').style.display = '';
+            }
+        }
+
+        // 重置加密导出相关 UI 状态
+        function resetEncryptUI() {
+            const ee = document.getElementById('encryptExport');
+            const ef = document.getElementById('encryptExportFields');
+            if (ee) ee.checked = false;
+            if (ef) ef.style.display = 'none';
+            const ep = document.getElementById('exportPassword');
+            if (ep) ep.value = '';
+        }
+
+        // ============ File Handling ============
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileRemove.addEventListener('click', () => {
+            selectedFile = null; parsedData = null;
+            fileInfo.classList.remove('show'); uploadZone.style.display = '';
+            nextStepBtn.disabled = true; fileInput.value = '';
+        });
+
+        function handleFile(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            const allFormats = ['json', 'zip', 'csv', '1pux', 'kdbx'];
+            if (!allFormats.includes(ext)) {
+                showToast('请选择 .json / .csv / .zip / .1pux / .kdbx 格式的文件', 'error');
+                return;
+            }
+
+            // KDBX only valid in to-bitwarden direction
+            if (ext === 'kdbx' && currentDir === 'to-kdbx') {
+                showToast('KDBX 文件请切换到「→ Bitwarden」方向使用', 'error');
+                return;
+            }
+            if (file.size > 100 * 1024 * 1024) {
+                showToast('文件大小不能超过 100MB', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = file.name;
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            fileMeta.textContent = `${sizeMB} MB · ${ext.toUpperCase()}`;
+            fileInfo.classList.add('show');
+            uploadZone.style.display = 'none';
+            nextStepBtn.disabled = false;
+
+            // 大文件提示（非阻断）：仅告知可能耗时，不改变读取方式
+            let bigHint = document.getElementById('largeFileHint');
+            if (file.size > 50 * 1024 * 1024) {
+                if (!bigHint) {
+                    bigHint = document.createElement('div');
+                    bigHint.id = 'largeFileHint';
+                    bigHint.className = 'option-row';
+                    bigHint.style.borderColor = 'var(--warning)';
+                    bigHint.style.color = 'var(--text)';
+                    bigHint.style.alignItems = 'center';
+                    uploadCard.insertBefore(bigHint, fileInfo.nextSibling);
+                }
+                bigHint.innerHTML =
+                    `<span style="font-size:1.2rem;flex-shrink:0;">⏳</span>` +
+                    `<div style="flex:1;min-width:0;">` +
+                        `<div style="font-weight:600;font-size:0.82rem;">文件较大（${sizeMB} MB）</div>` +
+                        `<div style="font-size:0.75rem;color:var(--text-secondary);">转换与图标获取可能需要几十秒，请耐心等待，期间不要关闭页面。</div>` +
+                    `</div>`;
+            } else if (bigHint) {
+                bigHint.remove();
+            }
+            // 从文件名自动填充数据库名称
+            const baseName = file.name.replace(/\.(json|zip|csv|1pux)$/i, '');
+            dbName.value = baseName || 'My Vault';
+        }
+
+        // ============ Step Navigation ============
+        nextStepBtn.addEventListener('click', async () => {
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+            uploadCard.style.display = 'none';
+            passwordCard.classList.add('show');
+            updateSteps(2);
+            configureBitwardenPasswordCard(ext);
+            if (currentDir === 'to-bitwarden') {
+                if (ext === 'kdbx') dbPassword.focus();
+                else if (exportPasswordEl) exportPasswordEl.focus();
+            } else {
+                dbPassword.focus();
+            }
+            updateConvertBtnState();
+            // 预扫描文件检测是否有 Passkey
+            checkForPasskeys();
+        });
+
+        // 按方向与文件类型配置密码/选项卡的可见性与文案
+        function configureBitwardenPasswordCard(ext) {
+            const dbNameRowEl = document.getElementById('dbNameRow');
+            const dbPasswordRowEl = document.getElementById('dbPasswordRow');
+            if (currentDir === 'to-kdbx') {
+                passwordTitle.textContent = '🔑 设置 KeePass 数据库密码';
+                passwordDesc.textContent = '此密码将用于加密您的 KeePass 数据库';
+                dbNameRowEl.style.display = '';
+                dbPasswordRowEl.style.display = '';
+                return;
+            }
+            // to-bitwarden
+            document.getElementById('encryptOptionRow').style.display = '';
+            if (ext === 'kdbx') {
+                passwordTitle.textContent = '🔑 输入 KeePass 数据库密码';
+                passwordDesc.textContent = '输入 KDBX 文件的主密码以读取内容';
+                dbNameRowEl.style.display = 'none';
+                dbPasswordRowEl.style.display = '';
+            } else {
+                passwordTitle.textContent = '⚙️ 导出选项';
+                passwordDesc.textContent = '可勾选「加密导出」设置密码保护；不勾选则直接生成明文 JSON';
+                dbNameRowEl.style.display = 'none';
+                dbPasswordRowEl.style.display = 'none';
+            }
+        }
+
+        backBtn.addEventListener('click', () => {
+            passwordCard.classList.remove('show');
+            uploadCard.style.display = '';
+            updateSteps(1);
+        });
+
+        function updateSteps(active) {
+            [step1, step2, step3].forEach((s, i) => {
+                s.classList.remove('active', 'done');
+                if (i + 1 < active) s.classList.add('done');
+                if (i + 1 === active) s.classList.add('active');
+            });
+        }
+
+        // ============ Password ============
+        togglePassword.addEventListener('click', () => {
+            const type = dbPassword.type === 'password' ? 'text' : 'password';
+            dbPassword.type = type;
+            togglePassword.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+
+        dbPassword.addEventListener('input', updatePasswordStrength);
+
+        // 加密导出选项联动
+        const encryptExportEl = document.getElementById('encryptExport');
+        const encryptExportFieldsEl = document.getElementById('encryptExportFields');
+        const exportPasswordEl = document.getElementById('exportPassword');
+        encryptExportEl.addEventListener('change', () => {
+            encryptExportFieldsEl.style.display = encryptExportEl.checked ? '' : 'none';
+            updateConvertBtnState();
+        });
+        if (exportPasswordEl) exportPasswordEl.addEventListener('input', updateConvertBtnState);
+
+        function updatePasswordStrength() {
+            const val = dbPassword.value;
+            let score = 0;
+            if (val.length >= 8) score++;
+            if (val.length >= 12) score++;
+            if (/[a-z]/.test(val) && /[A-Z]/.test(val)) score++;
+            if (/\d/.test(val)) score++;
+            if (/[^a-zA-Z0-9]/.test(val)) score++;
+
+            const pct = (score / 5) * 100;
+            passwordStrengthBar.style.width = pct + '%';
+
+            let color, label;
+            if (score <= 1) { color = 'var(--strength-1)'; label = '弱'; }
+            else if (score <= 2) { color = 'var(--strength-2)'; label = '一般'; }
+            else if (score <= 3) { color = 'var(--strength-3)'; label = '较好'; }
+            else if (score <= 4) { color = 'var(--strength-4)'; label = '强'; }
+            else { color = 'var(--strength-5)'; label = '非常强'; }
+
+            passwordStrengthBar.style.background = color;
+            strengthLabel.textContent = val ? `密码强度：${label}` : '输入密码';
+            updateConvertBtnState();
+        }
+
+        // 密码步骤（passwordCard 可见）触发；按方向与文件类型决定可转换条件
+        function updateConvertBtnState() {
+            if (currentDir === 'to-kdbx') {
+                convertBtn.disabled = dbPassword.value.length < 1;
+                return;
+            }
+            if (currentDir === 'to-bitwarden') {
+                const ext = (selectedFile ? selectedFile.name.split('.').pop().toLowerCase() : '');
+                if (ext === 'kdbx') {
+                    convertBtn.disabled = dbPassword.value.length < 1;
+                    return;
+                }
+                // 非 KDBX：仅需导出密码（若勾选加密），否则可直接转换
+                if (encryptExportEl.checked) {
+                    convertBtn.disabled = exportPasswordEl.value.length < 1;
+                } else {
+                    convertBtn.disabled = false;
+                }
+                return;
+            }
+            convertBtn.disabled = dbPassword.value.length < 1;
+        }
+
+        generatePasswordBtn.addEventListener('click', () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+            const arr = new Uint8Array(24);
+            crypto.getRandomValues(arr);
+            let pw = '';
+            for (let i = 0; i < 24; i++) pw += chars[arr[i] % chars.length];
+            dbPassword.value = pw;
+            dbPassword.type = 'text';
+            togglePassword.textContent = '🙈';
+            updatePasswordStrength();
+        });
+
+        // ============ Passkey Pre-scan ============
+        async function checkForPasskeys() {
+            const passkeyRow = document.getElementById('passkeyOptionRow');
+            const passkeyHint = document.getElementById('passkeyOptionHint');
+            const separateCheckbox = document.getElementById('separatePasskey');
+            // Reset
+            separateCheckbox.checked = false;
+            passkeyRow.style.display = 'none';
+
+            if (currentDir !== 'to-kdbx' || !selectedFile) return;
+
+            try {
+                const ext = selectedFile.name.split('.').pop().toLowerCase();
+                const data = await selectedFile.arrayBuffer();
+                let text;
+                if (ext === 'zip') {
+                    const JSZip = preloadedJsZip || await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+                    const zip = await JSZip.loadAsync(data);
+                    const jsonFile = Object.keys(zip.files).find(n => n.endsWith('data.json') || n.endsWith('.json'));
+                    if (!jsonFile) return;
+                    text = await zip.file(jsonFile).async('string');
+                } else {
+                    text = new TextDecoder().decode(data);
+                }
+                const json = JSON.parse(text);
+                let passkeyCount = 0;
+                for (const item of json.items || []) {
+                    if (item.deletedDate) continue;
+                    const fidos = item.fido2Credentials || (item.login && item.login.fido2Credentials) || [];
+                    passkeyCount += fidos.length;
+                }
+                if (passkeyCount > 0) {
+                    passkeyRow.style.display = '';
+                    passkeyHint.textContent =
+                        `检测到 ${passkeyCount} 个 Passkey。勾选后将额外生成 .passkey 文件，可通过 KeePassXC → Database → Import Passkey 单独导入。KDBX 中已包含 Passkey 数据，此选项仅作为备用导入方式。`;
+                }
+            } catch (e) {
+                // 预扫描失败不影响正常使用
+            }
+        }
+
+        // ============ Conversion ============
+        convertBtn.addEventListener('click', () => startConversion());
+
+        async function startConversion() {
+            if (!selectedFile) return;
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+            const needsPassword = (currentDir === 'to-kdbx') || (currentDir === 'to-bitwarden' && ext === 'kdbx');
+            if (needsPassword && !dbPassword.value) return;
+            // 加密导出：必须提供导出密码
+            if (currentDir === 'to-bitwarden' && encryptExportEl.checked && !exportPasswordEl.value) {
+                showToast('请设置加密导出密码', 'error');
+                return;
+            }
+
+            uploadCard.style.display = 'none';
+            passwordCard.classList.remove('show');
+            progressCard.classList.add('show');
+            successCard.classList.remove('show');
+            updateSteps(3);
+
+            try {
+                if (currentDir === 'to-kdbx') {
+                    await convertToKdbx();
+                } else {
+                    await convertToBitwarden();
+                }
+            } catch (err) {
+                progressCard.classList.remove('show');
+                uploadCard.style.display = '';
+                updateSteps(1);
+                console.error('Conversion error:', err);
+                if (err.message === '用户取消') {
+                    // 用户取消弹窗，不显示错误，静默返回
+                    return;
+                }
+                let msg = err.message || '未知错误';
+                if (err.code === 'InvalidKey') msg = '密码错误，请检查 KeePass 数据库密码';
+                else if (err.code === 'BadSignature') msg = '无效的 KDBX 文件';
+                else if (err.code === 'FileCorrupt') msg = '文件已损坏';
+                showConversionError(msg);
+            }
+        }
+
+        // 展示转换错误，并提供"重试"入口（保留已选文件与密码，不整体重置）
+        function showConversionError(msg) {
+            let bar = document.getElementById('conversionErrorBar');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'conversionErrorBar';
+                bar.className = 'option-row';
+                bar.style.borderColor = 'var(--danger)';
+                bar.style.color = 'var(--text)';
+                bar.style.alignItems = 'center';
+                uploadCard.insertBefore(bar, uploadCard.firstChild);
+            }
+            const hint = classifyError(msg);
+            bar.innerHTML =
+                `<span style="font-size:1.2rem;flex-shrink:0;">⚠️</span>` +
+                `<div style="flex:1;min-width:0;">` +
+                    `<div style="font-weight:600;font-size:0.85rem;">转换失败</div>` +
+                    `<div style="font-size:0.78rem;color:var(--text-secondary);word-break:break-word;margin-top:0.15rem;">${escapeHtml(hint)}</div>` +
+                    `<div style="font-size:0.72rem;color:var(--text-secondary);word-break:break-word;margin-top:0.1rem;opacity:0.8;">${escapeHtml(msg)}</div>` +
+                `</div>` +
+                `<button id="retryConvertBtn" class="btn btn-primary" style="flex-shrink:0;padding:0.5rem 1rem;">重试</button>`;
+            document.getElementById('retryConvertBtn').addEventListener('click', () => {
+                bar.remove();
+                startConversion();
+            });
+        }
+
+        // 简单 HTML 转义，防止错误信息中的特殊字符破坏布局
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        // 将底层错误归类为对用户更友好的可执行提示
+        function classifyError(msg) {
+            const m = String(msg || '').toLowerCase();
+            if (/password|decrypt|mac|hmac|key|kdf|argon|无效|不正确/.test(m)) {
+                return '可能是密码不正确或加密方式不匹配，请确认密码后重试。';
+            }
+            if (/not a (zip|kdbx)|损坏|corrupt|invalid|parse|格式|无法识别/.test(m)) {
+                return '文件可能已损坏或不是受支持的格式，请重新导出后重试。';
+            }
+            return '处理过程中出现问题，可重试；若持续失败请检查文件或提交反馈。';
+        }
+
+        // ============ TO KDBX ============
+        async function convertToKdbx() {
+            progressStats.textContent = '正在读取文件...';
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+            let vault;
+
+            if (ext === 'csv') {
+                const text = await selectedFile.text();
+                vault = parseCSV(text, selectedFile.name);
+                progressStats.textContent = `检测到 CSV 格式 · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === '1pux') {
+                vault = await parse1PUX(selectedFile);
+                progressStats.textContent = `检测到 1Password 1PUX · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === 'zip') {
+                const jsonData = await readZipFile(selectedFile);
+                vault = parseBitwardenJson(jsonData);
+                progressStats.textContent = `检测到 Bitwarden ZIP · 找到 ${vault.items.length} 个条目`;
+            } else {
+                const text = await selectedFile.text();
+                const jsonData = JSON.parse(text);
+                if (isBitwardenEncryptedJson(jsonData)) {
+                    const encResult = await promptAndDecryptEncryptedJson(jsonData);
+                    vault = parseBitwardenJson(encResult);
+                    progressStats.textContent = `检测到 Bitwarden 加密 JSON · 找到 ${vault.items.length} 个条目`;
+                } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
+                    vault = parse1PUXJSON(jsonData);
+                    progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
+                } else {
+                    vault = parseBitwardenJson(jsonData);
+                    progressStats.textContent = `检测到 Bitwarden JSON · 找到 ${vault.items.length} 个条目`;
+                }
+            }
+
+            parsedData = vault;
+            progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 KDBX...`;
+
+            const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
+            const db = Kdbx.create(credentials, dbName.value.trim() || 'My Vault');
+            db.upgrade();  // 升级到 KDBX 4
+            // Argon2d（如有 WASM 支持），否则回退 AES-KDF（均为 KDBX 4 格式）
+            db.setKdf(argon2Ready ? Consts.KdfId.Argon2d : Consts.KdfId.Aes);
+
+            const folderGroupMap = new Map();
+            folderGroupMap.set(null, db.getDefaultGroup());
+            for (const folder of vault.folders) {
+                const group = db.createGroup(db.getDefaultGroup(), sanitizePath(folder.name));
+                folderGroupMap.set(folder.id, group);
+            }
+            const csvFolderNames = new Set();
+            for (const item of vault.items) {
+                if (item.folderId && typeof item.folderId === 'string' && !folderGroupMap.has(item.folderId)) {
+                    csvFolderNames.add(item.folderId);
+                }
+            }
+            for (const fname of csvFolderNames) {
+                const group = db.createGroup(db.getDefaultGroup(), sanitizePath(fname));
+                folderGroupMap.set(fname, group);
+                vault.folders.push({ id: fname, name: fname });
+            }
+
+            let entryCount = 0;
+            const passkeys = []; // Collect passkeys for .passkey file export
+            const entryUrlMap = []; // Collect entries with HTTP URLs for favicon fetching
+            for (const item of vault.items) {
+                if (item.deleted) continue;
+                const parentGroup = folderGroupMap.get(item.folderId) || db.getDefaultGroup();
+                const entry = db.createEntry(parentGroup);
+                entry.fields.set('Title', item.name || '(无标题)');
+                if (item.login?.username) entry.fields.set('UserName', item.login.username);
+                if (item.login?.password) entry.fields.set('Password', ProtectedValue.fromString(item.login.password));
+                if (item.login?.uris?.length) {
+                    // 优先 http(s)，其次非 android URI 的当 URL（如 account.coolapk.com）
+                    const isAndroidUri = uri => uri && (uri.startsWith('androidapp://') || uri.startsWith('android://'));
+                    const webUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')))
+                        || item.login.uris.find(u => u.uri && !isAndroidUri(u.uri));
+                    if (webUri) {
+                        entry.fields.set('URL', webUri.uri);
+                        if (webUri.uri.startsWith('http://') || webUri.uri.startsWith('https://')) {
+                            entryUrlMap.push({ entry, url: webUri.uri });
+                        }
+                    }
+                }
+                const notes = buildNotes(item);
+                if (notes) entry.fields.set('Notes', notes);
+                const customFields = buildCustomFields(item);
+                for (const [key, value] of Object.entries(customFields)) {
+                    if (key === 'Password') {
+                        entry.fields.set(key, ProtectedValue.fromString(String(value)));
+                    } else {
+                        entry.fields.set(key, String(value));
+                    }
+                }
+                const tags = buildTags(item);
+                if (tags.length) entry.fields.set('_TAGS', tags.join(' '));
+                // Collect passkey data for .passkey file export
+                if (item.fido2Credentials?.length) {
+                    for (const fc of item.fido2Credentials) {
+                        passkeys.push({ item, fc });
+                    }
+                }
+                entryCount++;
+                throttledSetProgress(`已处理 ${entryCount}/${vault.items.length} 个条目...`);
+            }
+
+            // ============ Fetch favicons (optional) ============
+            const fetchFavicon = document.getElementById('fetchFavicon');
+            let faviconCount = 0;
+            if (fetchFavicon && fetchFavicon.checked && entryUrlMap.length > 0) {
+                progressStats.textContent = `正在获取网站图标...`;
+                faviconCount = await fetchAndSetFavicons(db, entryUrlMap, (done, total) => {
+                    progressStats.textContent = `获取图标中 ${done}/${total}...`;
+                });
+            }
+
+            progressStats.textContent = '正在加密并生成 KDBX 文件...';
+            generatedData = await db.save();
+
+            // 从二进制头读取实际 KDBX 版本
+            const _dv = new DataView(generatedData);
+            const _ver = _dv.getUint32(8, true);
+            const _kdbxMajor = (_ver >> 16) & 0xFFFF;
+            const _kdbxMinor = _ver & 0xFFFF;
+            const _kdfName = argon2Ready ? 'Argon2d' : 'AES-KDF';
+            generatedKdbxInfo = `KDBX ${_kdbxMajor}.${_kdbxMinor} · ${_kdfName} · AES-256`;
+
+            // Generate .passkey files only if user opted in
+            const separatePasskey = document.getElementById('separatePasskey');
+            generatedPasskeyData = null;
+            if (passkeys.length > 0 && separatePasskey.checked) {
+                const passkeyFiles = [];
+                for (const pk of passkeys) {
+                    const passkeyJson = buildPasskeyFile(pk.fc, pk.item);
+                    const safeName = (pk.item.name || 'passkey').replace(/[<>:"/\\|?*]/g, '_').substring(0, 60);
+                    const fileName = passkeys.length > 1
+                        ? `${safeName}_${passkeyFiles.length + 1}.passkey`
+                        : `${safeName}.passkey`;
+                    passkeyFiles.push({ name: fileName, json: passkeyJson });
+                }
+                generatedPasskeyData = { passkeys: passkeyFiles };
+            }
+
+            progressCard.classList.remove('show');
+            successCard.classList.add('show');
+            updateSteps(3); step3.classList.add('done');
+            outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.kdbx';
+            const passkeyInfo = passkeys.length > 0 ? ` · 包含 ${passkeys.length} 个 Passkey` : '';
+            const faviconInfo = faviconCount > 0 ? ` · ${faviconCount} 个网站图标` : '';
+            successDetails.textContent = `成功转换 ${entryCount} 个条目到 ${vault.folders.length} 个文件夹${passkeyInfo}${faviconInfo}`;
+            successDetails.textContent += `\n📦 ${generatedKdbxInfo}`;
+            downloadBtn.textContent = '💾 下载 KDBX 文件';
+            if (generatedPasskeyData) showPasskeyDownloadBtn();
+            buildSummaryTable(vault);
+            showToast('转换完成！');
+        }
+
+        // ============ TO BITWARDEN ============
+        async function convertToBitwarden() {
+            const ext = selectedFile.name.split('.').pop().toLowerCase();
+
+            // If it's a KDBX file, load and convert KeePass entries
+            if (ext === 'kdbx') {
+                await convertKdbxToBitwarden();
+                return;
+            }
+
+            // For CSV / 1PUX / JSON / ZIP - parse them into the same vault structure,
+            // then serialize to Bitwarden JSON
+            progressStats.textContent = '正在读取文件...';
+            let vault;
+
+            if (ext === 'csv') {
+                const text = await selectedFile.text();
+                vault = parseCSV(text, selectedFile.name);
+                progressStats.textContent = `检测到 CSV 格式 · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === '1pux') {
+                vault = await parse1PUX(selectedFile);
+                progressStats.textContent = `检测到 1Password 1PUX · 找到 ${vault.items.length} 个条目`;
+            } else if (ext === 'zip') {
+                const jsonData = await readZipFile(selectedFile);
+                vault = parseBitwardenJson(jsonData);
+                progressStats.textContent = `检测到 Bitwarden ZIP · 找到 ${vault.items.length} 个条目`;
+            } else {
+                const text = await selectedFile.text();
+                const jsonData = JSON.parse(text);
+                if (isBitwardenEncryptedJson(jsonData)) {
+                    const encResult = await promptAndDecryptEncryptedJson(jsonData);
+                    vault = parseBitwardenJson(encResult);
+                    progressStats.textContent = `检测到 Bitwarden 加密 JSON · 找到 ${vault.items.length} 个条目`;
+                } else if (jsonData.accounts && Array.isArray(jsonData.accounts)) {
+                    vault = parse1PUXJSON(jsonData);
+                    progressStats.textContent = `检测到 1Password 1PUX JSON · 找到 ${vault.items.length} 个条目`;
+                } else {
+                    vault = parseBitwardenJson(jsonData);
+                    progressStats.textContent = `检测到 Bitwarden JSON · 找到 ${vault.items.length} 个条目`;
+                }
+            }
+
+            // Serialize vault to Bitwarden JSON format
+            await convertVaultToBitwarden(vault);
+        }
+
+        // 若勾选加密导出，将明文 Bitwarden 导出加密为密码保护信封；否则返回明文 JSON
+        async function maybeEncryptBW(bwExport) {
+            if (currentDir === 'to-bitwarden' && encryptExportEl.checked) {
+                const saltMode = document.getElementById('saltMode').value || 'utf8';
+                const env = await encryptBitwardenExport(bwExport, exportPasswordEl.value, { saltMode: saltMode });
+                return { data: JSON.stringify(env, null, 2), encrypted: true };
+            }
+            return { data: JSON.stringify(bwExport, null, 2), encrypted: false };
+        }
+
+        async function convertVaultToBitwarden(vault) {
+            progressStats.textContent = `找到 ${vault.items.length} 个条目，正在生成 Bitwarden JSON...`;
+
+            // Convert internal folders to Bitwarden folder format
+            const bwFolders = (vault.folders || []).map(f => ({
+                id: f.id,
+                name: f.name
+            }));
+
+            // Convert items to Bitwarden item format
+            const bwItems = [];
+            for (const item of vault.items) {
+                if (item.deleted) continue;
+                const bwItem = convertVaultItemToBW(item);
+                if (bwItem) bwItems.push(bwItem);
+            }
+
+            const bwExport = {
+                encrypted: false,
+                folders: bwFolders,
+                items: bwItems
+            };
+
+            const out = await maybeEncryptBW(bwExport);
+            generatedData = out.data;
+            outputFileName = selectedFile.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.json';
+
+            progressCard.classList.remove('show');
+            successCard.classList.add('show');
+            updateSteps(3); step3.classList.add('done');
+            downloadBtn.textContent = out.encrypted ? '💾 下载加密 Bitwarden JSON' : '💾 下载 Bitwarden JSON';
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${bwFolders.length} 个文件夹` + (out.encrypted ? '（已加密）' : '');
+
+            // Summary
+            const typeCount = {};
+            for (const item of bwItems) {
+                const tn = TYPE_NAMES[item.type] || '其他';
+                typeCount[tn] = (typeCount[tn] || 0) + 1;
+            }
+            let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
+            for (const [type, count] of Object.entries(typeCount)) {
+                html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
+            }
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${bwItems.length}</td></tr></tbody>`;
+            summaryTable.innerHTML = html;
+
+            showToast('转换完成！');
+        }
+
+        function convertVaultItemToBW(item) {
+            if (!item.name && !item.login) return null;
+
+            const bwItem = {
+                id: generateUUID(),
+                organizationId: null,
+                folderId: item.folderId || null,
+                type: item.type || 1,
+                reprompt: 0,
+                name: item.name || '(无标题)',
+                notes: item.notes || null,
+                favorite: item.favorite || false,
+                login: item.login ? {
+                    username: item.login.username || null,
+                    password: item.login.password || null,
+                    totp: item.login.totp || null,
+                    uris: (item.login.uris || []).map(u => ({ uri: u.uri || u, match: null })),
+                } : null,
+                card: item.card || null,
+                identity: item.identity || null,
+                secureNote: item.type === 2 ? { type: 0 } : null,
+                collectionIds: [],
+                fields: (item.customFields || []).map(f => ({
+                    name: f.name,
+                    value: String(f.value || ''),
+                    type: f.type || 0
+                })),
+                passwordHistory: (item.passwordHistory || []).map(ph => ({
+                    password: ph.password || '',
+                    lastUsedDate: ph.lastUsedDate || ''
+                })),
+                fido2Credentials: (item.fido2Credentials || item.login?.fido2Credentials || []).map(fc => ({
+                    credentialId: fc.credentialId || '',
+                    keyType: fc.keyType || '',
+                    keyAlgorithm: fc.keyAlgorithm || '',
+                    keyCurve: fc.keyCurve || '',
+                    keyValue: fc.keyValue || '',
+                    rpId: fc.rpId || '',
+                    rpName: fc.rpName || '',
+                    userHandle: fc.userHandle || '',
+                    userName: fc.userName || '',
+                    userDisplayName: fc.userDisplayName || '',
+                    counter: fc.counter || '',
+                    discoverable: fc.discoverable || '',
+                    creationDate: fc.creationDate || '',
+                })),
+            };
+
+            return bwItem;
+        }
+
+        async function convertKdbxToBitwarden() {
+            progressStats.textContent = '正在加载 KDBX 数据库...';
+            const buf = await selectedFile.arrayBuffer();
+            const credentials = new Credentials(ProtectedValue.fromString(dbPassword.value));
+            const db = await Kdbx.load(buf, credentials);
+
+            progressStats.textContent = '正在读取分组和条目...';
+            const rootGroup = db.getDefaultGroup();
+            const allEntries = rootGroup.allEntries();
+
+            // Build folder structure from KeePass groups
+            const allGroups = rootGroup.allGroups();
+            const folderMap = new Map(); // group.uuid -> folder name
+            const folders = [];
+            let folderIdx = 0;
+
+            // Build folder path for each group (skip root and recycle bin)
+            function buildGroupPath(group, parentPath) {
+                if (!group || group === rootGroup) return '';
+                const name = getGroupName(group);
+                if (!name || name === 'Recycle Bin' || name === '回收站') return '';
+                const path = parentPath ? parentPath + '/' + name : name;
+                if (!folderMap.has(group.uuid)) {
+                    folderMap.set(group.uuid, { id: 'folder_' + (++folderIdx), name: path });
+                    folders.push({ id: 'folder_' + folderIdx, name: path });
+                }
+                return path;
+            }
+
+            function getGroupPath(entry) {
+                // Walk up the group hierarchy
+                const group = entry.parentGroup || entry.group;
+                if (!group || group === rootGroup) return null;
+                const path = buildGroupPath(group, '');
+                return path || null;
+            }
+
+            // First pass: build all folder paths
+            for (const group of allGroups) {
+                if (group === rootGroup) continue;
+                const name = getGroupName(group);
+                if (!name || name === 'Recycle Bin' || name === '回收站') continue;
+                // Build path
+                let path = name;
+                let parent = group.parentGroup;
+                while (parent && parent !== rootGroup) {
+                    const pn = getGroupName(parent);
+                    if (pn && pn !== 'Recycle Bin' && pn !== '回收站') {
+                        path = pn + '/' + path;
+                    }
+                    parent = parent.parentGroup;
+                }
+                if (!folderMap.has(group.uuid)) {
+                    folderMap.set(group.uuid, { id: 'folder_' + (++folderIdx), name: path });
+                    folders.push({ id: 'folder_' + folderIdx, name: path });
+                }
+            }
+
+            progressStats.textContent = `找到 ${allEntries.length} 个条目，正在生成 Bitwarden JSON...`;
+
+            const bwItems = [];
+            let idx = 0;
+            for (const entry of allEntries) {
+                const item = convertKdbxEntryToBW(entry, folderMap);
+                if (item) bwItems.push(item);
+                idx++;
+                if (idx % 50 === 0) {
+                    progressStats.textContent = `已处理 ${idx}/${allEntries.length} 个条目...`;
+                }
+            }
+
+            const bwExport = {
+                encrypted: false,
+                folders: folders,
+                items: bwItems
+            };
+
+            const out = await maybeEncryptBW(bwExport);
+            generatedData = out.data;
+            outputFileName = selectedFile.name.replace(/\.kdbx$/i, '') + '.json';
+
+            // 统计 passkey 数量
+            let passkeyCount = 0;
+            for (const item of bwItems) {
+                if (item.fido2Credentials && item.fido2Credentials.length > 0) {
+                    passkeyCount += item.fido2Credentials.length;
+                }
+            }
+
+            // 同时生成 CSV 数据
+            generatedCsvData = buildCSVFromBwItems(bwItems, folders);
+
+            progressCard.classList.remove('show');
+            successCard.classList.add('show');
+            updateSteps(3); step3.classList.add('done');
+            downloadBtn.textContent = out.encrypted ? '💾 下载加密 Bitwarden JSON' : '💾 下载 Bitwarden JSON';
+
+            let passkeyInfo = passkeyCount > 0 ? ` · ${passkeyCount} 个 Passkey 已保留` : '';
+            successDetails.textContent = `成功转换 ${bwItems.length} 个条目到 ${folders.length} 个文件夹${passkeyInfo}` + (out.encrypted ? '（已加密）' : '');
+
+            // Summary
+            const typeCount = {};
+            for (const item of bwItems) {
+                const tn = TYPE_NAMES[item.type] || '其他';
+                typeCount[tn] = (typeCount[tn] || 0) + 1;
+            }
+            let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
+            for (const [type, count] of Object.entries(typeCount)) {
+                html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
+            }
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${bwItems.length}</td></tr></tbody>`;
+            summaryTable.innerHTML = html;
+
+            // 显示 CSV 下载按钮
+            showCsvDownloadBtn(passkeyCount);
+
+            showToast('转换完成！');
+        }
+
+        function getGroupName(group) {
+            if (!group) return '';
+            if (typeof group.name === 'string') return group.name;
+            if (group.name && typeof group.name.getText === 'function') return group.name.getText();
+            return String(group.name || '');
+        }
+
+        function convertKdbxEntryToBW(entry, folderMap) {
+            const fields = entry.fields;
+            const getText = (key) => {
+                const v = fields.get(key);
+                if (!v) return '';
+                if (typeof v === 'string') return v;
+                if (typeof v.getText === 'function') return v.getText();
+                return String(v);
+            };
+
+            const title = getText('Title');
+            const username = getText('UserName');
+            const password = getText('Password');
+            const url = getText('URL');
+            const notes = getText('Notes');
+
+            if (!title && !username && !password && !url && !notes) return null;
+
+            const item = {
+                id: generateUUID(),
+                organizationId: null,
+                folderId: null,
+                type: 1,
+                reprompt: 0,
+                name: title || '(无标题)',
+                notes: notes || null,
+                favorite: false,
+                login: {
+                    username: username || null,
+                    password: password || null,
+                    totp: null,
+                    uris: url ? [{ uri: url, match: null }] : [],
+                },
+                collectionIds: [],
+                fields: [],
+                passwordHistory: [],
+                fido2Credentials: [],
+            };
+
+            // Get folder from group
+            const group = entry.parentGroup || entry.group;
+            if (group && folderMap.has(group.uuid)) {
+                item.folderId = folderMap.get(group.uuid).id;
+            }
+
+            // Detect type from custom fields
+            const bwTypeField = getText('BitwardenType');
+            if (bwTypeField && TYPE_NAME_TO_ID[bwTypeField]) {
+                item.type = TYPE_NAME_TO_ID[bwTypeField];
+            }
+
+            // Extract TOTP (兼容旧版 otpauth 字段名)
+            const totp = getText('TOTP Seed') || getText('TOTP') || getText('otp') || getText('otpauth');
+            if (totp && item.login) item.login.totp = totp;
+
+            // Extract extra URIs
+            if (item.login) {
+                for (let i = 2; i <= 10; i++) {
+                    const extraUri = getText(`URI_${i}`);
+                    if (extraUri) item.login.uris.push({ uri: extraUri, match: null });
+                }
+                // KP2A_URL / KP2A_URL_2 ... → 还原为多 URI
+                const seenUris = new Set(item.login.uris.map(u => u.uri));
+                for (let i = 0; i <= 20; i++) {
+                    const key = i === 0 ? 'KP2A_URL' : `KP2A_URL_${i + 1}`;
+                    const val = getText(key);
+                    if (val && !seenUris.has(val)) {
+                        item.login.uris.push({ uri: val, match: null });
+                        seenUris.add(val);
+                    }
+                }
+                // AndroidApp + Signature 字段 → 还原 android URI
+                for (let i = 0; i <= 10; i++) {
+                    const key = i === 0 ? 'AndroidApp' : `AndroidApp${i + 1}`;
+                    const pkg = getText(key);
+                    if (pkg) {
+                        const sigKey = i === 0 ? 'AndroidApp Signature' : `AndroidApp Signature${i + 1}`;
+                        const sig = getText(sigKey);
+                        if (sig) {
+                            const fpHex = sig.replace(/:/g, '');  // 保持原始大写
+                            item.login.uris.push({ uri: `android://${fpHex}@${pkg}`, match: null });
+                        } else {
+                            item.login.uris.push({ uri: `androidapp://${pkg}`, match: null });
+                        }
+                    }
+                }
+            }
+
+            // Extract card info
+            const cardBrand = getText('CardBrand');
+            const cardNumber = getText('CardNumber');
+            const cardExpiry = getText('CardExpiry');
+            if (cardBrand || cardNumber || cardExpiry) {
+                item.type = 3;
+                item.card = { cardholderName: '', brand: cardBrand || '', number: cardNumber || '', expMonth: '', expYear: '', code: '' };
+                if (cardExpiry && cardExpiry.includes('/')) {
+                    const parts = cardExpiry.split('/');
+                    item.card.expMonth = parts[0] || '';
+                    item.card.expYear = parts[1] || '';
+                }
+                item.login = null;
+            }
+
+            // Extract passkeys (reverse: KPEX_PASSKEY_* → fido2Credentials)
+            const passkeyFields = {};
+            for (const [key, value] of fields) {
+                if (key.startsWith('KPEX_PASSKEY_')) {
+                    const text = typeof value === 'string' ? value : (typeof value.getText === 'function' ? value.getText() : String(value));
+                    passkeyFields[key] = text;
+                }
+            }
+            if (Object.keys(passkeyFields).length > 0) {
+                const fidoCreds = extractPasskeysFromFields(passkeyFields);
+                if (fidoCreds.length > 0) {
+                    item.fido2Credentials = fidoCreds;
+                    if (item.login) {
+                        // Store on login as well (Bitwarden format)
+                    }
+                }
+            }
+
+            // Extract custom fields (skip internal fields)
+            const skipFields = new Set([
+                'Title', 'UserName', 'Password', 'URL', 'Notes',
+                'BitwardenType', 'TOTP Seed', 'TOTP', 'otp',
+                'AndroidApp', 'AndroidApp Signature',
+                'CardBrand', 'CardNumber', 'CardExpiry',
+                'CreationDate', 'RevisionDate',
+                'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
+                'IdentityTitle', 'IdentityFirstName', 'IdentityMiddleName', 'IdentityLastName',
+                'IdentityAddress1', 'IdentityCity', 'IdentityState', 'IdentityPostalCode',
+                'IdentityCountry', 'IdentityEmail', 'IdentityPhone', 'IdentitySSN',
+                'IdentityPassport', 'IdentityLicense',
+                '_TAGS'
+            ]);
+            const uriFields = new Set();
+            for (let i = 2; i <= 10; i++) uriFields.add(`URI_${i}`);
+
+            for (const [key, value] of fields) {
+                if (skipFields.has(key)) continue;
+                if (uriFields.has(key)) continue;
+                if (key.startsWith('KPEX_PASSKEY_')) continue;
+                if (key.startsWith('KP2A_URL')) continue;  // KP2A_URL 已作为多 URI 还原到 login.uris
+
+                const text = typeof value === 'string' ? value : (typeof value.getText === 'function' ? value.getText() : String(value));
+                if (text && key !== '_TAGS') {
+                    item.fields.push({ name: key, value: text, type: 0 });
+                }
+            }
+
+            // Tags
+            const tags = getText('_TAGS');
+            if (tags) {
+                item.fields.push({ name: 'Tags', value: tags, type: 0 });
+            }
+
+            // Identity detection (type=4)
+            if (getText('IdentityTitle') || getText('IdentityFirstName') || getText('IdentityLastName') || getText('IdentityEmail')) {
+                if (item.type === 1) item.type = 4;  // 从默认 Login 改判为 Identity
+                item.identity = {
+                    title: getText('IdentityTitle') || '',
+                    firstName: getText('IdentityFirstName') || '',
+                    middleName: getText('IdentityMiddleName') || '',
+                    lastName: getText('IdentityLastName') || '',
+                    address1: getText('IdentityAddress1') || '',
+                    address2: '',
+                    address3: '',
+                    city: getText('IdentityCity') || '',
+                    state: getText('IdentityState') || '',
+                    postalCode: getText('IdentityPostalCode') || '',
+                    country: getText('IdentityCountry') || '',
+                    company: '',
+                    email: getText('IdentityEmail') || '',
+                    phone: getText('IdentityPhone') || '',
+                    ssn: getText('IdentitySSN') || '',
+                    passportNumber: getText('IdentityPassport') || '',
+                    licenseNumber: getText('IdentityLicense') || '',
+                };
+                item.login = null;
+            }
+
+            // SSH Key detection
+            if (item.type === 1 && getText('SSHFingerprint')) {
+                item.type = 5;
+                item.sshKey = {
+                    privateKey: getText('SSHPrivateKey') || '',
+                    publicKey: getText('SSHPublicKey') || '',
+                    fingerprint: getText('SSHFingerprint') || '',
+                };
+            }
+
+            // Secure note detection (避免误判卡片/SSH 等类型)
+            if (bwTypeField === 'SecureNote' || (item.type !== 3 && item.type !== 4 && item.type !== 5 && !item.login?.username && !item.login?.password && !item.login?.uris?.length && notes)) {
+                item.type = 2;
+                item.secureNote = { type: 0 };
+            }
+
+            // Times
+            const creationDate = getText('CreationDate');
+            const revisionDate = getText('RevisionDate');
+            if (creationDate) item.creationDate = creationDate;
+            if (revisionDate) item.revisionDate = revisionDate;
+
+            return item;
+        }
+
+        function generateUUID() {
+            // 优先使用加密安全的 crypto.randomUUID()
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID();
+            }
+            // 回退方案：基于 crypto.getRandomValues 的 UUIDv4
+            if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+                const buf = new Uint8Array(16);
+                crypto.getRandomValues(buf);
+                buf[6] = (buf[6] & 0x0f) | 0x40;
+                buf[8] = (buf[8] & 0x3f) | 0x80;
+                const hex = [...buf].map(b => b.toString(16).padStart(2, '0')).join('');
+                return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+            }
+            // 最后回退（不推荐用于安全场景）
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        // ============ CSV 导出 ============
+        // generatedCsvData 已在顶部声明（与其他全局状态变量一起）
+
+        function buildCSVFromBwItems(bwItems, folders) {
+            // 构建文件夹 ID → 名称映射
+            const folderMap = {};
+            for (const f of folders) {
+                folderMap[f.id] = f.name;
+            }
+
+            const rows = [];
+            const columns = ['Title', 'UserName', 'Password', 'URL', 'Notes', 'TOTP', 'Group', 'Type', 'HasPasskey'];
+
+            for (const item of bwItems) {
+                const row = {
+                    Title: item.name || '',
+                    UserName: item.login?.username || '',
+                    Password: item.login?.password || '',
+                    URL: (item.login?.uris && item.login.uris.length > 0) ? item.login.uris[0].uri : '',
+                    Notes: item.notes || '',
+                    TOTP: item.login?.totp || '',
+                    Group: folderMap[item.folderId] || '',
+                    Type: TYPE_NAMES[item.type] || 'Login',
+                    HasPasskey: (item.fido2Credentials && item.fido2Credentials.length > 0) ? 'YES' : 'NO',
+                };
+                rows.push(row);
+            }
+
+            // 生成 CSV 字符串（BOM + 逗号分隔）
+            const escapeCsv = (val) => {
+                const s = String(val || '');
+                if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+                    return '"' + s.replace(/"/g, '""') + '"';
+                }
+                return s;
+            };
+
+            const header = columns.map(escapeCsv).join(',');
+            const dataLines = rows.map(r => columns.map(c => escapeCsv(r[c])).join(','));
+            return '\uFEFF' + header + '\n' + dataLines.join('\n');
+        }
+
+        function showCsvDownloadBtn(passkeyCount) {
+            // Remove existing
+            const existing = document.getElementById('csvDownloadBtn');
+            if (existing) existing.remove();
+
+            const container = document.createElement('div');
+            container.style.cssText = 'margin-top: 0.75rem;';
+
+            const btn = document.createElement('button');
+            btn.id = 'csvDownloadBtn';
+            btn.className = 'btn btn-outline';
+            btn.textContent = '📊 下载 CSV 文件';
+            btn.style.cssText = 'width: 100%;';
+            btn.addEventListener('click', () => {
+                if (!generatedCsvData) return;
+                const blob = new Blob([generatedCsvData], { type: 'text/csv;charset=utf-8' });
+                downloadBlob(blob, outputFileName.replace(/\.json$/i, '') + '.csv', 'text/csv');
+            });
+
+            container.appendChild(btn);
+
+            // 如果有 passkey，添加警告
+            if (passkeyCount > 0) {
+                const warning = document.createElement('div');
+                warning.style.cssText = 'margin-top: 0.5rem; padding: 0.6rem 0.8rem; background: rgba(240, 165, 0, 0.1); border: 1px solid rgba(240, 165, 0, 0.25); border-radius: 0.5rem; font-size: 0.78rem; color: #f0a500; line-height: 1.5;';
+                warning.innerHTML = `⚠️ <strong>注意：</strong>CSV 格式无法保留 ${passkeyCount} 个 Passkey 凭据。<br>如需保留 Passkey，请使用上方的 Bitwarden JSON 格式下载。`;
+                container.appendChild(warning);
+            }
+
+            const btnGroup = document.querySelector('#successCard .btn-group');
+            if (btnGroup) btnGroup.parentNode.insertBefore(container, btnGroup.nextSibling);
+        }
+
+        // Bitwarden credentialId is a UUID like "e64a25a4-3081-4bc4-baf3-426638381cf6"
+        // KeePassXC converts: UUID → remove dashes → hex bytes → base64url (no padding)
+        // KeePassXC 源码: QByteArray::fromHex(uuid) → toBase64(Base64UrlEncoding | OmitTrailingEquals)
+        function uuidToBase64(uuid) {
+            if (!uuid || uuid.includes('=') || uuid.includes('+') || uuid.includes('/')) {
+                // Already looks like base64, return as-is
+                return uuid;
+            }
+            const hex = uuid.replace(/-/g, '');
+            if (!/^[0-9a-fA-F]+$/.test(hex)) return uuid; // Not a UUID, return as-is
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+            }
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            // btoa → standard base64 → convert to URL-safe base64 → remove padding
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        // Bitwarden keyValue → KeePassXC PEM format
+        // KeePassXC 源码 (BitwardenReader.cpp) 的转换流程：
+        //   1. fromBase64(keyValue, Base64UrlEncoding) → 原始字节
+        //   2. toBase64(Base64Encoding) → 标准 base64
+        //   3. 包裹 PEM 头尾
+        // Bitwarden 的 keyValue 是 base64 编码的 DER 密钥（非 URL 编码），
+        // 我们做 URL-safe base64 解码后再标准 base64 编码，然后包裹 PEM。
+        function formatPrivateKeyPEM(keyValue) {
+            if (!keyValue) return '';
+            if (keyValue.includes('-----BEGIN')) return keyValue;
+            try {
+                // 1. URL-safe base64 解码为原始字节
+                // 将 keyValue 转为 URL-safe 格式后解码
+                const urlSafe = keyValue.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = keyValue.length % 4;
+                const padded = padding ? urlSafe + '='.repeat(4 - padding) : urlSafe;
+                const rawBytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+                // 2. 重新编码为标准 base64
+                let binary = '';
+                for (let i = 0; i < rawBytes.length; i++) binary += String.fromCharCode(rawBytes[i]);
+                const stdB64 = btoa(binary);
+                // 3. 包裹 PEM
+                const lines = ['-----BEGIN PRIVATE KEY-----'];
+                for (let i = 0; i < stdB64.length; i += 64) {
+                    lines.push(stdB64.substring(i, i + 64));
+                }
+                lines.push('-----END PRIVATE KEY-----');
+                return lines.join('\n');
+            } catch (e) {
+                // 回退：直接包裹原始值
+                const lines = ['-----BEGIN PRIVATE KEY-----'];
+                for (let i = 0; i < keyValue.length; i += 64) {
+                    lines.push(keyValue.substring(i, i + 64));
+                }
+                lines.push('-----END PRIVATE KEY-----');
+                return lines.join('\n');
+            }
+        }
+
+        // ============ Passkey 反向转换 ============
+        // 将 KeePassXC 的 KPEX_PASSKEY_* 自定义字段反向转换为 Bitwarden fido2Credentials
+
+        // base64url → UUID hex (反向: uuidToBase64)
+        function base64ToUUID(b64url) {
+            if (!b64url) return '';
+            // 如果已经是 UUID 格式
+            if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(b64url)) return b64url;
+            try {
+                // URL-safe base64 → 标准 base64
+                let std = b64url.replace(/-/g, '+').replace(/_/g, '/');
+                const padding = std.length % 4;
+                if (padding) std += '='.repeat(4 - padding);
+                // 解码为字节
+                const binary = atob(std);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                // 字节 → hex
+                let hex = '';
+                for (let i = 0; i < bytes.length; i++) hex += bytes[i].toString(16).padStart(2, '0');
+                // 格式化为 UUID
+                if (hex.length === 32) {
+                    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`;
+                }
+                return hex;
+            } catch (e) {
+                return b64url;
+            }
+        }
+
+        // PEM → URL-safe base64 (反向: formatPrivateKeyPEM)
+        function pemToB64Url(pem) {
+            if (!pem) return '';
+            if (!pem.includes('-----BEGIN')) return pem;
+            try {
+                // 提取 base64 内容
+                const lines = pem.split('\n').filter(l => !l.startsWith('-----'));
+                const stdB64 = lines.join('').trim();
+                // 标准 base64 → 字节
+                const binary = atob(stdB64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                // 字节 → 标准 base64 → URL-safe base64 → 去掉 padding
+                let rawB64 = '';
+                for (let i = 0; i < bytes.length; i++) rawB64 += String.fromCharCode(bytes[i]);
+                return btoa(rawB64).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            } catch (e) {
+                return pem;
+            }
+        }
+
+        // 从 KPEX_PASSKEY_* 字段提取 fido2Credentials
+        function extractPasskeysFromFields(passkeyFields) {
+            // 收集所有 credential ID 字段
+            const credKeys = Object.keys(passkeyFields)
+                .filter(k => k.startsWith('KPEX_PASSKEY_CREDENTIAL_ID'))
+                .sort((a, b) => {
+                    const getIdx = (k) => k === 'KPEX_PASSKEY_CREDENTIAL_ID' ? -1 : parseInt(k.split('_').pop());
+                    return getIdx(a) - getIdx(b);
+                });
+
+            const result = [];
+            for (const ck of credKeys) {
+                let suffix = '';
+                if (ck !== 'KPEX_PASSKEY_CREDENTIAL_ID') {
+                    suffix = '_' + ck.split('_').pop();
+                }
+
+                const credentialIdB64 = passkeyFields[ck] || '';
+                const credentialId = base64ToUUID(credentialIdB64);
+                const keyPem = passkeyFields[`KPEX_PASSKEY_PRIVATE_KEY_PEM${suffix}`] || '';
+                const keyValue = pemToB64Url(keyPem);
+                const rpId = passkeyFields[`KPEX_PASSKEY_RELYING_PARTY${suffix}`] || '';
+                const userHandle = passkeyFields[`KPEX_PASSKEY_USER_HANDLE${suffix}`] || '';
+                const userName = passkeyFields[`KPEX_PASSKEY_USERNAME${suffix}`] || '';
+                const rpName = passkeyFields[`KPEX_PASSKEY_RP_NAME${suffix}`] || rpId;
+                const userDisplayName = passkeyFields[`KPEX_PASSKEY_USER_DISPLAY_NAME${suffix}`] || userName;
+                const creationDate = passkeyFields[`KPEX_PASSKEY_CREATION_DATE${suffix}`] || '';
+
+                result.push({
+                    credentialId: credentialId,
+                    keyType: 'public-key',
+                    keyAlgorithm: 'ECDSA',
+                    keyCurve: 'P-256',
+                    keyValue: keyValue,
+                    rpId: rpId,
+                    rpName: rpName,
+                    userHandle: userHandle,
+                    userName: userName,
+                    userDisplayName: userDisplayName,
+                    counter: '0',
+                    discoverable: 'true',
+                    creationDate: creationDate,
+                });
+            }
+            return result;
+        }
+
+        // Generate .passkey file JSON for KeePassXC import
+        function buildPasskeyFile(fc, item) {
+            const credentialId = uuidToBase64(fc.credentialId || '');
+            const privateKey = formatPrivateKeyPEM(fc.keyValue || '');
+            return {
+                relyingParty: fc.rpId || '',
+                url: (item.login?.uris && item.login.uris.length > 0) ? (item.login.uris[0].uri || '') : '',
+                username: fc.userName || item.login?.username || '',
+                credentialId: credentialId,
+                userHandle: fc.userHandle || '',
+                privateKey: privateKey
+            };
+        }
+
+        // ============ Download ============
+        downloadBtn.addEventListener('click', () => {
+            if (!generatedData) return;
+            const mime = outputFileName.endsWith('.kdbx') ? 'application/octet-stream' : 'application/json';
+            const blob = new Blob([generatedData], { type: mime });
+            downloadBlob(blob, outputFileName, mime);
+        });
+
+        newConvertBtn.addEventListener('click', resetAll);
+
+        function showPasskeyDownloadBtn() {
+            // Remove existing passkey button if any
+            const existing = document.getElementById('passkeyDownloadBtn');
+            if (existing) existing.remove();
+
+            const btn = document.createElement('button');
+            btn.id = 'passkeyDownloadBtn';
+            btn.className = 'btn btn-outline';
+            btn.textContent = '🔑 下载 Passkey 文件 (.passkey)';
+            btn.style.cssText = 'margin-top: 0.75rem; width: 100%;';
+            btn.addEventListener('click', downloadPasskeyFiles);
+            const btnGroup = document.querySelector('#successCard .btn-group');
+            if (btnGroup) btnGroup.parentNode.insertBefore(btn, btnGroup.nextSibling);
+        }
+
+        function downloadPasskeyFiles() {
+            if (!generatedPasskeyData?.passkeys?.length) return;
+
+            const passkeyFiles = generatedPasskeyData.passkeys;
+            if (passkeyFiles.length === 1) {
+                // Single passkey: download directly as .passkey file
+                const pk = passkeyFiles[0];
+                const blob = new Blob([JSON.stringify(pk.json, null, 2)], { type: 'application/json' });
+                downloadBlob(blob, pk.name, 'application/json');
+            } else {
+                // Multiple passkeys: download as ZIP
+                downloadPasskeysAsZip(passkeyFiles);
+            }
+        }
+
+        async function downloadPasskeysAsZip(passkeyFiles) {
+            // Use a lightweight approach: generate a ZIP manually
+            // Simple ZIP format (no compression, stored method)
+            const encoder = new TextEncoder();
+            const fileEntries = [];
+            let centralDirOffset = 0;
+
+            for (const pf of passkeyFiles) {
+                const content = JSON.stringify(pf.json, null, 2);
+                const data = encoder.encode(content);
+                const nameBytes = encoder.encode(pf.name);
+
+                // Local file header
+                const localHeader = new Uint8Array(30 + nameBytes.length);
+                const lhView = new DataView(localHeader.buffer);
+                lhView.setUint32(0, 0x04034b50, true); // signature
+                lhView.setUint16(4, 20, true);         // version needed
+                lhView.setUint16(6, 0, true);          // flags
+                lhView.setUint16(8, 0, true);          // compression: stored
+                lhView.setUint16(10, 0, true);         // mod time
+                lhView.setUint16(12, 0, true);         // mod date
+                // CRC32: simple implementation
+                const crc = crc32(data);
+                lhView.setUint32(14, crc, true);       // crc32
+                lhView.setUint32(18, data.length, true); // compressed size
+                lhView.setUint32(22, data.length, true); // uncompressed size
+                lhView.setUint16(26, nameBytes.length, true); // filename length
+                lhView.setUint16(28, 0, true);         // extra field length
+                localHeader.set(nameBytes, 30);
+
+                fileEntries.push({
+                    localHeader, data, nameBytes,
+                    crc, offset: centralDirOffset
+                });
+                centralDirOffset += localHeader.length + data.length;
+            }
+
+            // Central directory
+            const cdParts = [];
+            let cdOffset = centralDirOffset;
+            for (const fe of fileEntries) {
+                const cd = new Uint8Array(46 + fe.nameBytes.length);
+                const cdView = new DataView(cd.buffer);
+                cdView.setUint32(0, 0x02014b50, true); // signature
+                cdView.setUint16(4, 20, true);         // version made by
+                cdView.setUint16(6, 20, true);         // version needed
+                cdView.setUint16(8, 0, true);          // flags
+                cdView.setUint16(10, 0, true);         // compression
+                cdView.setUint16(12, 0, true);         // mod time
+                cdView.setUint16(14, 0, true);         // mod date
+                cdView.setUint32(16, fe.crc, true);    // crc32
+                cdView.setUint32(20, fe.data.length, true); // compressed size
+                cdView.setUint32(24, fe.data.length, true); // uncompressed size
+                cdView.setUint16(28, fe.nameBytes.length, true); // filename length
+                cdView.setUint16(30, 0, true);         // extra field length
+                cdView.setUint16(32, 0, true);         // comment length
+                cdView.setUint16(34, 0, true);         // disk number start
+                cdView.setUint16(36, 0, true);         // internal attrs
+                cdView.setUint32(38, 0, true);         // external attrs
+                cdView.setUint32(42, fe.offset, true); // local header offset
+                cd.set(fe.nameBytes, 46);
+                cdParts.push(cd);
+                cdOffset += cd.length;
+            }
+
+            // End of central directory
+            const eocd = new Uint8Array(22);
+            const eocdView = new DataView(eocd.buffer);
+            eocdView.setUint32(0, 0x06054b50, true);  // signature
+            eocdView.setUint16(4, 0, true);           // disk number
+            eocdView.setUint16(6, 0, true);           // disk with CD
+            eocdView.setUint16(8, fileEntries.length, true); // entries on disk
+            eocdView.setUint16(10, fileEntries.length, true); // total entries
+            eocdView.setUint32(12, cdParts.reduce((s, c) => s + c.length, 0), true); // CD size
+            eocdView.setUint32(16, centralDirOffset, true); // CD offset
+            eocdView.setUint16(20, 0, true);          // comment length
+
+            // Assemble ZIP
+            const parts = [];
+            for (const fe of fileEntries) {
+                parts.push(fe.localHeader);
+                parts.push(fe.data);
+            }
+            for (const cd of cdParts) parts.push(cd);
+            parts.push(eocd);
+
+            const totalLen = parts.reduce((s, p) => s + p.length, 0);
+            const zipData = new Uint8Array(totalLen);
+            let offset = 0;
+            for (const p of parts) {
+                zipData.set(p, offset);
+                offset += p.length;
+            }
+
+            const zipBlob = new Blob([zipData], { type: 'application/zip' });
+            const zipName = outputFileName.replace(/\.kdbx$/i, '_passkeys.zip');
+            downloadBlob(zipBlob, zipName, 'application/zip');
+        }
+
+        // Simple CRC32 for ZIP
+        function crc32(data) {
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc ^= data[i];
+                for (let j = 0; j < 8; j++) {
+                    crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+                }
+            }
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        function resetAll() {
+            selectedFile = null; parsedData = null; generatedData = null; generatedPasskeyData = null; generatedCsvData = null;
+            dbPassword.value = '';
+            passwordStrengthBar.style.width = '0';
+            strengthLabel.textContent = '输入密码';
+            convertBtn.disabled = true;
+            fileInput.value = '';
+            fileInfo.classList.remove('show');
+            uploadZone.style.display = '';
+            nextStepBtn.disabled = true;
+            successCard.classList.remove('show');
+            passwordCard.classList.remove('show');
+            progressCard.classList.remove('show');
+            // Reset passkey option
+            const passkeyRow = document.getElementById('passkeyOptionRow');
+            const separateCheckbox = document.getElementById('separatePasskey');
+            if (passkeyRow) passkeyRow.style.display = 'none';
+            if (separateCheckbox) separateCheckbox.checked = false;
+            // Reset favicon option
+            const faviconCheckbox = document.getElementById('fetchFavicon');
+            if (faviconCheckbox) faviconCheckbox.checked = false;
+            uploadCard.style.display = '';
+            updateSteps(1);
+            // Remove passkey download button if exists
+            const pkBtn = document.getElementById('passkeyDownloadBtn');
+            if (pkBtn) pkBtn.remove();
+            // Remove CSV download button if exists
+            const csvBtn = document.getElementById('csvDownloadBtn');
+            if (csvBtn) csvBtn.remove();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ============ BW JSON Parser ============
+        function parseBitwardenJson(json) {
+            const folders = [], items = [];
+            if (json.folders) {
+                for (const f of json.folders) folders.push({ id: f.id, name: f.name });
+            }
+            if (json.items) {
+                for (const item of json.items) {
+                    if (item.deletedDate) continue;
+                    const parsed = {
+                        id: item.id, name: item.name || '', type: item.type || 1,
+                        notes: item.notes || '', favorite: item.favorite || false,
+                        folderId: item.folderId || null, collectionIds: item.collectionIds || [],
+                        deleted: false, creationDate: item.creationDate || '', revisionDate: item.revisionDate || '',
+                        login: null, card: null, identity: null, secureNote: null, sshKey: null,
+                        fido2Credentials: [], customFields: [], passwordHistory: [],
+                    };
+                    if (item.login) {
+                        parsed.login = {
+                            username: item.login.username || '', password: item.login.password || '',
+                            totp: item.login.totp || '',
+                            uris: (item.login.uris || []).map(u => ({ uri: u.uri || '', match: u.match || null })),
+                        };
+                    }
+                    if (item.card) {
+                        parsed.card = {
+                            cardholderName: item.card.cardholderName || '', brand: item.card.brand || '',
+                            number: item.card.number || '', expMonth: item.card.expMonth || '',
+                            expYear: item.card.expYear || '', code: item.card.code || '',
+                        };
+                    }
+                    if (item.identity) parsed.identity = { ...item.identity };
+                    if (item.secureNote) parsed.secureNote = { type: item.secureNote.type || 0 };
+                    if (item.sshKey) {
+                        parsed.sshKey = {
+                            privateKey: item.sshKey.privateKey || '', publicKey: item.sshKey.publicKey || '',
+                            fingerprint: item.sshKey.fingerprint || '',
+                        };
+                    }
+                    for (const fc of (item.login?.fido2Credentials || [])) {
+                        parsed.fido2Credentials.push({
+                            credentialId: fc.credentialId || '', keyType: fc.keyType || '',
+                            keyAlgorithm: fc.keyAlgorithm || '', keyCurve: fc.keyCurve || '',
+                            keyValue: fc.keyValue || '', rpId: fc.rpId || '', rpName: fc.rpName || '',
+                            userHandle: fc.userHandle || '', userName: fc.userName || '',
+                            userDisplayName: fc.userDisplayName || '', counter: String(fc.counter || '0'),
+                            discoverable: String(fc.discoverable || 'false'), creationDate: fc.creationDate || '',
+                        });
+                    }
+                    for (const cf of (item.fields || [])) {
+                        parsed.customFields.push({ name: cf.name || '', value: cf.value || '', type: cf.type || 0 });
+                    }
+                    for (const ph of (item.passwordHistory || [])) {
+                        parsed.passwordHistory.push({ password: ph.password || '', lastUsedDate: ph.lastUsedDate || '' });
+                    }
+                    items.push(parsed);
+                }
+            }
+            return { folders, items };
+        }
+
+        // ============ Notes Builder ============
+        function buildNotes(item) {
+            const parts = [];
+            if (item.notes) parts.push(item.notes);
+            // TOTP 和备用 URI 已在自定义字段中，不再重复写入 Notes
+            if (item.card && (item.card.number || item.card.cardholderName)) {
+                const lines = ['\n[卡片信息]'];
+                if (item.card.cardholderName) lines.push(`持卡人: ${item.card.cardholderName}`);
+                if (item.card.brand) lines.push(`品牌: ${item.card.brand}`);
+                if (item.card.number) lines.push(`卡号: ${item.card.number}`);
+                if (item.card.expMonth) lines.push(`有效期: ${item.card.expMonth}/${item.card.expYear}`);
+                if (item.card.code) lines.push(`安全码: ${item.card.code}`);
+                parts.push(lines.join('\n'));
+            }
+            if (item.passwordHistory?.length) {
+                const lines = ['\n[密码历史]'];
+                for (const h of item.passwordHistory.slice(0, 10)) {
+                    const ds = h.lastUsedDate ? ` (${h.lastUsedDate})` : '';
+                    lines.push(`- ${h.password}${ds}`);
+                }
+                parts.push(lines.join('\n'));
+            }
+            // Passkey / FIDO2 凭据已在自定义字段中，不再重复写入 Notes
+            return parts.join('\n');
+        }
+
+        // ============ Custom Fields Builder ============
+        function buildCustomFields(item) {
+            const fields = {};
+            if (item.type) fields['BitwardenType'] = TYPE_NAMES[item.type] || `Type${item.type}`;
+            if (item.login?.totp) {
+                // 构建 otpauth:// URL 格式，KeePassXC/KeePassDX 等客户端可自动识别
+                const totpRaw = item.login.totp;
+                let otpauthUrl = totpRaw;
+                if (!totpRaw.startsWith('otpauth://')) {
+                    const label = encodeURIComponent(item.name || 'Account');
+                    const issuer = item.login.username ? encodeURIComponent(item.login.username) : label;
+                    otpauthUrl = `otpauth://totp/${issuer}:${label}?secret=${totpRaw}&issuer=${issuer}&digits=6&period=30`;
+                }
+                fields['TOTP Seed'] = totpRaw;
+                fields['TOTP Settings'] = '30;6';
+                fields['otp'] = otpauthUrl;
+            }
+            // android URI → KeePassDX AndroidApp + AndroidApp Signature 字段
+            if (item.login?.uris?.length) {
+                const isAndroidUri = uri => uri.startsWith('androidapp://') || uri.startsWith('android://');
+                const parseAndroidUri = uri => {
+                    if (uri.startsWith('androidapp://')) return { pkg: uri.slice(13), sig: '' };
+                    if (uri.startsWith('android://')) {
+                        const rest = uri.slice(9);
+                        if (rest.includes('@')) {
+                            const at = rest.lastIndexOf('@');
+                            const fpHex = rest.substring(0, at);
+                            const pkg = rest.substring(at + 1);
+                            const sig = fpHex.match(/.{2}/g).join(':').toUpperCase();
+                            return { pkg, sig };
+                        }
+                        return { pkg: rest, sig: '' };
+                    }
+                    return null;
+                };
+                let appIdx = 0;
+                const seenUris = new Set();
+                for (const u of item.login.uris) {
+                    const uri = u.uri || '';
+                    if (!uri || seenUris.has(uri)) continue;
+                    seenUris.add(uri);
+                    if (isAndroidUri(uri)) {
+                        const parsed = parseAndroidUri(uri);
+                        if (parsed && parsed.pkg) {
+                            const key = appIdx === 0 ? 'AndroidApp' : `AndroidApp${appIdx + 1}`;
+                            fields[key] = parsed.pkg;
+                            if (parsed.sig) {
+                                const sigKey = appIdx === 0 ? 'AndroidApp Signature' : `AndroidApp Signature${appIdx + 1}`;
+                                fields[sigKey] = parsed.sig;
+                            }
+                            appIdx++;
+                        }
+                    }
+                }
+                // 使用 KP2A_URL 格式存储备用 URL，排除 android URI 和主 URL
+                const mainUri = item.login.uris.find(u => u.uri && (u.uri.startsWith('http://') || u.uri.startsWith('https://')));
+                let urlIdx = 0;
+                for (const u of item.login.uris) {
+                    const uri = u.uri || '';
+                    if (!uri || isAndroidUri(uri) || (mainUri && uri === mainUri.uri)) continue;
+                    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+                        urlIdx++;
+                        const key = urlIdx === 1 ? 'KP2A_URL' : `KP2A_URL_${urlIdx}`;
+                        fields[key] = uri;
+                    }
+                }
+            }
+            if (item.card) {
+                if (item.card.brand) fields['CardBrand'] = item.card.brand;
+                if (item.card.number) fields['CardNumber'] = item.card.number;
+                if (item.card.expMonth) fields['CardExpiry'] = `${item.card.expMonth}/${item.card.expYear}`;
+            }
+            // Identity 字段存储到自定义属性
+            if (item.identity) {
+                const idMap = {
+                    'IdentityTitle': item.identity.title,
+                    'IdentityFirstName': item.identity.firstName,
+                    'IdentityMiddleName': item.identity.middleName,
+                    'IdentityLastName': item.identity.lastName,
+                    'IdentityAddress1': item.identity.address1,
+                    'IdentityCity': item.identity.city,
+                    'IdentityState': item.identity.state,
+                    'IdentityPostalCode': item.identity.postalCode,
+                    'IdentityCountry': item.identity.country,
+                    'IdentityEmail': item.identity.email,
+                    'IdentityPhone': item.identity.phone,
+                    'IdentitySSN': item.identity.ssn,
+                    'IdentityPassport': item.identity.passportNumber,
+                    'IdentityLicense': item.identity.licenseNumber,
+                };
+                for (const [k, v] of Object.entries(idMap)) {
+                    if (v) fields[k] = v;
+                }
+            }
+            if (item.sshKey?.fingerprint) fields['SSHFingerprint'] = item.sshKey.fingerprint;
+            for (const cf of item.customFields) {
+                if (!fields[cf.name]) fields[cf.name] = cf.value;
+            }
+            for (let i = 0; i < item.fido2Credentials.length; i++) {
+                const fc = item.fido2Credentials[i];
+                const idx = item.fido2Credentials.length > 1 ? `_${i}` : '';
+                // KeePassXC 标准 Passkey 字段（兼容 KeePassXC / KeePassPasskey）
+                // 需要做与 KeePassXC PR #11401 一致的格式转换：
+                //   credentialId: UUID → base64url
+                //   keyValue: URL-safe base64 → PEM
+                if (fc.credentialId) fields[`KPEX_PASSKEY_CREDENTIAL_ID${idx}`] = uuidToBase64(fc.credentialId);
+                if (fc.keyValue) fields[`KPEX_PASSKEY_PRIVATE_KEY_PEM${idx}`] = formatPrivateKeyPEM(fc.keyValue);
+                if (fc.rpId) fields[`KPEX_PASSKEY_RELYING_PARTY${idx}`] = fc.rpId;
+                if (fc.userHandle) fields[`KPEX_PASSKEY_USER_HANDLE${idx}`] = fc.userHandle;
+                if (fc.userName) fields[`KPEX_PASSKEY_USERNAME${idx}`] = fc.userName;
+                // 额外字段（KeePassXC 不存，我们补充存储以便往返还原）
+                if (fc.rpName && fc.rpName !== fc.rpId) fields[`KPEX_PASSKEY_RP_NAME${idx}`] = fc.rpName;
+                if (fc.userDisplayName && fc.userDisplayName !== fc.userName) fields[`KPEX_PASSKEY_USER_DISPLAY_NAME${idx}`] = fc.userDisplayName;
+                if (fc.creationDate) fields[`KPEX_PASSKEY_CREATION_DATE${idx}`] = fc.creationDate;
+            }
+            if (item.creationDate) fields['CreationDate'] = item.creationDate;
+            if (item.revisionDate) fields['RevisionDate'] = item.revisionDate;
+            return fields;
+        }
+
+        function buildTags(item) {
+            const tags = [];
+            const tn = TYPE_NAMES[item.type];
+            if (tn) tags.push(tn);
+            if (item.favorite) tags.push('Favorite');
+            if (item.fido2Credentials?.length) tags.push('Passkey');
+            return tags;
+        }
+
+        // ============ Favicon Fetcher ============
+        async function fetchAndSetFavicons(db, entryUrlMap, onProgress) {
+            // 1. 按域名去重，构建 domain → entries 映射
+            const domainMap = new Map();
+            for (const { entry, url } of entryUrlMap) {
+                try {
+                    const hostname = new URL(url).hostname;
+                    if (!hostname) continue;
+                    if (!domainMap.has(hostname)) {
+                        domainMap.set(hostname, { entries: [], iconData: null, uuid: null });
+                    }
+                    domainMap.get(hostname).entries.push(entry);
+                } catch (_) { /* 无效 URL 跳过 */ }
+            }
+
+            const domains = Array.from(domainMap.keys());
+            if (domains.length === 0) return 0;
+
+            // 2. 并发获取 favicon（限制并发数避免浏览器限制）
+            const CONCURRENCY = 8;
+            let done = 0;
+            let iconCount = 0;
+
+            async function fetchOne(domain) {
+                const record = domainMap.get(domain);
+
+                // 策略 1：尝试 Google Favicon Service（绕过 CORS，成功率最高）
+                const googleUrls = [
+                    `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+                    `https://www.google.com/s2/favicons?domain=${domain}&sz=32`,
+                ];
+                for (const u of googleUrls) {
+                    if (await tryFetchIcon(record, u)) break;
+                }
+
+                // 策略 1.5：如果 Google 失败，尝试 DuckDuckGo 图标服务
+                if (!record.iconData) {
+                    if (await tryFetchIcon(record, `https://icons.duckduckgo.com/ip3/${domain}.ico`)) {
+                        // DuckDuckGo 成功
+                    }
+                }
+
+                // 策略 2：如果第三方服务都失败，尝试直接从网站获取
+                if (!record.iconData) {
+                    // 尝试解析 HTML <link> 标签获取真实 favicon 路径
+                    try {
+                        const controller = new AbortController();
+                        const timeout = setTimeout(() => controller.abort(), 5000);
+                        const resp = await fetch(`https://${domain}`, {
+                            signal: controller.signal,
+                            mode: 'cors',
+                            credentials: 'omit',
+                        });
+                        clearTimeout(timeout);
+                        if (resp.ok) {
+                            const html = await resp.text();
+                            const iconUrls = extractFaviconLinks(html, domain);
+                            for (const iconUrl of iconUrls) {
+                                if (await tryFetchIcon(record, iconUrl)) break;
+                            }
+                        }
+                    } catch (_) { /* HTML 解析失败 */ }
+
+                    // 策略 3：常见的固定路径
+                    if (!record.iconData) {
+                        const commonUrls = [
+                            `https://${domain}/favicon.ico`,
+                            `https://${domain}/apple-touch-icon.png`,
+                            `https://${domain}/favicon-32x32.png`,
+                            `https://${domain}/favicon-16x16.png`,
+                        ];
+                        for (const u of commonUrls) {
+                            if (await tryFetchIcon(record, u)) break;
+                        }
+                    }
+                }
+
+                done++;
+                if (onProgress) onProgress(done, domains.length);
+            }
+
+            // 尝试获取一个图标 URL，成功返回 true
+            async function tryFetchIcon(record, faviconUrl) {
+                try {
+                    const controller = new AbortController();
+                    const timeout = setTimeout(() => controller.abort(), 5000);
+                    const resp = await fetch(faviconUrl, {
+                        signal: controller.signal,
+                        mode: 'cors',
+                        credentials: 'omit',
+                    });
+                    clearTimeout(timeout);
+                    if (!resp.ok) return false;
+                    const blob = await resp.blob();
+                    if (blob.size === 0 || blob.size > 1024 * 1024) return false;
+                    record.iconData = await blob.arrayBuffer();
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            // 从 HTML 中提取 favicon 的 <link> 标签 URL
+            function extractFaviconLinks(html, domain) {
+                const urls = [];
+                const linkRegex = /<link\s[^>]*rel=["'](?:shortcut )?(?:icon|apple-touch-icon|mask-icon)["'][^>]*>/gi;
+                const matches = html.match(linkRegex) || [];
+                for (const tag of matches) {
+                    const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+                    if (hrefMatch) {
+                        let href = hrefMatch[1];
+                        if (href.startsWith('//')) href = 'https:' + href;
+                        else if (href.startsWith('/')) href = 'https://' + domain + href;
+                        else if (!href.startsWith('http')) continue;
+                        // SVG 图标可能导致 KDBX 显示问题，优先 PNG/ICO
+                        if (href.endsWith('.svg')) continue;
+                        urls.push(href);
+                    }
+                }
+                return urls;
+            }
+
+            // 分批并发执行
+            for (let i = 0; i < domains.length; i += CONCURRENCY) {
+                const batch = domains.slice(i, i + CONCURRENCY);
+                await Promise.all(batch.map(fetchOne));
+            }
+
+            // 3. 将获取到的图标注册到 db.meta.customIcons，并为条目设置 customIcon
+            for (const [domain, record] of domainMap) {
+                if (!record.iconData) continue;
+                try {
+                    const uuid = KdbxUuid.random();
+                    record.uuid = uuid;
+                    db.meta.customIcons.set(uuid.id, {
+                        data: record.iconData,
+                        name: domain,
+                        lastModified: new Date(),
+                    });
+                    for (const entry of record.entries) {
+                        entry.customIcon = uuid;
+                    }
+                    iconCount++;
+                } catch (_) {
+                    // 注册失败，跳过此图标
+                }
+            }
+
+            return iconCount;
+        }
+
+        function buildSummaryTable(vault) {
+            const typeCount = {};
+            for (const item of vault.items) {
+                const tn = TYPE_NAMES[item.type] || '其他';
+                typeCount[tn] = (typeCount[tn] || 0) + 1;
+            }
+            let html = '<thead><tr><th>类型</th><th class="num">数量</th></tr></thead><tbody>';
+            for (const [type, count] of Object.entries(typeCount)) {
+                html += `<tr><td>${type}</td><td class="num">${count}</td></tr>`;
+            }
+            html += `<tr style="font-weight:600;"><td>总计</td><td class="num">${vault.items.length}</td></tr></tbody>`;
+            summaryTable.innerHTML = html;
+        }
+
+        // ============ CSV Parser ============
+        function parseCSV(text, fileName) {
+            const items = [], folders = [];
+            const firstLine = text.split('\n')[0] || '';
+            const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.split(',').length > firstLine.split(';').length ? ',' : ';');
+            // 使用状态机解析 CSV，正确处理字段内换行符（RFC 4180 兼容）
+            const rows = parseCSVText(text, delimiter);
+            if (rows.length < 2) return { folders, items };
+            const headers = rows[0];
+            const headerMap = {};
+            headers.forEach((h, i) => { headerMap[h.trim().toLowerCase()] = i; });
+            const format = detectCSVFormat(headerMap, fileName);
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.length === 0 || (row.length === 1 && !row[0])) continue;
+                const item = format.parseRow(row, headerMap, i);
+                if (item && item.name) items.push(item);
+            }
+            return { folders, items };
+        }
+
+        // 基于字符状态机的 CSV 解析器，支持字段内换行符、双引号转义
+        function parseCSVText(text, delimiter) {
+            const rows = [];
+            let row = [], field = '', inQuotes = false, i = 0;
+            while (i < text.length) {
+                const ch = text[i];
+                if (inQuotes) {
+                    if (ch === '"') {
+                        if (i + 1 < text.length && text[i + 1] === '"') { field += '"'; i += 2; continue; }
+                        inQuotes = false; i++; continue;
+                    }
+                    field += ch; i++; continue;
+                }
+                if (ch === '"') { inQuotes = true; i++; continue; }
+                if (ch === delimiter) { row.push(field.trim()); field = ''; i++; continue; }
+                if (ch === '\r') { i++; continue; }  // 跳过 \r
+                if (ch === '\n') {
+                    row.push(field.trim()); field = '';
+                    if (row.length > 1 || (row.length === 1 && row[0])) rows.push(row);
+                    row = []; i++; continue;
+                }
+                field += ch; i++;
+            }
+            // 处理最后一行
+            if (field || row.length) {
+                row.push(field.trim());
+                if (row.length > 1 || (row.length === 1 && row[0])) rows.push(row);
+            }
+            return rows;
+        }
+
+        function detectCSVFormat(headerMap, fileName) {
+            if (headerMap['name'] !== undefined && headerMap['url'] !== undefined && headerMap['password'] !== undefined) {
+                return { name: 'Chrome', parseRow: (row, hm) => ({
+                    name: row[hm['name']] || row[hm['title']] || '', type: 1,
+                    login: { username: row[hm['username']] || row[hm['user']] || row[hm['login']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['url']] || row[hm['website']] || '' }], totp: '' },
+                    notes: row[hm['note']] || row[hm['notes']] || '', folderId: row[hm['folder']] || row[hm['category']] || null,
+                })};
+            }
+            if (headerMap['title'] !== undefined && (headerMap['url'] !== undefined || headerMap['website'] !== undefined)) {
+                return { name: '1Password', parseRow: (row, hm) => ({
+                    name: row[hm['title']] || '', type: 1,
+                    login: { username: row[hm['username']] || row[hm['user']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['url']] || row[hm['website']] || row[hm['login url']] || '' }], totp: row[hm['otpauth']] || row[hm['totp']] || '' },
+                    notes: row[hm['notes']] || row[hm['note']] || '', folderId: null,
+                })};
+            }
+            if (headerMap['url'] !== undefined && headerMap['username'] !== undefined && headerMap['extra'] !== undefined) {
+                return { name: 'LastPass', parseRow: (row, hm) => ({
+                    name: row[hm['name']] || row[hm['title']] || row[hm['url']] || '', type: 1,
+                    login: { username: row[hm['username']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['url']] || '' }], totp: row[hm['totp']] || '' },
+                    notes: row[hm['extra']] || row[hm['notes']] || '', folderId: row[hm['grouping']] || row[hm['group']] || row[hm['folder']] || null,
+                })};
+            }
+            if (headerMap['hostname'] !== undefined || headerMap['httpRealm'] !== undefined) {
+                return { name: 'Firefox', parseRow: (row, hm) => {
+                    const host = row[hm['hostname']] || row[hm['url']] || '';
+                    const realm = row[hm['httprealm']] || row[hm['realm']] || '';
+                    return {
+                        name: realm ? `${host} (${realm})` : host || '未命名', type: 1,
+                        login: { username: row[hm['username']] || row[hm['user']] || '', password: row[hm['password']] || '', uris: [{ uri: host.startsWith('http') ? host : 'https://' + host }], totp: '' },
+                        notes: '', folderId: null,
+                    };
+                }};
+            }
+            if (headerMap['login_username'] !== undefined && headerMap['login_password'] !== undefined) {
+                return { name: 'Bitwarden', parseRow: (row, hm) => ({
+                    name: row[hm['name']] || row[hm['title']] || '', type: (row[hm['type']] || '').toLowerCase() === 'note' ? 2 : 1,
+                    login: { username: row[hm['login_username']] || '', password: row[hm['login_password']] || '', uris: [{ uri: row[hm['login_uri']] || row[hm['login_url']] || '' }], totp: row[hm['login_totp']] || '' },
+                    notes: row[hm['notes']] || row[hm['note']] || '', folderId: row[hm['folder']] || null,
+                    favorite: (row[hm['favorite']] || row[hm['fav']] || '') === '1' || (row[hm['favorite']] || '').toLowerCase() === 'true',
+                })};
+            }
+            if (headerMap['account'] !== undefined || headerMap['title'] !== undefined || headerMap['website'] !== undefined) {
+                return { name: 'Generic', parseRow: (row, hm) => ({
+                    name: row[hm['account']] || row[hm['title']] || row[hm['name']] || '未命名', type: 1,
+                    login: { username: row[hm['login name']] || row[hm['username']] || row[hm['login']] || row[hm['user']] || '', password: row[hm['password']] || '', uris: [{ uri: row[hm['web site']] || row[hm['website']] || row[hm['url']] || '' }], totp: '' },
+                    notes: row[hm['comments']] || row[hm['notes']] || row[hm['note']] || '', folderId: null,
+                })};
+            }
+            return { name: 'Auto-Detect', parseRow: (row, hm) => {
+                const keys = Object.keys(hm);
+                const pwCol = keys.find(k => /password|passwd|pwd/i.test(k));
+                const userCol = keys.find(k => /user|username|login|email/i.test(k));
+                const urlCol = keys.find(k => /url|website|site|link/i.test(k));
+                const nameCol = keys.find(k => /name|title|account|site/i.test(k));
+                const notesCol = keys.find(k => /notes|note|comment|desc/i.test(k));
+                return {
+                    name: nameCol ? row[hm[nameCol]] : (urlCol ? row[hm[urlCol]] : '未命名'), type: 1,
+                    login: { username: userCol ? row[hm[userCol]] : '', password: pwCol ? row[hm[pwCol]] : '', uris: [{ uri: urlCol ? row[hm[urlCol]] : '' }], totp: '' },
+                    notes: notesCol ? row[hm[notesCol]] : '', folderId: null,
+                };
+            }};
+        }
+
+        // ============ 1PUX Parser ============
+        async function parse1PUX(file) {
+            const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+            const zip = await JSZip.default.loadAsync(file);
+            const items = [], folders = [];
+            const dataFiles = Object.keys(zip.files).filter(name => name.match(/\/data\/[^/]+\.json$/) && !name.includes('__MACOSX'));
+            for (const dataFile of dataFiles) {
+                try {
+                    const content = await zip.files[dataFile].async('string');
+                    const data = JSON.parse(content);
+                    if (data.items) {
+                        for (const item of data.items) {
+                            if (item.trashed === true || item.trashed === 'Y') continue;
+                            const parsed = convert1PUXItem(item);
+                            if (parsed) items.push(parsed);
+                        }
+                    }
+                } catch (e) { console.warn('Failed to parse 1PUX file:', dataFile, e); }
+            }
+            return { folders, items };
+        }
+
+        function parse1PUXJSON(json) {
+            const items = [], folders = [];
+            if (json.items) {
+                for (const item of json.items) {
+                    if (item.trashed === true || item.trashed === 'Y') continue;
+                    const parsed = convert1PUXItem(item);
+                    if (parsed) items.push(parsed);
+                }
+            }
+            return { folders, items };
+        }
+
+        function convert1PUXItem(item) {
+            const overview = item.overview || {};
+            const details = item.details || {};
+            const parsed = { name: overview.title || overview.ainfo || '未命名', type: 1, notes: '', folderId: null, favorite: overview.favorite || false };
+            const category = (overview.category || item.category || '').toUpperCase();
+            if (category === 'LOGIN' || category === 'PASSWORD' || !category) {
+                parsed.type = 1;
+                parsed.login = { username: '', password: '', uris: [], totp: '' };
+                if (overview.url) parsed.login.uris.push({ uri: overview.url });
+                if (overview.urls) {
+                    for (const u of overview.urls) { if (u.url && u.url !== overview.url) parsed.login.uris.push({ uri: u.url }); }
+                }
+                if (details.fields) {
+                    for (const field of details.fields) {
+                        const design = field.designation || '';
+                        const val = field.value || '';
+                        if (!val) continue;
+                        if (design === 'username') parsed.login.username = val;
+                        else if (design === 'password') parsed.login.password = val;
+                        else if (design === 'URL' && !parsed.login.uris.find(u => u.uri === val)) parsed.login.uris.push({ uri: val });
+                    }
+                }
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+                if (details.sections) {
+                    for (const section of details.sections) {
+                        if (section.fields) {
+                            for (const field of section.fields) {
+                                if (field.k === 'TOTP' || field.t === 'OTP' || field.n === 'TOTP' || field.n === 'one-time password') {
+                                    if (field.v) parsed.login.totp = field.v;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (details.passwordHistory) {
+                    parsed.passwordHistory = details.passwordHistory.map(ph => ({
+                        password: ph.value || '', lastUsedDate: ph.time ? new Date(ph.time * 1000).toISOString() : '',
+                    }));
+                }
+            } else if (category === 'SECURE_NOTE' || category === 'NOTE') {
+                parsed.type = 2; parsed.login = null;
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+            } else if (category === 'CREDIT_CARD' || category === 'BANK_ACCOUNT') {
+                parsed.type = 3; parsed.login = null; parsed.card = {};
+                if (details.sections) {
+                    for (const section of details.sections) {
+                        if (section.fields) {
+                            for (const field of section.fields) {
+                                const n = (field.n || field.t || '').toLowerCase();
+                                if (n.includes('cardholder') || n.includes('name')) parsed.card.cardholderName = field.v || '';
+                                if (n.includes('number') || n.includes('ccnum')) parsed.card.number = field.v || '';
+                                if (n.includes('expir') || n.includes('exp')) {
+                                    const exp = (field.v || '').split('/');
+                                    parsed.card.expMonth = exp[0] || ''; parsed.card.expYear = exp[1] || '';
+                                }
+                                if (n.includes('cvv') || n.includes('cvc') || n.includes('security')) parsed.card.code = field.v || '';
+                                if (n.includes('type') || n.includes('brand')) parsed.card.brand = field.v || '';
+                            }
+                        }
+                    }
+                }
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+            } else if (category === 'IDENTITY') {
+                parsed.type = 4; parsed.login = null; parsed.identity = {};
+                if (details.sections) {
+                    for (const section of details.sections) {
+                        if (section.fields) {
+                            for (const field of section.fields) {
+                                const n = (field.n || field.t || '').toLowerCase();
+                                const v = field.v || '';
+                                if (n.includes('first')) parsed.identity.firstName = (parsed.identity.firstName || '') + ' ' + v;
+                                if (n.includes('last')) parsed.identity.lastName = v;
+                                if (n.includes('email')) parsed.identity.email = v;
+                                if (n.includes('phone')) parsed.identity.phone = v;
+                                if (n.includes('address')) parsed.identity.address1 = v;
+                                if (n.includes('city')) parsed.identity.city = v;
+                                if (n.includes('state')) parsed.identity.state = v;
+                                if (n.includes('zip') || n.includes('postal')) parsed.identity.postalCode = v;
+                                if (n.includes('country')) parsed.identity.country = v;
+                            }
+                        }
+                    }
+                }
+            } else {
+                parsed.type = 1;
+                parsed.login = { username: '', password: '', uris: [], totp: '' };
+                if (details.notesPlain) parsed.notes = details.notesPlain;
+            }
+            parsed.customFields = [];
+            if (details.sections) {
+                for (const section of details.sections) {
+                    if (section.fields) {
+                        for (const field of section.fields) {
+                            const n = field.n || field.t || field.k || '';
+                            const v = field.v || field.t || '';
+                            if (n && v && n !== 'notesPlain' && n !== 'password' && n !== 'username') {
+                                parsed.customFields.push({ name: n, value: String(v), type: 0 });
+                            }
+                        }
+                    }
+                }
+            }
+            if (overview.tags && overview.tags.length) parsed.customFields.push({ name: '_TAGS', value: overview.tags.join(', '), type: 0 });
+            if (item.created_at || overview.created) parsed.creationDate = item.created_at || overview.created || '';
+            if (item.updated_at || overview.updated) parsed.revisionDate = item.updated_at || overview.updated || '';
+            return parsed;
+        }
+
+        // ============ Bitwarden 加密 JSON 解密 ============
+        // 使用 Web Crypto API 实现 PBKDF2 + HKDF + AES-256-CBC + HMAC-SHA256
+        // 基于 Bitwarden 的加密规范: https://bitwarden.com/help/encrypted-export/
+
+        const APP_BUILD = '20260706f';  // 构建号，用于在无 F12 环境下确认页面版本
+
+        async function decryptBitwardenEncryptedJson(jsonData, password) {
+            // 验证加密 JSON 格式
+            if (!jsonData.encrypted || !jsonData.passwordProtected || !jsonData.salt || !jsonData.data) {
+                throw new Error('不是有效的 Bitwarden 加密导出格式');
+            }
+
+            // 取 data 密文的 encType（用于无 F12 环境下的可见诊断）
+            let dataEncType = '?';
+            try { dataEncType = parseCipherString(jsonData.data).encType; } catch (_) {}
+
+            const enc = new TextEncoder();
+            const kdfType = jsonData.kdfType || 0;
+            const kdfIterations = jsonData.kdfIterations || 100000;
+            const kdfMemory = jsonData.kdfMemory || 64;       // Bitwarden 以 MiB 存储
+            const kdfParallelism = jsonData.kdfParallelism || 4;
+
+            // Bitwarden 导出里的 salt 字段是 Base64 字符串。官方 bitwarden_crypto 采用
+            // Base64 解码得到原始字节参与 KDF（与 C# Convert.FromBase64String 一致）；
+            // 个别旧路径曾使用 UTF-8 文本。两种都尝试，以 MAC 校验为准选择正确者。
+            const saltCandidates = [
+                base64ToArrayBuffer(jsonData.salt),   // 官方：Base64 解码
+                enc.encode(jsonData.salt),            // 兼容：UTF-8 文本
+            ];
+            // Argon2 的 memory 单位在不同来源表述不一（MiB vs KiB），同时尝试两种
+            const argonMemoryCandidates = [kdfMemory * 1024, kdfMemory];
+
+            let lastErr = null;
+            let fatalErr = null;  // 结构性错误（不支持的加密/KDF 类型等），换 salt/memory 候选无意义
+            for (const saltBytes of saltCandidates) {
+                try {
+                    let masterKey;
+                    if (kdfType === 1) {
+                        // Argon2id（账户使用 Argon2id KDF 时）
+                        if (typeof hashwasm === 'undefined') {
+                            throw new Error('当前环境未加载 hash-wasm，无法解密 Argon2 加密导出，请检查网络后重试');
+                        }
+                        let derived = null, derr = null, derrMsg = '';
+                        for (const mem of argonMemoryCandidates) {
+                            try {
+                                derived = await hashwasm.argon2id({
+                                    password: password,
+                                    salt: new Uint8Array(saltBytes),
+                                    parallelism: kdfParallelism,
+                                    iterations: kdfIterations,
+                                    memorySize: mem,
+                                    hashLength: 32,
+                                    outputType: 'binary',
+                                });
+                                derr = null;
+                                break;
+                            } catch (e) {
+                                derr = e;
+                                derrMsg = e && e.message ? e.message : String(e);
+                            }
+                        }
+                        if (derr && !derived) {
+                            throw new Error('Argon2 派生失败：' + derrMsg);
+                        }
+                        masterKey = derived;
+                    } else if (kdfType === 0) {
+                        // PBKDF2-SHA256（默认）
+                        const passwordKey = await crypto.subtle.importKey(
+                            'raw', enc.encode(password),
+                            { name: 'PBKDF2' }, false, ['deriveBits']
+                        );
+                        masterKey = await crypto.subtle.deriveBits(
+                            { name: 'PBKDF2', salt: saltBytes, iterations: kdfIterations, hash: 'SHA-256' },
+                            passwordKey, 256
+                        );
+                    } else {
+                        throw new Error('不支持的 KDF 类型: ' + kdfType + '（当前仅支持 PBKDF2 与 Argon2id）');
+                    }
+
+                    // HKDF-Expand 密钥拉伸（Bitwarden stretchKey：分别用 "enc"/"mac" 作为 info 派生）
+                    const masterKeyBytes = new Uint8Array(masterKey);
+                    const encKey = await hkdfExpand(masterKeyBytes, 32, 'enc');
+                    const macKey = await hkdfExpand(masterKeyBytes, 32, 'mac');
+
+                    // 解密 encKeyValidation 验证密码/算法正确性（旧版导出可能没有此字段，则改校验 data）
+                    if (jsonData.encKeyValidation_DO_NOT_EDIT) {
+                        await decryptCipherString(jsonData.encKeyValidation_DO_NOT_EDIT, encKey, macKey);
+                    } else {
+                        await decryptCipherString(jsonData.data, encKey, macKey);
+                    }
+
+                    // 校验通过，解密主数据
+                    const dataBuffer = await decryptCipherString(jsonData.data, encKey, macKey);
+                    const decryptedText = new TextDecoder().decode(dataBuffer);
+                    return JSON.parse(decryptedText);
+                } catch (e) {
+                    // 结构性错误（不支持的加密/KDF 类型、未加载 hash-wasm 等）换 salt/memory 候选无意义，直接透传
+                    if (e && e.message && (e.message.indexOf('不支持') === 0 || e.message.indexOf('未加载') === 0)) {
+                        lastErr = e;
+                        fatalErr = e;
+                        break;
+                    }
+                    // 该 salt/参数组合不通过 MAC 校验，尝试下一种候选
+                    lastErr = e;
+                }
+            }
+            if (fatalErr) throw fatalErr;  // 透传真实的结构性错误（避免被伪装成 MAC 失败）
+            // 所有候选组合均失败
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('[bw2keepass] 解密失败：已尝试全部 salt/memory 候选组合均未通过 MAC 校验。', {
+                    kdfType,
+                    kdfIterations,
+                    kdfMemory,
+                    saltCandidates: saltCandidates.map((s) => (s instanceof ArrayBuffer ? s.byteLength : s.length) + 'B'),
+                    argonMemoryCandidates,
+                    lastError: lastErr ? lastErr.message : null,
+                });
+            }
+            // 可见诊断（无 F12 也可读）：build/kdf/iter/mem/encType/hw/salt候选长度/末次错误
+            const diag = [
+                'build=' + APP_BUILD,
+                'kdf=' + kdfType,
+                'iter=' + kdfIterations,
+                'mem=' + kdfMemory,
+                'encType=' + dataEncType,
+                'hw=' + (typeof hashwasm !== 'undefined' ? 'Y' : 'N'),
+                'saltB=' + saltCandidates.map((s) => (s instanceof ArrayBuffer ? s.byteLength : s.length)).join(','),
+                'err=' + (lastErr ? lastErr.message : '?'),
+            ].join(' ');
+            throw new Error('密码错误或数据已损坏（MAC 验证失败）\n[诊断] ' + diag);
+        }
+
+        // HKDF-Expand (RFC 5869): 从 PRK 派生子密钥，info 为上下文字符串（Bitwarden 用 "enc"/"mac"）
+        async function hkdfExpand(prk, length, info) {
+            const hashLen = 32; // SHA-256 = 32 bytes
+            const n = Math.ceil(length / hashLen);
+            const result = new Uint8Array(n * hashLen);
+            let t = new Uint8Array(0);
+            const infoBytes = info ? new TextEncoder().encode(info) : new Uint8Array(0);
+
+            for (let i = 1; i <= n; i++) {
+                const input = new Uint8Array(t.length + infoBytes.length + 1);
+                input.set(t, 0);
+                if (infoBytes.length) input.set(infoBytes, t.length);
+                input[input.length - 1] = i;
+                const key = await crypto.subtle.importKey('raw', prk, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+                const sig = await crypto.subtle.sign('HMAC', key, input);
+                t = new Uint8Array(sig);
+                result.set(t, (i - 1) * hashLen);
+            }
+            return result.slice(0, length);
+        }
+
+        // 解析 Bitwarden 密文字符串: "encType.ivB64|ctB64|macB64"
+        // 旧式 encType=0（AesCbc256 无 MAC）格式为 "0.ivB64|ctB64"（仅 2 段）
+        function parseCipherString(cipherStr) {
+            const dotIdx = cipherStr.indexOf('.');
+            if (dotIdx === -1) throw new Error('无效的密文格式');
+            const encType = parseInt(cipherStr.substring(0, dotIdx), 10);
+            const parts = cipherStr.substring(dotIdx + 1).split('|');
+            if (parts.length !== 3 && parts.length !== 2) throw new Error('无效的密文格式');
+            return {
+                encType,
+                iv: base64ToArrayBuffer(parts[0]),
+                ct: base64ToArrayBuffer(parts[1]),
+                ivB64: parts[0],
+                ctB64: parts[1],
+                mac: parts.length === 3 ? parts[2] : '' // 保持 base64 字符串，用于比较
+            };
+        }
+
+        // Base64 解码 → ArrayBuffer
+        function base64ToArrayBuffer(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        // ArrayBuffer → Base64
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+
+        // AES-CBC 解密 + HMAC 验证
+        // Bitwarden 加密类型（见 core/Enums::EncryptionType）:
+        //   0 = AesCbc256 (无 MAC，旧式)         -> 256 位密钥，跳过 MAC
+        //   1 = AesCbc128_HmacSha256_B64         -> 128 位密钥 + HMAC
+        //   2 = AesCbc256_HmacSha256_B64 (默认)  -> 256 位密钥 + HMAC
+        async function decryptCipherString(cipherStr, encKey, macKey) {
+            const { encType, iv, ct, mac } = parseCipherString(cipherStr);
+
+            let keyLen, needMac;
+            if (encType === 2) { keyLen = 32; needMac = true; }
+            else if (encType === 1) { keyLen = 16; needMac = true; }
+            else if (encType === 0) { keyLen = 32; needMac = false; }
+            else throw new Error('不支持的加密类型: ' + encType);
+
+            // HMAC 完整性验证（encType 0 为旧式无 MAC，跳过）
+            if (needMac) {
+                const macData = new Uint8Array(iv.byteLength + ct.byteLength);
+                macData.set(new Uint8Array(iv), 0);
+                macData.set(new Uint8Array(ct), iv.byteLength);
+                const hmacKey = await crypto.subtle.importKey('raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+                const computedSig = await crypto.subtle.sign('HMAC', hmacKey, macData);
+                const computedMac = arrayBufferToBase64(computedSig);
+                if (!constantTimeEqual(computedMac, mac)) {
+                    throw new Error('密码错误或数据已损坏（MAC 验证失败）');
+                }
+            }
+
+            // AES-CBC 解密（encType 1 用前 16 字节作为 128 位密钥，其余用 32 字节 256 位密钥）
+            const aesKeyBytes = encKey.slice(0, keyLen);
+            const aesKey = await crypto.subtle.importKey('raw', aesKeyBytes, { name: 'AES-CBC' }, false, ['decrypt']);
+            const plaintext = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, aesKey, ct);
+            return plaintext;
+        }
+
+        // 常量时间字符串比较
+        function constantTimeEqual(a, b) {
+            if (a.length !== b.length) return false;
+            let result = 0;
+            for (let i = 0; i < a.length; i++) {
+                result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+            }
+            return result === 0;
+        }
+
+        // 验证是否为 Bitwarden 加密 JSON 格式
+        function isBitwardenEncryptedJson(json) {
+            return !!(json && json.encrypted && json.passwordProtected && json.salt && json.data);
+        }
+
+        // ============ 加密（明文 → Bitwarden 密码保护加密导出）============
+        // 与 decryptBitwardenEncryptedJson 完全对称，沿用上面的 PBKDF2/Argon2/HKDF 实现。
+
+        // 按 KDF 派生主密钥（与解密侧一致；saltMode=utf8 时用 salt 字符串 UTF-8 字节）
+        async function deriveMasterKeyWeb(password, saltBytes, kdfType, iterations, memory, parallelism) {
+            if (kdfType === 1) {
+                if (typeof hashwasm === 'undefined') {
+                    throw new Error('当前环境未加载 hash-wasm，无法使用 Argon2 加密，请检查网络后重试');
+                }
+                const derived = await hashwasm.argon2id({
+                    password: password,
+                    salt: new Uint8Array(saltBytes),
+                    parallelism: parallelism,
+                    iterations: iterations,
+                    memorySize: memory * 1024,   // Bitwarden 以 MiB 存储，转 KiB
+                    hashLength: 32,
+                    outputType: 'binary',
+                });
+                return new Uint8Array(derived);
+            }
+            const pwKey = await crypto.subtle.importKey(
+                'raw', new TextEncoder().encode(password),
+                { name: 'PBKDF2' }, false, ['deriveBits']
+            );
+            const bits = await crypto.subtle.deriveBits(
+                { name: 'PBKDF2', salt: saltBytes, iterations: iterations, hash: 'SHA-256' },
+                pwKey, 256
+            );
+            return new Uint8Array(bits);
+        }
+
+        // AES-CBC 加密 + HMAC-SHA256，返回密文串 "encType.ivB64|ctB64|macB64"（encType 默认 2）
+        async function encryptCipherString(plaintextBytes, encKey, macKey, encType) {
+            encType = (encType === undefined) ? 2 : encType;
+            let keyLen, needMac;
+            if (encType === 2) { keyLen = 32; needMac = true; }
+            else if (encType === 1) { keyLen = 16; needMac = true; }
+            else if (encType === 0) { keyLen = 32; needMac = false; }
+            else throw new Error('不支持的加密类型: ' + encType);
+
+            const iv = crypto.getRandomValues(new Uint8Array(16));
+            const aesKey = await crypto.subtle.importKey(
+                'raw', encKey.slice(0, keyLen), { name: 'AES-CBC' }, false, ['encrypt']
+            );
+            const ct = await crypto.subtle.encrypt({ name: 'AES-CBC', iv: iv }, aesKey, plaintextBytes);
+
+            let macB64 = '';
+            if (needMac) {
+                const macData = new Uint8Array(iv.byteLength + ct.byteLength);
+                macData.set(new Uint8Array(iv), 0);
+                macData.set(new Uint8Array(ct), iv.byteLength);
+                const hk = await crypto.subtle.importKey(
+                    'raw', macKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+                );
+                const sig = await crypto.subtle.sign('HMAC', hk, macData);
+                macB64 = arrayBufferToBase64(sig);
+            }
+            return encType + '.' + arrayBufferToBase64(iv) + '|' + arrayBufferToBase64(ct) + (needMac ? '|' + macB64 : '');
+        }
+
+        // 将明文 Bitwarden 导出加密为密码保护信封
+        async function encryptBitwardenExport(plaintextObj, password, opts) {
+            opts = opts || {};
+            const kdfType = opts.kdfType || 0;
+            const kdfIterations = opts.kdfIterations || 600000;
+            const kdfMemory = opts.kdfMemory || 64;
+            const kdfParallelism = opts.kdfParallelism || 4;
+            const saltMode = opts.saltMode || 'utf8';
+            const validationPlaintext = opts.validationPlaintext || 'Bitwarden';
+
+            // 随机 16 字节 salt，以 base64 字符串存储
+            const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+            const saltField = arrayBufferToBase64(saltBytes);
+            const kdfSalt = (saltMode === 'utf8') ? new TextEncoder().encode(saltField) : base64ToArrayBuffer(saltField);
+
+            const master = await deriveMasterKeyWeb(password, kdfSalt, kdfType, kdfIterations, kdfMemory, kdfParallelism);
+            const encKey = await hkdfExpand(master, 32, 'enc');
+            const macKey = await hkdfExpand(master, 32, 'mac');
+
+            const dataPlain = new TextEncoder().encode(JSON.stringify(plaintextObj));
+            const dataCs = await encryptCipherString(dataPlain, encKey, macKey, 2);
+            const valCs = await encryptCipherString(new TextEncoder().encode(validationPlaintext), encKey, macKey, 2);
+
+            const envelope = {
+                encrypted: true,
+                passwordProtected: true,
+                salt: saltField,
+                kdfType: kdfType,
+                kdfIterations: kdfIterations,
+                encKeyValidation_DO_NOT_EDIT: valCs,
+                data: dataCs,
+            };
+            if (kdfType === 1) {
+                envelope.kdfMemory = kdfMemory;
+                envelope.kdfParallelism = kdfParallelism;
+            } else {
+                envelope.kdfMemory = null;
+                envelope.kdfParallelism = null;
+            }
+            return envelope;
+        }
+
+        // 弹窗 + 解密流程封装
+        async function promptAndDecryptEncryptedJson(jsonData) {
+            const overlay = document.getElementById('encPwOverlay');
+            const input = document.getElementById('encPwInput');
+            const confirmBtn = document.getElementById('encPwConfirm');
+            const cancelBtn = document.getElementById('encPwCancel');
+            const errorEl = document.getElementById('encPwError');
+            const loadingEl = document.getElementById('encPwLoading');
+            const toggleBtn = document.getElementById('encPwToggle');
+
+            let pwVisible = false;
+
+            function resetUI() {
+                errorEl.textContent = '';
+                loadingEl.style.display = 'none';
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '解密并继续';
+                input.disabled = false;
+                cancelBtn.disabled = false;
+                input.type = 'password';
+                pwVisible = false;
+                toggleBtn.textContent = '👁️';
+            }
+
+            function setLoading(loading) {
+                loadingEl.style.display = loading ? 'flex' : 'none';
+                confirmBtn.disabled = loading;
+                confirmBtn.textContent = loading ? '解密中...' : '解密并继续';
+                input.disabled = loading;
+                cancelBtn.disabled = loading;
+                errorEl.textContent = '';
+            }
+
+            // 初始化弹窗
+            overlay.classList.add('show');
+            input.value = '';
+            resetUI();
+            input.focus();
+
+            // 焦点陷阱：弹窗打开时 Tab 不跳出弹窗
+            overlay.onkeydown = (e) => {
+                if (e.key !== 'Tab') return;
+                const f = overlay.querySelectorAll('button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])');
+                if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            };
+
+            let retries = 0;
+            const maxRetries = 3;
+
+            while (retries < maxRetries) {
+                try {
+                    const password = await new Promise((resolve, reject) => {
+                        let resolved = false;
+
+                        function onConfirm() {
+                            // 注意：Bitwarden 官方不会对导出密码做 trim，保持原样以与官方派生一致
+                            const pw = input.value;
+                            if (!pw) {
+                                errorEl.textContent = '请输入密码';
+                                const row = input.closest('.modal-input-row'); if (row) row.classList.add('error');
+                                return;
+                            }
+                            const row = input.closest('.modal-input-row'); if (row) row.classList.remove('error');
+                            if (resolved) return;
+                            resolved = true;
+                            setLoading(true);
+                            resolve(pw);
+                        }
+
+                        function onCancel() {
+                            if (resolved) return;
+                            resolved = true;
+                            reject(new Error('用户取消'));
+                        }
+
+                        confirmBtn.onclick = onConfirm;
+                        cancelBtn.onclick = onCancel;
+                        input.onkeydown = (e) => { if (e.key === 'Enter') onConfirm(); if (e.key === 'Escape') onCancel(); };
+                        overlay.onclick = (e) => { if (e.target === overlay) onCancel(); };
+                        toggleBtn.onclick = () => {
+                            pwVisible = !pwVisible;
+                            input.type = pwVisible ? 'text' : 'password';
+                            toggleBtn.textContent = pwVisible ? '🙈' : '👁️';
+                        };
+                    });
+
+                    // 用户输入了密码，尝试解密
+                    const decrypted = await decryptBitwardenEncryptedJson(jsonData, password);
+                    overlay.classList.remove('show');
+                    input.value = '';
+                    return decrypted;
+                } catch (err) {
+                    if (err.message === '用户取消') {
+                        overlay.classList.remove('show');
+                        input.value = '';
+                        throw err;
+                    }
+                    // 解密失败（密码错误等）
+                    retries++;
+                    if (retries >= maxRetries) {
+                        overlay.classList.remove('show');
+                        input.value = '';
+                        throw new Error('密码错误次数过多（' + maxRetries + ' 次），请确认密码后重新导入\n' + err.message);
+                    }
+                    errorEl.textContent = '❌ ' + (err.message || '解密失败，请检查密码') + '（剩余 ' + (maxRetries - retries) + ' 次）· 技术详情见浏览器控制台(F12)';
+                    const row = input.closest('.modal-input-row'); if (row) row.classList.add('error');
+                    resetUI();
+                    input.focus();
+                    input.select();
+                }
+            }
+        }
+
+        async function readZipFile(file) {
+            const JSZip = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+            const zip = await JSZip.default.loadAsync(file);
+            const jsonFile = Object.keys(zip.files).find(name => name.endsWith('.json'));
+            if (!jsonFile) throw new Error('ZIP 文件中未找到 JSON 数据');
+            const content = await zip.files[jsonFile].async('string');
+            return JSON.parse(content);
+        }
+
+        // ============ Helpers ============
+        function sanitizePath(path) { return path.replace(/[\/\\]/g, '_'); }
+
+        function showToast(msg, type = '') {
+            toast.textContent = msg;
+            toast.className = 'toast ' + type + ' show';
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && passwordCard.classList.contains('show') && !convertBtn.disabled) {
+                e.preventDefault(); startConversion();
+            }
+        });
+        // ============ Service Worker 注册（APK 中 file:// 协议不支持 SW，已移除；网页版保留）============
+    </script>
+</body>
+</html>

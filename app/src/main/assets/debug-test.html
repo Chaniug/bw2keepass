@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>KDBX Debug Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/kdbxweb@2.1.1/dist/kdbxweb.min.js"></script>
+</head>
+<body>
+    <h1>KDBX Debug Test</h1>
+    <pre id="log"></pre>
+
+    <script>
+        const log = document.getElementById('log');
+        function L(msg) { log.textContent += msg + '\n'; }
+
+        async function test() {
+            const { Kdbx, Credentials, ProtectedValue, Consts } = kdbxweb;
+            
+            // Test 1: Create db with simple entry using .set()
+            L('=== Test 1: entry.fields.set() ===');
+            const creds = new Credentials(ProtectedValue.fromString('test123'));
+            const db = Kdbx.create(creds, 'Test DB');
+            db.upgrade();
+            db.setKdf(Consts.KdfId.Aes);  // debug 用 AES-KDF 避免依赖
+            
+            const group = db.createGroup(db.getDefaultGroup(), 'TestFolder');
+            const entry = db.createEntry(group);
+            entry.fields.set('Title', 'My Test Entry');
+            entry.fields.set('UserName', 'testuser');
+            entry.fields.set('Password', ProtectedValue.fromString('mypassword'));
+            entry.fields.set('URL', 'https://example.com');
+            entry.fields.set('Notes', 'Test notes here');
+            
+            L('Fields after set:');
+            for (const [k, v] of entry.fields) {
+                const val = typeof v === 'string' ? v : (v.getText ? v.getText() : String(v));
+                L(`  ${k}: ${val}`);
+            }
+            
+            const saved = await db.save();
+            L(`Saved: ${saved.byteLength} bytes`);
+            
+            // Test 2: Reload and check
+            L('\n=== Test 2: Reload saved db ===');
+            const creds2 = new Credentials(ProtectedValue.fromString('test123'));
+            const db2 = await Kdbx.load(saved, creds2);
+            const allEntries = db2.getDefaultGroup().allEntries();
+            L(`Entries found: ${allEntries.length}`);
+            for (const e of allEntries) {
+                L(`  Entry: "${e.fields.get('Title')}"`);
+                L(`    UserName: ${e.fields.get('UserName')}`);
+                const pw = e.fields.get('Password');
+                L(`    Password: ${pw ? pw.getText() : '(none)'}`);
+                L(`    URL: ${e.fields.get('URL')}`);
+                L(`    Notes: ${e.fields.get('Notes')}`);
+            }
+            
+            // Test 3: Using property assignment (original code style)
+            L('\n=== Test 3: property assignment ===');
+            const db3 = Kdbx.create(new Credentials(ProtectedValue.fromString('test123')), 'Test DB 3');
+            const group3 = db3.createGroup(db3.getDefaultGroup(), 'Folder3');
+            const entry3 = db3.createEntry(group3);
+            entry3.fields.Title = 'Entry via property';
+            entry3.fields.UserName = 'propuser';
+            entry3.fields.Password = ProtectedValue.fromString('proppass');
+            
+            L('Fields after property assignment:');
+            for (const [k, v] of entry3.fields) {
+                const val = typeof v === 'string' ? v : (v.getText ? v.getText() : String(v));
+                L(`  ${k}: ${val}`);
+            }
+            
+            const saved3 = await db3.save();
+            L(`Saved: ${saved3.byteLength} bytes`);
+            
+            L('\n=== ALL TESTS COMPLETE ===');
+        }
+
+        test().catch(e => L('ERROR: ' + e.message + '\n' + e.stack));
+    </script>
+</body>
+</html>

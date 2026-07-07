@@ -17,6 +17,7 @@
 - [功能特性](#功能特性)
 - [命令行工具（Python）](#命令行工具python)
   - [加密导出（密码保护）](#加密导出密码保护)
+- [Android App 独立工程](#android-app-独立工程)
 - [项目结构](#项目结构)
 - [隐私说明](#隐私说明)
 - [License](#license)
@@ -50,6 +51,19 @@
 👉 **[打开网页版转换器](https://key.valk.ccwu.cc)**
 
 无需安装，支持所有现代浏览器。手机 Chrome / Edge 亦可「添加到主屏幕」作为 PWA 使用。
+
+---
+
+## 🤖 Android App 独立工程
+
+Android APK 已从「CI 内联脚本临时拼装」升级为仓库内**固化、可独立演进**的真实工程，位于 **`app/`** 目录（详见 [`app/README.md`](app/README.md)）。
+
+- **独立发布线**：APK 走专属 tag（前缀 `app-v*`，如 `app-v1.0`）与独立 Release 标题「Pass2KDBX Android App」，**不再与网页版 `apk-latest` 混用**。
+- **独立前端副本**：`app/src/main/assets/` 是 `web/` 的固化副本（A 方案），首次由 `web/` 复制而来。网页端 `web/` 原文件保持不动，App 后续单独迭代只改 `assets/` 副本。
+- **本地可构建**：提供 [`app/build-apk-local.sh`](app/build-apk-local.sh)，配置好 Android SDK 后可在本机直接复现 CI 构建，无需等待 CI。
+- **签名一致**：使用 CI 缓存的固定 keystore，保证每次构建签名一致、可覆盖安装。
+
+> 当前 App 仍处于开发阶段（前端尚未脱离网页版独立成型），但工程结构已独立，可单独维护与发布。
 
 ---
 
@@ -166,14 +180,22 @@ bw2keepass/
 │   ├── encrypted.py         # Bitwarden 密码保护加密导出的加密 / 解密
 │   ├── csv_exporter.py      # CSV 导出
 │   └── writer.py           # KeePass 数据库写入器
-├── web/                     # 网页版 + PWA
+├── web/                     # 网页版 + PWA（原文件保持不动）
 │   ├── index.html           # 纯前端单页应用
 │   ├── manifest.json        # PWA 清单
 │   ├── sw.js               # Service Worker（离线支持）
 │   └── icon-*.png          # PWA 图标
+├── app/                     # Android App 独立工程（固化）
+│   ├── README.md            # App 工程说明
+│   ├── build-apk-local.sh   # 本地构建脚本
+│   └── src/main/
+│       ├── AndroidManifest.xml
+│       ├── java/cc/valk/pass2kdbx/MainActivity.java  # WebView 壳 + 下载接口
+│       ├── res/             # styles.xml / ic_launcher.xml
+│       └── assets/          # 前端固化副本（来自 web/，可独立演进）
 ├── tests/                   # 测试（47 个用例）
 ├── .github/workflows/       # GitHub Actions
-│   ├── build-apk.yml       # 自动构建 Android APK
+│   ├── build-apk.yml       # 自动构建 Android APK（独立 app-v* 发布线）
 │   └── deploy-pages.yml     # 部署网页版
 ├── requirements.txt
 └── README.md

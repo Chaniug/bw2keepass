@@ -33,271 +33,14 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
-      - name: Create Android project
+      - name: Verify Android project (固化的 app/ 工程)
         run: |
-          python3 <<'PYEOF'
-          import os
-          os.makedirs('app/src/main/java/cc/valk/pass2kdbx', exist_ok=True)
-          os.makedirs('app/src/main/res/values', exist_ok=True)
-          os.makedirs('app/src/main/res/drawable', exist_ok=True)
-          os.makedirs('app/src/main/assets', exist_ok=True)
-
-          # 复制 web 文件到 assets
-          import shutil
-          for item in os.listdir('web'):
-              src = os.path.join('web', item)
-              dst = os.path.join('app/src/main/assets', item)
-              if os.path.isdir(src):
-                  shutil.copytree(src, dst, dirs_exist_ok=True)
-              else:
-                  shutil.copy2(src, dst)
-
-          # AndroidManifest.xml
-          with open('app/src/main/AndroidManifest.xml', 'w') as f:
-              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
-              f.write('<manifest xmlns:android="http://schemas.android.com/apk/res/android"\n')
-              f.write('    package="cc.valk.pass2kdbx">\n')
-              f.write('    <uses-permission android:name="android.permission.INTERNET" />\n')
-              f.write('    <application\n')
-              f.write('        android:allowBackup="true"\n')
-              f.write('        android:icon="@drawable/ic_launcher"\n')
-              f.write('        android:label="Pass2KDBX"\n')
-              f.write('        android:theme="@style/AppTheme"\n')
-              f.write('        android:usesCleartextTraffic="true">\n')
-              f.write('        <activity\n')
-              f.write('            android:name=".MainActivity"\n')
-              f.write('            android:exported="true"\n')
-              f.write('            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">\n')
-              f.write('            <intent-filter>\n')
-              f.write('                <action android:name="android.intent.action.MAIN" />\n')
-              f.write('                <category android:name="android.intent.category.LAUNCHER" />\n')
-              f.write('            </intent-filter>\n')
-              f.write('        </activity>\n')
-              f.write('    </application>\n')
-              f.write('</manifest>\n')
-
-          # MainActivity.java
-          java_code = '''package cc.valk.pass2kdbx;
-
-          import android.app.Activity;
-          import android.content.Context;
-          import android.content.Intent;
-          import android.net.Uri;
-          import android.os.Bundle;
-          import android.os.Environment;
-          import android.util.Base64;
-          import android.util.Log;
-          import android.webkit.WebChromeClient;
-          import android.webkit.WebSettings;
-          import android.webkit.WebView;
-          import android.webkit.WebViewClient;
-          import android.webkit.ValueCallback;
-          import android.webkit.ConsoleMessage;
-          import android.webkit.JavascriptInterface;
-          import android.os.Build;
-          import android.webkit.PermissionRequest;
-          import android.content.ActivityNotFoundException;
-          import android.provider.MediaStore;
-          import android.content.ContentResolver;
-          import android.content.ContentValues;
-          import java.io.File;
-          import java.io.FileOutputStream;
-          import java.io.OutputStream;
-
-          public class MainActivity extends Activity {
-              private WebView webView;
-              private ValueCallback<Uri[]> filePathCallback;
-              private static final int FILE_CHOOSER_REQUEST = 100;
-              private static final String TAG = "Pass2KDBX";
-
-              @Override
-              protected void onCreate(Bundle savedInstanceState) {
-                  super.onCreate(savedInstanceState);
-                  webView = new WebView(this);
-                  setContentView(webView);
-
-                  WebSettings settings = webView.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setAllowFileAccess(true);
-                  settings.setAllowContentAccess(true);
-                  settings.setDomStorageEnabled(true);
-                  settings.setDatabaseEnabled(true);
-                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-                  settings.setJavaScriptCanOpenWindowsAutomatically(true);
-                  settings.setSupportMultipleWindows(false);
-                  settings.setLoadWithOverviewMode(true);
-                  settings.setUseWideViewPort(true);
-                  settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
-                  webView.setWebViewClient(new WebViewClient());
-                  webView.setWebChromeClient(new WebChromeClient() {
-                      @Override
-                      public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> fpc, FileChooserParams params) {
-                          if (filePathCallback != null) {
-                              filePathCallback.onReceiveValue(null);
-                              filePathCallback = null;
-                          }
-                          filePathCallback = fpc;
-                          try {
-                              Intent intent = params.createIntent();
-                              intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                              startActivityForResult(intent, FILE_CHOOSER_REQUEST);
-                          } catch (ActivityNotFoundException e) {
-                              Log.e(TAG, "No file chooser available", e);
-                              filePathCallback.onReceiveValue(null);
-                              filePathCallback = null;
-                              return false;
-                          }
-                          return true;
-                      }
-
-                      @Override
-                      public void onPermissionRequest(PermissionRequest request) {
-                          request.grant(request.getResources());
-                      }
-
-                      @Override
-                      public boolean onConsoleMessage(ConsoleMessage cm) {
-                          Log.d(TAG, "JS: " + cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")");
-                          return true;
-                      }
-                  });
-
-                  // 注入文件下载接口
-                  webView.addJavascriptInterface(new FileSaver(this), "AndroidFileSaver");
-
-                  webView.loadUrl("file:///android_asset/index.html");
-              }
-
-              // JavaScript 接口：处理文件下载
-              public static class FileSaver {
-                  private Context context;
-                  FileSaver(Context ctx) { context = ctx; }
-
-                  @JavascriptInterface
-                  public void saveFile(String base64Data, String fileName, String mimeType) {
-                      try {
-                          byte[] data = Base64.decode(base64Data, Base64.NO_WRAP);
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                              // Android 10+ 用 MediaStore
-                              ContentResolver resolver = context.getContentResolver();
-                              ContentValues values = new ContentValues();
-                              values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-                              values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
-                              values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
-                              Uri uri = resolver.insert(MediaStore.Files.getContentUri("external"), values);
-                              if (uri != null) {
-                                  OutputStream os = resolver.openOutputStream(uri);
-                                  if (os != null) {
-                                      os.write(data);
-                                      os.close();
-                                      Log.i(TAG, "File saved to Downloads: " + fileName);
-                                  }
-                              }
-                          } else {
-                              // Android 9 及以下，写到 Downloads 目录
-                              File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                              if (!downloads.exists()) downloads.mkdirs();
-                              File file = new File(downloads, fileName);
-                              FileOutputStream fos = new FileOutputStream(file);
-                              fos.write(data);
-                              fos.close();
-                              Log.i(TAG, "File saved: " + file.getAbsolutePath());
-                          }
-                      } catch (Exception e) {
-                          Log.e(TAG, "saveFile error", e);
-                      }
-                  }
-              }
-
-              @Override
-              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-                  super.onActivityResult(requestCode, resultCode, data);
-                  if (requestCode != FILE_CHOOSER_REQUEST || filePathCallback == null) {
-                      return;
-                  }
-                  Uri[] results = null;
-                  try {
-                      if (resultCode == RESULT_OK) {
-                          if (data != null && data.getData() != null) {
-                              results = new Uri[]{data.getData()};
-                          } else if (data != null && data.getClipData() != null) {
-                              int count = data.getClipData().getItemCount();
-                              results = new Uri[count];
-                              for (int i = 0; i < count; i++) {
-                                  results[i] = data.getClipData().getItemAt(i).getUri();
-                              }
-                          }
-                      }
-                  } catch (Exception e) {
-                      Log.e(TAG, "onActivityResult error", e);
-                      results = null;
-                  }
-                  try {
-                      filePathCallback.onReceiveValue(results);
-                  } catch (Exception e) {
-                      Log.e(TAG, "callback error", e);
-                  }
-                  filePathCallback = null;
-              }
-
-              @Override
-              public void onBackPressed() {
-                  if (webView != null && webView.canGoBack()) {
-                      webView.goBack();
-                  } else {
-                      super.onBackPressed();
-                  }
-              }
-
-              @Override
-              protected void onDestroy() {
-                  if (webView != null) {
-                      webView.destroy();
-                      webView = null;
-                  }
-                  super.onDestroy();
-              }
-          }
-          '''
-          import textwrap
-          java_code = textwrap.dedent(java_code)
-          with open('app/src/main/java/cc/valk/pass2kdbx/MainActivity.java', 'w') as f:
-              f.write(java_code)
-
-          # styles.xml
-          with open('app/src/main/res/values/styles.xml', 'w') as f:
-              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
-              f.write('<resources>\n')
-              f.write('    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">\n')
-              f.write('        <item name="android:windowBackground">#0f1117</item>\n')
-              f.write('        <item name="android:statusBarColor">#6c5ce7</item>\n')
-              f.write('        <item name="android:navigationBarColor">#0f1117</item>\n')
-              f.write('    </style>\n')
-              f.write('</resources>\n')
-
-          # ic_launcher.xml
-          with open('app/src/main/res/drawable/ic_launcher.xml', 'w') as f:
-              f.write('<?xml version="1.0" encoding="utf-8"?>\n')
-              f.write('<vector xmlns:android="http://schemas.android.com/apk/res/android"\n')
-              f.write('    android:width="108dp"\n')
-              f.write('    android:height="108dp"\n')
-              f.write('    android:viewportWidth="108"\n')
-              f.write('    android:viewportHeight="108">\n')
-              f.write('    <path\n')
-              f.write('        android:fillColor="#6c5ce7"\n')
-              f.write('        android:pathData="M0,0h108v108H0z"/>\n')
-              f.write('    <path\n')
-              f.write('        android:fillColor="#ffffff"\n')
-              f.write('        android:pathData="M54,30c-8.8,0-16,7.2-16,16v8h-4c-2.2,0-4,1.8-4,4v24c0,2.2,1.8,4,4,4h40c2.2,0,4-1.8,4-4V58c0-2.2-1.8-4-4-4h-4v-8C70,37.2,62.8,30,54,30zM54,38c4.4,0,8,3.6,8,8v8H46v-8C46,41.6,49.6,38,54,38z"/>\n')
-              f.write('</vector>\n')
-
-          print("Android project created successfully")
-          # 列出 assets
-          for f in os.listdir('app/src/main/assets'):
-              p = os.path.join('app/src/main/assets', f)
-              print(f"  {f}: {os.path.getsize(p)} bytes")
-          PYEOF
+          echo "使用仓库内固化的 app/ 工程，无需 CI 临时拼装"
+          test -f app/src/main/AndroidManifest.xml && echo "  OK AndroidManifest.xml"
+          test -f app/src/main/java/cc/valk/pass2kdbx/MainActivity.java && echo "  OK MainActivity.java"
+          test -f app/src/main/res/values/styles.xml && echo "  OK styles.xml"
+          test -f app/src/main/res/drawable/ic_launcher.xml && echo "  OK ic_launcher.xml"
+          test -f app/src/main/assets/index.html && echo "  OK assets/index.html"
 
       - name: Restore signing keystore (cache)
         id: keystore-cache
@@ -317,6 +60,9 @@ jobs:
             -noprompt
 
       - name: Build APK
+        env:
+          VERSION_CODE: 1
+          VERSION_NAME: 1.0
         run: |
           BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
           PLATFORM=$ANDROID_HOME/platforms/android-34
@@ -333,8 +79,8 @@ jobs:
             -A app/src/main/assets \
             --min-sdk-version 21 \
             --target-sdk-version 34 \
-            --version-code 1 \
-            --version-name 1.0 \
+            --version-code ${VERSION_CODE} \
+            --version-name ${VERSION_NAME} \
             --package-id 0x7f \
             app/build/res.zip
 
@@ -393,28 +139,31 @@ jobs:
           name: Pass2KDBX-APK
           path: app/build/Pass2KDBX.apk
 
-      - name: Create/Update Release
+      - name: Create/Update Release (独立 app-v* tag)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 删除旧 release 与远程 tag（本地 tag 一并清理，避免状态不一致）
-          gh release delete "apk-latest" --yes --cleanup-tag 2>/dev/null || true
-          git push origin :refs/tags/apk-latest 2>/dev/null || true
-          git tag -d apk-latest 2>/dev/null || true
+          # 独立发布线：tag 前缀 app-v*，不与网页版 apk-latest 混用
+          APP_TAG="app-v${VERSION_NAME:-1.0}"
+          # 若 tag 已存在则先清理（便于重跑）
+          gh release delete "$APP_TAG" --yes --cleanup-tag 2>/dev/null || true
+          git push origin ":refs/tags/$APP_TAG" 2>/dev/null || true
+          git tag -d "$APP_TAG" 2>/dev/null || true
           # 让 gh 直接在远端基于当前 commit 创建 tag，避免"本地 tag 未推送"竞态
-          gh release create apk-latest \
+          gh release create "$APP_TAG" \
             app/build/Pass2KDBX.apk \
             --target "${{ github.sha }}" \
-            --title "Pass2KDBX APK (Latest)" \
-            --notes "## Pass2KDBX Android APK
+            --title "Pass2KDBX Android App v${VERSION_NAME:-1.0}" \
+            --notes "## Pass2KDBX Android App
 
           自动构建的 Android APK，可直接安装。
 
+          - 版本：${VERSION_NAME:-1.0} (code ${VERSION_CODE:-1})
           - 构建时间：$(date -u '+%Y-%m-%d %H:%M UTC')
           - 提交：${{ github.sha }}
           - 安装：下载 APK → 允许\"未知来源\"安装 → 打开使用
 
-          > 此 Release 每次构建自动更新。" \
+          > 此 Release 为 Android App 独立发布线（tag: $APP_TAG）。" \
             --latest
           # 同步本地 tag 以便后续步骤/缓存一致
-          git fetch origin "refs/tags/apk-latest:refs/tags/apk-latest" 2>/dev/null || true
+          git fetch origin "refs/tags/$APP_TAG:refs/tags/$APP_TAG" 2>/dev/null || true
