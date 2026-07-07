@@ -10,7 +10,9 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 dependencies = [
-    "pykeepass>=4.1.0",
+    "pykeepass>=4.1.0",       # KDBX 读写
+    "cryptography>=49.0.0",   # AES-CBC / HMAC / HKDF 加解密原语（直接 import）
+    "argon2-cffi>=25.1.0",    # Bitwarden Argon2id KDF（账户限制型解密，可选但推荐）
 ]
 
 [project.scripts]

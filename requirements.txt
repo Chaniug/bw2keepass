@@ -1,1 +1,6 @@
-pykeepass>=4.1.0
+# Bitwarden -> KeePass 转换工具依赖
+# 本地实测通过版本（Python 3.14.6）
+
+pykeepass>=4.1.0          # KDBX 读写（间接依赖 lxml / pycryptodome）
+cryptography>=49.0.0      # AES-CBC / HMAC / HKDF 加解密原语
+argon2-cffi>=25.1.0       # Bitwarden Argon2id KDF（账户限制型解密，可选但推荐）

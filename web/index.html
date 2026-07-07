@@ -557,8 +557,8 @@
                 </div>
                 <div class="input-group" style="margin-top: 0.5rem;">
                     <select id="saltMode" aria-label="salt 处理方式" style="width: 100%; padding: 0.7rem 0.9rem; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text);">
-                        <option value="utf8">salt 模式: UTF-8（默认，对齐常见 Bitwarden 导出）</option>
-                        <option value="base64">salt 模式: Base64（Bitwarden 文档标准，可移植性更好）</option>
+                        <option value="utf8">salt 模式: UTF-8（默认，与 Bitwarden 官方一致，可被 Bitwarden 导入）</option>
+                        <option value="base64">salt 模式: Base64（仅本工具内部互转，Bitwarden 官方无法解密导入）</option>
                     </select>
                 </div>
             </div>

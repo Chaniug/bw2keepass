@@ -11,7 +11,7 @@ import uuid
 from typing import Any
 from dataclasses import dataclass, field
 
-from .encrypted import decrypt_bitwarden_export, EncryptedExportRequiresPassword
+from .encrypted import decrypt_bitwarden_export, decrypt_account_export, EncryptedExportRequiresPassword
 
 
 @dataclass
@@ -129,6 +129,8 @@ class VaultItem:
 def parse_bitwarden_export(
     file_path: str,
     export_password: str | None = None,
+    master_password: str | None = None,
+    email: str | None = None,
 ) -> tuple[list[Folder], list[VaultItem]]:
     """
     解析 Bitwarden 导出文件（支持 .json 和 .zip）
@@ -137,9 +139,14 @@ def parse_bitwarden_export(
     需要传入 export_password 进行解密；未传入则抛出
     EncryptedExportRequiresPassword 提示用户提供密码。
 
+    当输入为「账户限制型加密导出」(encrypted + 有 encKey，无 passwordProtected) 时，
+    需要传入 master_password（Bitwarden 主密码）与 email（账户邮箱）进行解密。
+
     Args:
         file_path: 输入文件路径（.json 或 .zip）
-        export_password: Bitwarden 加密导出的解密密码（明文导出可省略）
+        export_password: Bitwarden 密码保护导出的解密密码（明文导出可省略）
+        master_password: Bitwarden 账户主密码（仅账户限制型加密导出需要）
+        email: Bitwarden 账户邮箱（仅账户限制型加密导出需要）
     Returns:
         (folders, items) 元组
     """
@@ -147,11 +154,13 @@ def parse_bitwarden_export(
         data = _parse_zip(file_path)
     else:
         data = _parse_json(file_path)
-    data = _maybe_decrypt(data, export_password)
+    data = _maybe_decrypt(data, export_password, master_password, email)
     return _parse_data(data)
 
 
-def _maybe_decrypt(data: dict, export_password: str | None) -> dict:
+def _maybe_decrypt(data: dict, export_password: str | None,
+                   master_password: str | None = None,
+                   email: str | None = None) -> dict:
     """若为加密导出则解密；缺少密码时抛出明确异常（避免静默空库）"""
     if data.get('encrypted') and data.get('passwordProtected'):
         if not export_password:
@@ -160,6 +169,14 @@ def _maybe_decrypt(data: dict, export_password: str | None) -> dict:
                 "使用 --export-password 参数，或在交互提示中输入。"
             )
         return decrypt_bitwarden_export(data, export_password)
+    # 账户限制型加密导出：encrypted=True 但有 encKey、无 passwordProtected
+    if data.get('encrypted') and data.get('encKey') and not data.get('passwordProtected'):
+        if not master_password or not email:
+            raise EncryptedExportRequiresPassword(
+                "检测到 Bitwarden 账户限制型加密导出。请提供账户主密码与邮箱："
+                "使用 --email 参数，并在提示中输入主密码。"
+            )
+        return decrypt_account_export(data, master_password, email)
     return data
 
 
@@ -178,6 +195,25 @@ def _parse_zip(zip_path: str) -> dict:
         if not json_files:
             raise ValueError("ZIP 文件中未找到 data.json")
         return json.loads(zf.read(json_files[0]).decode('utf-8'))
+
+
+def peek_export_kind(file_path: str) -> dict:
+    """读取导出文件的原始 dict（不解密），用于探测加密类型
+
+    返回 {'encrypted': bool, 'passwordProtected': bool, 'account': bool}
+    其中 account=True 表示账户限制型加密（有 encKey 且无 passwordProtected）。
+    """
+    ext = file_path.lower().split('.')[-1]
+    if ext == 'zip':
+        data = _parse_zip(file_path)
+    else:
+        data = _parse_json(file_path)
+    return {
+        'encrypted': bool(data.get('encrypted')),
+        'passwordProtected': bool(data.get('passwordProtected')),
+        'account': bool(data.get('encrypted') and data.get('encKey')
+                        and not data.get('passwordProtected')),
+    }
 
 
 def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
@@ -253,7 +289,15 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
             ))
 
         # FIDO2 / Passkey 凭据
-        for fido_data in item_data.get('fido2Credentials', []):
+        # 位置兼容：Bitwarden 标准导出放在 item 顶层 fido2Credentials，
+        # 但部分导出（如从 KDBX 反向重建的 JSON）放在 login.fido2Credentials。
+        # 两处都读取并合并，避免 passkey 丢失。
+        fido_sources = []
+        fido_sources.extend(item_data.get('fido2Credentials', []) or [])
+        login_block = item_data.get('login') or {}
+        if isinstance(login_block, dict):
+            fido_sources.extend(login_block.get('fido2Credentials', []) or [])
+        for fido_data in fido_sources:
             item.fido2_credentials.append(Fido2Credential(
                 credential_id=fido_data.get('credentialId', '') or '',
                 key_type=fido_data.get('keyType', '') or '',

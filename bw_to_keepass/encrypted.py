@@ -255,8 +255,8 @@ def encrypt_bitwarden_export(
     kdf_iterations: int = 600000,
     kdf_memory: int = 64,          # MiB（仅 Argon2 使用）
     kdf_parallelism: int = 4,      # 仅 Argon2 使用
-    salt_mode: str = 'utf8',       # 'utf8' = 用 salt 字符串的 UTF-8 字节做 KDF（对齐真实导出）；
-                                   # 'base64' = 用 salt 的 base64 解码字节（Bitwarden 文档标准）
+    salt_mode: str = 'utf8',       # 'utf8' = 用 salt 字符串的 UTF-8 字节做 KDF（与 Bitwarden 官方一致，可被导入）；
+                                   # 'base64' = 用 salt 的 base64 解码字节（仅本工具内部互转，Bitwarden 官方无法解密）
     validation_plaintext: str = 'Bitwarden',
 ) -> dict:
     """将明文 Bitwarden 导出（含 folders/items 的 dict）加密为密码保护导出信封
@@ -324,3 +324,115 @@ def encrypt_bitwarden_export(
         envelope['kdfParallelism'] = None
 
     return envelope
+
+
+# ============================================================================
+# 账户限制型解密（Account-restricted Bitwarden export / 本地 data.json）
+# 与密码保护型不同：它用 Bitwarden 主账号密钥加密，字段值以"内联密文串"
+# 形式直接替换（如 "password": "2.iv|ct|mac"），无独立 data 信封。
+# 解密需要 email + 主密码派生主密钥，再解出 encKey 后才能逐字段解密。
+# 参考：Bitwarden 客户端 / GurpreetKang-BitwardenDecrypt 的解密流程。
+# ============================================================================
+
+# 匹配内联密文串：  "encType.ivB64|ctB64[|macB64]"
+_CIPHER_RE = None  # 延迟编译，避免模块导入期依赖 re
+
+
+def _decrypt_protected_symmetric_key(cipher_str: str, stretch_enc: bytes,
+                                      stretch_mac: bytes) -> tuple[bytes, bytes]:
+    """解密 Protected Symmetric Key（encKey 字段）
+
+    该密文串用 stretchKey 解密后得到 64 字节：
+      前 32 字节 = 真正的加密密钥 (encKey)
+      后 32 字节 = 真正的 MAC 密钥 (macKey)
+    """
+    raw = _decrypt_cipher_string(cipher_str, stretch_enc, stretch_mac)
+    if len(raw) < 64:
+        raise EncryptedExportError("encKey 解密结果长度异常（账户加密密钥损坏）")
+    return raw[:32], raw[32:64]
+
+
+def _decrypt_tree(node, enc_key: bytes, mac_key: bytes):
+    """递归遍历 JSON 树，把所有内联密文串就地解密为明文
+
+    密文串特征：以数字开头、含 '.' 与 '|'，如 "2.ivB64|ctB64|macB64"。
+    非密文字符串（如普通文本、UUID）原样保留。
+    """
+    import re
+    global _CIPHER_RE
+    if _CIPHER_RE is None:
+        # 密文串形如 "2.ivB64|ctB64|macB64" 或旧式 "0.ivB64|ctB64"
+        # 每段为 Base64（可能含末尾 padding '='），共 2~3 段，以数字+点开头
+        _CIPHER_RE = re.compile(r'^\d+\.[A-Za-z0-9+/=]+(\|[A-Za-z0-9+/=]+){1,2}$')
+
+    if isinstance(node, dict):
+        for k, v in node.items():
+            node[k] = _decrypt_tree(v, enc_key, mac_key)
+        return node
+    if isinstance(node, list):
+        for i, v in enumerate(node):
+            node[i] = _decrypt_tree(v, enc_key, mac_key)
+        return node
+    if isinstance(node, str):
+        if _CIPHER_RE.match(node):
+            try:
+                return _decrypt_cipher_string(node, enc_key, mac_key).decode('utf-8')
+            except EncryptedExportError:
+                # MAC 不匹配（可能该字段用的不是同一密钥体系）→ 保留原密文，避免崩溃
+                return node
+        return node
+    return node
+
+
+def decrypt_account_export(data: dict, master_password: str, email: str) -> dict:
+    """解密 Bitwarden 账户限制型（Account-restricted）加密导出 / 本地 data.json
+
+    Args:
+        data: 账户加密导出 JSON 解析后的 dict（含 encrypted / encKey / kdfType / kdfIterations 等）
+        master_password: Bitwarden 主账号密码
+        email: Bitwarden 账户邮箱（作为 KDF 盐的一部分）
+    Returns:
+        解密后的明文 JSON dict（folders/items 等字段值已还原）
+    Raises:
+        EncryptedExportError: 格式无效 / 密码或邮箱错误 / 数据损坏
+    """
+    if not data.get('encrypted') or not data.get('encKey'):
+        raise EncryptedExportError("不是有效的 Bitwarden 账户加密导出（缺少 encKey）")
+
+    kdf_type = int(data.get('kdfType') or 0)
+    kdf_iterations = int(data.get('kdfIterations') or 100000)
+    kdf_memory = int(data.get('kdfMemory') or 64)
+    kdf_parallelism = int(data.get('kdfParallelism') or 4)
+
+    # 主密钥派生盐：PBKDF2 用 email 的 UTF-8；Argon2 用 SHA256(email)
+    if kdf_type == 1:
+        kdf_salt = hashlib.sha256(email.encode('utf-8')).digest()
+        mem_candidates = [kdf_memory * 1024, kdf_memory]
+        master_key = None
+        last_err = None
+        for mem in mem_candidates:
+            try:
+                master_key = _derive_master_key(1, master_password, kdf_salt,
+                                                kdf_iterations, mem, kdf_parallelism)
+                break
+            except EncryptedExportError:
+                last_err = EncryptedExportError
+                continue
+        if master_key is None:
+            raise EncryptedExportError("账户加密 Argon2 派生失败（密码/邮箱错误或参数非法）")
+    else:
+        kdf_salt = email.encode('utf-8')
+        master_key = _derive_master_key(0, master_password, kdf_salt,
+                                        kdf_iterations, kdf_memory, kdf_parallelism)
+
+    # HKDF 拉伸出 stretchKey
+    stretch_enc = _hkdf_expand(master_key, 32, b'enc')
+    stretch_mac = _hkdf_expand(master_key, 32, b'mac')
+
+    # 解密 encKey → 真正的对称密钥
+    enc_key, mac_key = _decrypt_protected_symmetric_key(
+        data['encKey'], stretch_enc, stretch_mac
+    )
+
+    # 递归解密整棵 JSON 树
+    return _decrypt_tree(data, enc_key, mac_key)

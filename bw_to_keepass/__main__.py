@@ -18,7 +18,7 @@ import getpass
 import os
 import json
 
-from .parser import parse_bitwarden_export
+from .parser import parse_bitwarden_export, peek_export_kind
 from .encrypted import EncryptedExportRequiresPassword, EncryptedExportError
 from .writer import write_keepass, print_summary
 
@@ -80,7 +80,11 @@ def main():
         "--salt-mode",
         choices=['utf8', 'base64'],
         default='utf8',
-        help="加密导出的 salt 处理方式：utf8=用 salt 字符串的 UTF-8 字节做 KDF（默认，对齐常见 Bitwarden 导出）；base64=用 salt 的 base64 解码字节（Bitwarden 文档标准，可移植性更好）",
+        help="加密导出的 salt 处理方式：utf8=用 salt 字符串的 UTF-8 字节做 KDF（默认，与 Bitwarden 官方一致，可被 Bitwarden 导入）；base64=用 salt 的 base64 解码字节（仅限本工具内部互转，Bitwarden 官方无法解密导入）",
+    )
+    parser.add_argument(
+        "--email",
+        help="账户限制型加密导出解密用：Bitwarden 账户邮箱（配合主密码派生密钥）",
     )
 
     args = parser.parse_args()
@@ -126,25 +130,51 @@ def main():
         _do_csv_export(args.input, args.output, password, args.csv_format, args.key_file)
     else:
         # 正向转换：Bitwarden → KDBX
-        _do_forward_convert(args.input, args.output, password, args.name, args.export_password)
+        _do_forward_convert(args.input, args.output, password, args.name,
+                            args.export_password, args.email)
 
 
-def _do_forward_convert(input_path: str, output_path: str, password: str, db_name: str, export_password: str | None = None):
+def _do_forward_convert(input_path: str, output_path: str, password: str, db_name: str,
+                        export_password: str | None = None, email: str | None = None):
     """Bitwarden → KeePass 正向转换"""
     ext = os.path.splitext(input_path)[1].lower()
     if ext not in ('.json', '.zip'):
         print(f"错误: 不支持的输入格式 '{ext}'，需要 .json 或 .zip", file=sys.stderr)
         sys.exit(1)
 
+    # 探测加密类型，决定需要哪种凭据（避免反复试错）
+    master_password = None
+    is_account = False
+    try:
+        is_account = peek_export_kind(input_path).get('account', False)
+    except Exception:
+        is_account = False
+
     print(f"\n正在解析: {input_path}")
     try:
-        folders, items = parse_bitwarden_export(input_path, export_password=export_password)
+        folders, items = parse_bitwarden_export(
+            input_path, export_password=export_password,
+            master_password=master_password, email=email)
     except EncryptedExportRequiresPassword:
-        # 检测到加密导出但未提供密码：交互索取（避免静默空库）
-        if export_password:
-            raise
-        export_password = getpass.getpass("检测到 Bitwarden 加密导出，请输入导出密码: ")
-        folders, items = parse_bitwarden_export(input_path, export_password=export_password)
+        # 账户限制型加密导出：索取主密码 + 邮箱
+        if is_account:
+            if not email:
+                email = input("检测到 Bitwarden 账户限制型加密导出，请输入账户邮箱: ").strip()
+            if not email:
+                print("错误: 邮箱不能为空", file=sys.stderr)
+                sys.exit(1)
+            master_password = getpass.getpass("请输入 Bitwarden 账户主密码: ")
+            if not master_password:
+                print("错误: 主密码不能为空", file=sys.stderr)
+                sys.exit(1)
+            folders, items = parse_bitwarden_export(
+                input_path, master_password=master_password, email=email)
+        else:
+            # 密码保护型加密导出：索取导出密码
+            if export_password:
+                raise
+            export_password = getpass.getpass("检测到 Bitwarden 加密导出，请输入导出密码: ")
+            folders, items = parse_bitwarden_export(input_path, export_password=export_password)
     except EncryptedExportError as e:
         print(f"错误: 加密导出解密失败: {e}", file=sys.stderr)
         sys.exit(1)
@@ -197,6 +227,15 @@ def _do_reverse_convert(input_path: str, output_path: str, password: str, key_fi
     # 写入 JSON（可选加密为密码保护导出）
     print(f"\n正在生成 Bitwarden JSON...")
     if export_password:
+        if salt_mode == 'base64':
+            print("\n" + "!" * 64)
+            print("  [警告] 你选择了 salt_mode=base64。")
+            print("  此模式用 salt 的 base64 解码字节做 KDF，与 Bitwarden 官方")
+            print("  （使用 salt 字符串的 UTF-8 字节）不一致，生成的加密 JSON")
+            print("  【无法被 Bitwarden 官方导入解密】。")
+            print("  仅限用本工具（encrypt_bitwarden_export / decrypt_bitwarden_export）")
+            print("  内部互转使用。若要导入 Bitwarden，请改用默认的 utf8 模式。")
+            print("!" * 64 + "\n")
         out = encrypt_bitwarden_export(data, export_password, salt_mode=salt_mode)
         mode_desc = "加密（密码保护）导出"
     else:
