@@ -128,7 +128,6 @@ public class MainActivity extends Activity {
         int r = Color.red(argb), g = Color.green(argb), b = Color.blue(argb);
         // 提亮/降暗派生 hover 与 glow
         int hover = lighten(argb, 0.12f);
-        int glowR = r, glowG = g, glowB = b;
         // container：主色 + 透明度混合到深色背景（前端用 rgba，这里给出带 alpha 的 hex）
         String accent = String.format("#%02x%02x%02x", r, g, b);
         String accentHover = String.format("#%02x%02x%02x", Color.red(hover), Color.green(hover), Color.blue(hover));
@@ -158,7 +157,6 @@ public class MainActivity extends Activity {
         String js = "if (window.Pass2KDBXDynamic && window.Pass2KDBXDynamic.setSystemDark) {"
                 + " window.Pass2KDBXDynamic.setSystemDark(" + (isDark ? "true" : "false") + "); }";
         view.evaluateJavascript(js, null);
-    }
     }
 
     // JavaScript 接口：处理文件下载
