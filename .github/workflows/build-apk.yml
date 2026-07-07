@@ -397,12 +397,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # 删除旧 release 与远程 tag（本地 tag 一并清理，避免状态不一致）
           gh release delete "apk-latest" --yes --cleanup-tag 2>/dev/null || true
           git push origin :refs/tags/apk-latest 2>/dev/null || true
-          git tag -f apk-latest
-          git push origin apk-latest --force
+          git tag -d apk-latest 2>/dev/null || true
+          # 让 gh 直接在远端基于当前 commit 创建 tag，避免"本地 tag 未推送"竞态
           gh release create apk-latest \
             app/build/Pass2KDBX.apk \
+            --target "${{ github.sha }}" \
             --title "Pass2KDBX APK (Latest)" \
             --notes "## Pass2KDBX Android APK
 
@@ -410,7 +412,9 @@ jobs:
 
           - 构建时间：$(date -u '+%Y-%m-%d %H:%M UTC')
           - 提交：${{ github.sha }}
-          - 安装：下载 APK → 允许"未知来源"安装 → 打开使用
+          - 安装：下载 APK → 允许\"未知来源\"安装 → 打开使用
 
           > 此 Release 每次构建自动更新。" \
             --latest
+          # 同步本地 tag 以便后续步骤/缓存一致
+          git fetch origin "refs/tags/apk-latest:refs/tags/apk-latest" 2>/dev/null || true
