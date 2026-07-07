@@ -33,6 +33,14 @@ app/
 - minSdk 21 / targetSdk 34
 - versionCode / versionName：`1` / `1.0`（发布时递增，见下方「版本与发布」）
 
+## UI 与设计
+
+- **Material You 风格**：圆润大圆角（24px）、实色分层 surface、柔和长阴影、主色驱动一切元素。
+- **深色 / 浅色兼容**：默认跟随系统 `prefers-color-scheme`；右上角按钮可手动切换并 localStorage 记忆；切换时同步 `meta theme-color`（影响安卓状态栏/导航栏配色）。
+- **动态取色（Android 12+）**：`MainActivity` 通过 `WallpaperManager.getWallpaperColors()` 读取壁纸主色，在 `onPageFinished` 用 `evaluateJavascript` 调用前端 `window.Pass2KDBXDynamic.apply({accent, accentHover, accentGlow})`，前端把主色写入 CSS 变量 `--accent*`，并据亮度自动算出 `--on-accent`（主色上的文字色），打 `data-dynamic="true"` 标记。
+  - **降级**：Android < 12 不支持壁纸取色，自动沿用默认主色（`--accent` 紫色基线），UI 不受影响。
+- 前端为 `web/index.html` 的固化副本（见上文「与网页版的关系」），UI 改动只落在 `app/src/main/assets/`。
+
 ## 本地构建
 
 需要：JDK 17、Android SDK（platforms;android-34、build-tools;34.0.0）、`aapt2`/`javac`/`d8`/`zipalign`/`apksigner` 在 PATH，`keytool` 可用。

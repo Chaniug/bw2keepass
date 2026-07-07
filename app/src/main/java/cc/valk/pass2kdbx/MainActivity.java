@@ -1,11 +1,14 @@
 package cc.valk.pass2kdbx;
 
 import android.app.Activity;
+import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Build;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.WebChromeClient;
@@ -15,7 +18,6 @@ import android.webkit.WebViewClient;
 import android.webkit.ValueCallback;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
-import android.os.Build;
 import android.webkit.PermissionRequest;
 import android.content.ActivityNotFoundException;
 import android.provider.MediaStore;
@@ -50,7 +52,16 @@ public class MainActivity extends Activity {
         settings.setUseWideViewPort(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // 页面加载完成后注入系统动态取色（Android 12+ 壁纸主色）
+                applyDynamicColor();
+                // 通知前端当前系统深浅模式，便于同步 theme-color / 状态栏
+                applySystemDarkMode(view);
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView wv, ValueCallback<Uri[]> fpc, FileChooserParams params) {
@@ -88,6 +99,66 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new FileSaver(this), "AndroidFileSaver");
 
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    // ============ Material You 动态取色（Android 12+）============
+    // 读取壁纸主色，扩展成 Material 风格的 primary / onPrimary / container 等，
+    // 通过 evaluateJavascript 注入到前端 CSS 变量。Android < 12 不支持时降级默认紫。
+    private void applyDynamicColor() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            Log.i(TAG, "Dynamic color not supported (< Android 12), using default purple");
+            return;
+        }
+        try {
+            WallpaperManager wm = WallpaperManager.getInstance(this);
+            if (wm == null) return;
+            android.app.WallpaperColors colors = wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM);
+            if (colors == null) return;
+            Color primary = colors.getPrimaryColor();
+            if (primary == null) return;
+            int argb = primary.toArgb();
+            injectColor(argb);
+        } catch (Exception e) {
+            Log.e(TAG, "applyDynamicColor error", e);
+        }
+    }
+
+    // 将取到的主色扩展为一组 Material 变量并注入前端
+    private void injectColor(int argb) {
+        int r = Color.red(argb), g = Color.green(argb), b = Color.blue(argb);
+        // 提亮/降暗派生 hover 与 glow
+        int hover = lighten(argb, 0.12f);
+        int glowR = r, glowG = g, glowB = b;
+        // container：主色 + 透明度混合到深色背景（前端用 rgba，这里给出带 alpha 的 hex）
+        String accent = String.format("#%02x%02x%02x", r, g, b);
+        String accentHover = String.format("#%02x%02x%02x", Color.red(hover), Color.green(hover), Color.blue(hover));
+        String glow = String.format("rgba(%d, %d, %d, 0.32)", r, g, b);
+        String js = String.format(
+            "if (window.Pass2KDBXDynamic && window.Pass2KDBXDynamic.apply) {"
+            + " window.Pass2KDBXDynamic.apply({accent:'%s', accentHover:'%s', accentGlow:'%s'}); }",
+            accent, accentHover, glow);
+        webView.evaluateJavascript(js, null);
+        Log.i(TAG, "Dynamic color injected: " + accent);
+    }
+
+    // 提亮颜色（向白色混合）
+    private static int lighten(int color, float factor) {
+        int r = Color.red(color), g = Color.green(color), b = Color.blue(color);
+        r = (int) (r + (255 - r) * factor);
+        g = (int) (g + (255 - g) * factor);
+        b = (int) (b + (255 - b) * factor);
+        return Color.argb(255, r, g, b);
+    }
+
+    // 同步系统深浅模式给前端（仅提示，前端自行决定是否跟随）
+    private void applySystemDarkMode(WebView view) {
+        int nightMode = getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        boolean isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        String js = "if (window.Pass2KDBXDynamic && window.Pass2KDBXDynamic.setSystemDark) {"
+                + " window.Pass2KDBXDynamic.setSystemDark(" + (isDark ? "true" : "false") + "); }";
+        view.evaluateJavascript(js, null);
+    }
     }
 
     // JavaScript 接口：处理文件下载
