@@ -70,6 +70,7 @@ Android APK 已从「CI 内联脚本临时拼装」升级为仓库内**固化、
 ## ✨ 功能特性
 
 - 🔁 **双向转换**：Bitwarden JSON ↔ KeePass KDBX，正向反向均支持
+- 🧩 **1Password 支持**：1Password 1PUX 导入与导出，与 Bitwarden 互转能力对等
 - 🔑 **Passkey 完整迁移**：FIDO2 / WebAuthn 凭据在 Bitwarden 与 KeePassXC 间无损迁移
 - 🔐 **密码保护导出**：KDBX → Bitwarden 可输出**密码保护加密 JSON**，与 Bitwarden 加密导出格式兼容，可被 Bitwarden 或本工具重新解密导入
 - 📊 **CSV 导出**：支持通用 / Bitwarden / KeePass 三种 CSV 格式
@@ -89,6 +90,13 @@ Android APK 已从「CI 内联脚本临时拼装」升级为仓库内**固化、
 | Passkey / FIDO2 | ✅ | ✅ |
 
 ---
+
+## 🧩 1Password 支持
+
+除了 Bitwarden，Pass2KDBX 也支持 1Password 导出：
+
+- **导入**：`export.1pux`（1Password 官方导出，ZIP 内含数据）或含 `accounts`/`items` 的 `.json`。CLI 会**自动识别**源格式，无需额外参数；兼容旧式 `overview`/`details` 结构与官方「平铺」结构。
+- **导出**：`--reverse --to 1password` 将 KeePass KDBX 导出为 1Password 1PUX（`.1pux`）。类别映射为 LOGIN / SECURE_NOTE / CREDIIT_CARD / IDENTITY / SSH_KEY；Passkey 因 1Password 官方导入格式不支持，会以备注形式保留，导入后请核对。
 
 ## 📦 命令行工具（Python）
 
@@ -118,6 +126,12 @@ python -m bw_to_keepass --reverse input.kdbx output.json \
 
 # KDBX → CSV 导出
 python -m bw_to_keepass --csv input.kdbx output.csv --password "your_password"
+
+# 1Password 1PUX → KeePass KDBX（自动识别 .1pux 或含 accounts 的 .json）
+python -m bw_to_keepass export.1pux output.kdbx --password "your_password"
+
+# KDBX → 1Password 1PUX（反向导出，使用 --to 1password）
+python -m bw_to_keepass --reverse --to 1password input.kdbx output.1pux --password "your_password"
 ```
 
 ### 命令行参数

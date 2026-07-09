@@ -21,6 +21,7 @@ import json
 from .parser import parse_bitwarden_export, peek_export_kind
 from .encrypted import EncryptedExportRequiresPassword, EncryptedExportError
 from .writer import write_keepass, print_summary
+from .onepassword import parse_1password_export, is_1password_data
 
 
 def main():
@@ -83,6 +84,12 @@ def main():
         help="加密导出的 salt 处理方式：utf8=用 salt 字符串的 UTF-8 字节做 KDF（默认，与 Bitwarden 官方一致，可被 Bitwarden 导入）；base64=用 salt 的 base64 解码字节（仅限本工具内部互转，Bitwarden 官方无法解密导入）",
     )
     parser.add_argument(
+        "--to",
+        choices=['bitwarden', '1password'],
+        default='bitwarden',
+        help="反向转换（KDBX→）的输出格式：bitwarden=Bitwarden JSON（默认）；1password=1Password 1PUX（.1pux）",
+    )
+    parser.add_argument(
         "--email",
         help="账户限制型加密导出解密用：Bitwarden 账户邮箱（配合主密码派生密钥）",
     )
@@ -124,7 +131,7 @@ def main():
     if args.reverse:
         # 反向转换：KDBX → Bitwarden JSON（可选加密导出）
         _do_reverse_convert(args.input, args.output, password, args.key_file,
-                            args.export_password, args.salt_mode)
+                            args.export_password, args.salt_mode, args.to)
     elif args.csv:
         # CSV 导出
         _do_csv_export(args.input, args.output, password, args.csv_format, args.key_file)
@@ -136,48 +143,34 @@ def main():
 
 def _do_forward_convert(input_path: str, output_path: str, password: str, db_name: str,
                         export_password: str | None = None, email: str | None = None):
-    """Bitwarden → KeePass 正向转换"""
+    """Bitwarden / 1Password → KeePass 正向转换（自动识别源格式）"""
     ext = os.path.splitext(input_path)[1].lower()
-    if ext not in ('.json', '.zip'):
-        print(f"错误: 不支持的输入格式 '{ext}'，需要 .json 或 .zip", file=sys.stderr)
-        sys.exit(1)
 
-    # 探测加密类型，决定需要哪种凭据（避免反复试错）
-    master_password = None
-    is_account = False
+    # ---- 自动识别源格式 ----
     try:
-        is_account = peek_export_kind(input_path).get('account', False)
-    except Exception:
-        is_account = False
-
-    print(f"\n正在解析: {input_path}")
-    try:
-        folders, items = parse_bitwarden_export(
-            input_path, export_password=export_password,
-            master_password=master_password, email=email)
-    except EncryptedExportRequiresPassword:
-        # 账户限制型加密导出：索取主密码 + 邮箱
-        if is_account:
-            if not email:
-                email = input("检测到 Bitwarden 账户限制型加密导出，请输入账户邮箱: ").strip()
-            if not email:
-                print("错误: 邮箱不能为空", file=sys.stderr)
-                sys.exit(1)
-            master_password = getpass.getpass("请输入 Bitwarden 账户主密码: ")
-            if not master_password:
-                print("错误: 主密码不能为空", file=sys.stderr)
-                sys.exit(1)
-            folders, items = parse_bitwarden_export(
-                input_path, master_password=master_password, email=email)
+        if ext == '.1pux':
+            print(f"\n正在解析 1Password 1PUX: {input_path}")
+            folders, items = parse_1password_export(input_path)
+        elif ext == '.json':
+            # JSON：先探测是否 1Password，否则按 Bitwarden 处理
+            try:
+                with open(input_path, 'r', encoding='utf-8') as f:
+                    probe = json.load(f)
+                if is_1password_data(probe):
+                    print(f"\n正在解析 1Password JSON: {input_path}")
+                    folders, items = parse_1password_export(input_path)
+                else:
+                    folders, items = _parse_bitwarden(input_path, export_password, email)
+            except EncryptedExportRequiresPassword:
+                folders, items = _parse_bitwarden(input_path, export_password, email)
+        elif ext == '.zip':
+            folders, items = _parse_bitwarden(input_path, export_password, email)
         else:
-            # 密码保护型加密导出：索取导出密码
-            if export_password:
-                raise
-            export_password = getpass.getpass("检测到 Bitwarden 加密导出，请输入导出密码: ")
-            folders, items = parse_bitwarden_export(input_path, export_password=export_password)
-    except EncryptedExportError as e:
-        print(f"错误: 加密导出解密失败: {e}", file=sys.stderr)
-        sys.exit(1)
+            print(f"错误: 不支持的输入格式 '{ext}'，需要 .json / .zip（Bitwarden）或 .1pux（1Password）", file=sys.stderr)
+            sys.exit(1)
+    except EncryptedExportRequiresPassword:
+        folders, items = _parse_bitwarden(input_path, export_password, email)
+
     print(f"找到 {len(folders)} 个文件夹, {len(items)} 个条目")
 
     print(f"\n正在生成 KeePass 数据库...")
@@ -194,13 +187,67 @@ def _do_forward_convert(input_path: str, output_path: str, password: str, db_nam
     print("可使用 KeePass 2.x 或 KeePassXC 打开此文件。\n")
 
 
+def _parse_bitwarden(input_path: str, export_password: str | None, email: str | None):
+    """解析 Bitwarden 导出（含加密导出交互式索取密码）"""
+    master_password = None
+    is_account = False
+    try:
+        is_account = peek_export_kind(input_path).get('account', False)
+    except Exception:
+        is_account = False
+
+    print(f"\n正在解析: {input_path}")
+    try:
+        return parse_bitwarden_export(
+            input_path, export_password=export_password,
+            master_password=master_password, email=email)
+    except EncryptedExportRequiresPassword:
+        if is_account:
+            if not email:
+                email = input("检测到 Bitwarden 账户限制型加密导出，请输入账户邮箱: ").strip()
+            if not email:
+                print("错误: 邮箱不能为空", file=sys.stderr)
+                sys.exit(1)
+            master_password = getpass.getpass("请输入 Bitwarden 账户主密码: ")
+            if not master_password:
+                print("错误: 主密码不能为空", file=sys.stderr)
+                sys.exit(1)
+            return parse_bitwarden_export(
+                input_path, master_password=master_password, email=email)
+        else:
+            if export_password:
+                raise
+            export_password = getpass.getpass("检测到 Bitwarden 加密导出，请输入导出密码: ")
+            return parse_bitwarden_export(input_path, export_password=export_password)
+
+
 def _do_reverse_convert(input_path: str, output_path: str, password: str, key_file: str | None,
-                         export_password: str | None = None, salt_mode: str = 'utf8'):
+                         export_password: str | None = None, salt_mode: str = 'utf8',
+                         to_format: str = 'bitwarden'):
     """KDBX → Bitwarden JSON 反向转换（可选加密导出）"""
     ext = os.path.splitext(input_path)[1].lower()
     if ext != '.kdbx':
         print(f"错误: 反向转换需要 .kdbx 文件，不支持 '{ext}'", file=sys.stderr)
         sys.exit(1)
+
+    # 反向导出为 1Password 1PUX
+    if to_format == '1password':
+        from .reverse_to_1password import kdbx_to_1password
+        print(f"\n正在加载 KDBX 数据库: {input_path}")
+        try:
+            stats = kdbx_to_1password(input_path, output_path, password, key_file)
+        except Exception as e:  # noqa: BLE001
+            print(f"错误: 无法导出 1Password 1PUX: {e}", file=sys.stderr)
+            sys.exit(1)
+        print("\n" + "=" * 50)
+        print("  反向转换完成（→ 1Password 1PUX）！")
+        print("=" * 50)
+        print(f"  总条目数: {stats['items']}")
+        print(f"  文件夹数: {stats['folders']}")
+        print("=" * 50)
+        print(f"\n文件已保存至: {os.path.abspath(output_path)}")
+        print("可在 1Password 中通过 文件 → 导入 → 1Password 1PUX 导入此文件。\n")
+        return
 
     from .reverse_converter import convert_kdbx_to_bitwarden
     from .encrypted import encrypt_bitwarden_export

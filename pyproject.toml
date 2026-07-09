@@ -4,7 +4,7 @@ build-backend = "setuptools"
 
 [project]
 name = "bw-to-keepass"
-version = "0.1.0"
+version = "0.1.1"
 description = "将 Bitwarden 导出 JSON 转换为 KeePass KDBX 格式"
 readme = "README.md"
 license = {text = "MIT"}
