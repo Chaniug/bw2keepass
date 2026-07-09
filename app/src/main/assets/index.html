@@ -767,6 +767,25 @@
                 <label class="md-switch"><input type="checkbox" id="encryptExport"><span class="track"></span><span class="thumb"></span></label>
             </div>
 
+            <!-- 导出格式（仅导出到 Bitwarden 方向） -->
+            <div id="exportFormatsCard" class="hidden" style="margin-top:0.5rem; padding-top:0.85rem; border-top:1px solid var(--border);">
+                <div class="sr-title" style="margin-bottom:0.6rem;">导出格式<span class="sr-tag">结果按所选格式提供</span></div>
+                <div class="switch-row">
+                    <div class="sr-text">
+                        <div class="sr-title">1Password 1PUX<span class="sr-tag">双向</span></div>
+                        <div class="sr-hint">结果页额外提供「下载 1Password 1PUX」，便于导入 1Password</div>
+                    </div>
+                    <label class="md-switch"><input type="checkbox" id="export1pux" checked><span class="track"></span><span class="thumb"></span></label>
+                </div>
+                <div class="switch-row" id="exportCsvRow">
+                    <div class="sr-text">
+                        <div class="sr-title">CSV 通用<span class="sr-tag">备选</span></div>
+                        <div class="sr-hint">提供 CSV 下载（Passkey 无法保留在 CSV 中）</div>
+                    </div>
+                    <label class="md-switch"><input type="checkbox" id="exportCsv" checked><span class="track"></span><span class="thumb"></span></label>
+                </div>
+            </div>
+
             <div id="encryptFields" class="hidden">
                 <div class="field" style="margin-top:0.75rem;">
                     <label for="exportPassword">导出密码</label>
@@ -902,6 +921,7 @@
         const faviconRow = $('faviconRow'), fetchFavicon = $('fetchFavicon');
         const passkeyRow = $('passkeyRow'), separatePasskey = $('separatePasskey');
         const encryptRow = $('encryptRow'), encryptExport = $('encryptExport'), encryptFields = $('encryptFields');
+        const exportFormatsCard = $('exportFormatsCard'), export1pux = $('export1pux'), exportCsv = $('exportCsv'), exportCsvRow = $('exportCsvRow');
         const exportPassword = $('exportPassword'), saltMode = $('saltMode');
         const newConvertBtn = $('newConvertBtn');
         const snackbar = $('snackbar');
@@ -971,6 +991,8 @@
             const isKdbx = direction === 'to-kdbx';
             faviconRow.classList.toggle('hidden', !isKdbx);
             encryptRow.classList.toggle('hidden', isKdbx);
+            // 导出格式选择器：仅「导出到 Bitwarden」方向显示
+            exportFormatsCard.classList.toggle('hidden', isKdbx);
             passkeyRow.classList.add('hidden');
             // accept
             fileInput.setAttribute('accept', isKdbx ? '.json,.csv,.zip,.1pux' : '.kdbx,.json,.csv,.zip,.1pux');
@@ -1062,6 +1084,8 @@
                     $('configDesc').textContent = '可勾选「加密导出」设置密码保护；不勾选则生成明文 JSON';
                     dbPasswordField.style.display = 'none';
                 }
+                // CSV 仅 KDBX 源可用，非 KDBX 源隐藏该选项
+                if (exportCsvRow) exportCsvRow.classList.toggle('hidden', ext !== 'kdbx');
             }
             updateConvertState();
         }
@@ -1144,6 +1168,8 @@
                 separatePasskey: separatePasskey.checked,
                 fetchFavicon: fetchFavicon.checked,
                 encryptExport: encryptExport.checked,
+                export1pux: export1pux.checked,
+                exportCsv: exportCsv.checked,
                 exportPassword: exportPassword.value,
                 saltMode: saltMode.value,
                 onProgress: onProgress,

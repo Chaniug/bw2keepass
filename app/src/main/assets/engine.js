@@ -1040,11 +1040,15 @@
     const downloads = [{ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.json', mime: 'application/json', data: new Blob([out.data], { type: 'application/json' }) }];
     const passkeyCount = bwItems.reduce((n, it) => n + (it.fido2Credentials && it.fido2Credentials.length ? it.fido2Credentials.length : 0), 0);
     const csvData = buildCSVFromBwItems(bwItems, bwFolders);
-    downloads.push({ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.csv', mime: 'text/csv', data: new Blob(['﻿' + csvData], { type: 'text/csv;charset=utf-8' }), csvNote: passkeyCount > 0 ? `${passkeyCount} 个 Passkey 无法保留在 CSV 中` : null });
-    // 1Password 1PUX 导出
-    const _1pData = generate1PUXExport(vault.items, vault.folders);
-    const _1pBlob = await build1PUXZip(_1pData);
-    downloads.push({ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.1pux', mime: 'application/zip', data: _1pBlob, _1puxNote: '1Password 官方 .1pux 格式' });
+    if (opts.exportCsv !== false) {
+      downloads.push({ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.csv', mime: 'text/csv', data: new Blob(['﻿' + csvData], { type: 'text/csv;charset=utf-8' }), csvNote: passkeyCount > 0 ? `${passkeyCount} 个 Passkey 无法保留在 CSV 中` : null });
+    }
+    // 1Password 1PUX 导出（受导出格式选择器控制；默认开启）
+    if (opts.export1pux !== false) {
+      const _1pData = generate1PUXExport(vault.items, vault.folders);
+      const _1pBlob = await build1PUXZip(_1pData);
+      downloads.push({ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.1pux', mime: 'application/zip', data: _1pBlob, _1puxNote: '1Password 官方 .1pux 格式' });
+    }
     const typeCount = {};
     for (const item of bwItems) { const tn = TYPE_NAMES[item.type] || '其他'; typeCount[tn] = (typeCount[tn] || 0) + 1; }
     return {
@@ -1137,11 +1141,15 @@
     const downloads = [{ name: file.name.replace(/\.kdbx$/i, '') + '.json', mime: 'application/json', data: new Blob([out.data], { type: 'application/json' }) }];
     const passkeyCount = bwItems.reduce((n, it) => n + (it.fido2Credentials && it.fido2Credentials.length ? it.fido2Credentials.length : 0), 0);
     const csvData = buildCSVFromBwItems(bwItems, folders);
-    downloads.push({ name: file.name.replace(/\.kdbx$/i, '') + '.csv', mime: 'text/csv', data: new Blob(['﻿' + csvData], { type: 'text/csv;charset=utf-8' }), csvNote: passkeyCount > 0 ? `${passkeyCount} 个 Passkey 无法保留在 CSV 中` : null });
-    // 1Password 1PUX 导出
-    const _1pData2 = generate1PUXExport(bwItems, folders);
-    const _1pBlob2 = await build1PUXZip(_1pData2);
-    downloads.push({ name: file.name.replace(/\.kdbx$/i, '') + '.1pux', mime: 'application/zip', data: _1pBlob2, _1puxNote: '1Password 官方 .1pux 格式' });
+    if (opts.exportCsv !== false) {
+      downloads.push({ name: file.name.replace(/\.kdbx$/i, '') + '.csv', mime: 'text/csv', data: new Blob(['﻿' + csvData], { type: 'text/csv;charset=utf-8' }), csvNote: passkeyCount > 0 ? `${passkeyCount} 个 Passkey 无法保留在 CSV 中` : null });
+    }
+    // 1Password 1PUX 导出（受导出格式选择器控制；默认开启）
+    if (opts.export1pux !== false) {
+      const _1pData2 = generate1PUXExport(bwItems, folders);
+      const _1pBlob2 = await build1PUXZip(_1pData2);
+      downloads.push({ name: file.name.replace(/\.kdbx$/i, '') + '.1pux', mime: 'application/zip', data: _1pBlob2, _1puxNote: '1Password 官方 .1pux 格式' });
+    }
     const typeCount = {};
     for (const item of bwItems) { const tn = TYPE_NAMES[item.type] || '其他'; typeCount[tn] = (typeCount[tn] || 0) + 1; }
     return {
