@@ -37,7 +37,7 @@ jobs:
             ${{ env.ANDROID_HOME }}/platforms
             ${{ env.ANDROID_HOME }}/build-tools
             ${{ env.ANDROID_HOME }}/platform-tools
-          key: android-sdk-v1
+          key: android-sdk-v2
 
       - name: Setup Android SDK
         if: steps.sdk-cache.outputs.cache-hit != 'true'
@@ -45,9 +45,13 @@ jobs:
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
           curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
-          unzip -q tools.zip
+          unzip -q -o tools.zip
+          # 幂等：清除可能由缓存部分恢复残留的 latest 目录，避免 mv 非空冲突
+          rm -rf latest
           mv cmdline-tools latest
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          # 清理可能因缓存部分恢复残留的目标目录，确保 sdkmanager 重新干净安装
+          rm -rf $ANDROID_HOME/platforms/android-34 $ANDROID_HOME/build-tools/34.0.0 $ANDROID_HOME/platform-tools
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Verify Android project (固化的 app/ 工程)
