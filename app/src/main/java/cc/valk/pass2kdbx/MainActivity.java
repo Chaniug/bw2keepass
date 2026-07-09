@@ -4,11 +4,15 @@ import android.app.Activity;
 import android.app.WallpaperManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Build;
+import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.WebChromeClient;
@@ -36,7 +40,28 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 沉浸式状态栏：将状态栏设为透明，内容可延伸到状态栏之下
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = getWindow();
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.setStatusBarColor(Color.TRANSPARENT);
+            // 浅色背景下让状态栏图标/文字为深色（仅 Android M+ 可控，早期用默认浅色图标）
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+            } else {
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+            }
+        }
+
         webView = new WebView(this);
+        // 让 WebView 内容绘制到状态栏之下（配合前端 safe-area 内边距）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            webView.setFitsSystemWindows(false);
+        }
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
@@ -185,12 +210,34 @@ public class MainActivity extends Activity {
 
     // 同步系统深浅模式给前端（仅提示，前端自行决定是否跟随）
     private void applySystemDarkMode(WebView view) {
-        int nightMode = getResources().getConfiguration().uiMode
-                & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
-        boolean isDark = nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        boolean isDark = isSystemDark();
+        syncStatusBarIcon(isDark);
         String js = "if (window.Pass2KDBXDynamic && window.Pass2KDBXDynamic.setSystemDark) {"
                 + " window.Pass2KDBXDynamic.setSystemDark(" + (isDark ? "true" : "false") + "); }";
         view.evaluateJavascript(js, null);
+    }
+
+    // 读取当前系统是否为深色模式
+    private boolean isSystemDark() {
+        int nightMode = getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+        return nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    // 根据当前是否为深色背景，调整状态栏图标/文字的颜色（浅色背景→深色图标，深色背景→浅色图标）
+    private void syncStatusBarIcon(boolean isDark) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return; // 早版本无法控制图标色
+        Window window = getWindow();
+        View decor = window.getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        if (isDark) {
+            // 深色背景：移除 LIGHT_STATUS_BAR，使状态栏图标为浅色
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        } else {
+            // 浅色背景：加 LIGHT_STATUS_BAR，使状态栏图标为深色
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        decor.setSystemUiVisibility(flags);
     }
 
     // JavaScript 接口：处理文件下载
@@ -271,6 +318,15 @@ public class MainActivity extends Activity {
             webView.goBack();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    // 实时跟随系统深浅模式切换（需在 Manifest 声明 android:configChanges="uiMode"）
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (webView != null) {
+            applySystemDarkMode(webView);
         }
     }
 
