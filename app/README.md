@@ -27,7 +27,7 @@ app/
 ## 与网页版的关系
 
 - **App 前端已从网页版独立**：`assets/index.html` 是一套**全新的 Material Design 3（MD3）界面**，目标是有别于网页端的「现代化安卓 App」观感（大圆角、surface 分层、Material 开关/分段控件、FAB、Snackbar、Bottom Sheet、动态取色）。
-- **逻辑层复用**：转换核心抽离为 `assets/engine.js`（无 DOM 的纯函数），通过 `window.Pass2KDBXEngine.run(opts)` 暴露，UI 仅负责交互与渲染，保持与网页版**功能对等**（Bitwarden/KeePass/1Password/CSV、Passkey 分离、favicon、加密导出等）。
+- **逻辑层复用**：转换核心抽离为 `assets/engine.js`（无 DOM 的纯函数），通过 `window.Pass2KDBXEngine.run(opts)` 暴露，UI 仅负责交互与渲染，保持与网页版**功能对等**（Bitwarden/KeePass/1Password/CSV 双向转换、Passkey 分离、favicon、加密导出等）。1Password 支持官方 .1pux 平铺结构（fields/sections/urls）与旧式 overview/details 双兼容，反向导出 KDBX → 1Password .1pux 也已支持。
 - **依赖本地化**：`kdbxweb` / `hash-wasm(Argon2)` / `JSZip` 已下载至 `assets/vendor/`，WebView 在 `file://` 下**完全离线**运行，不再依赖 CDN。
 - **已移除 web 专用产物**：`sw.js`、`CNAME`、`manifest.json`、`debug-test.html` 等与 WebView 无关的文件不再随 App 打包。
 

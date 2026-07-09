@@ -368,6 +368,11 @@
     return { folders, items };
   }
   function convert1PUXItem(item) {
+    // 官方平铺结构（item 顶层有 fields/sections/urls 而非 overview/details）
+    if (!item.overview && !item.details && (item.fields || item.sections || item.urls)) {
+      return convert1PUXFlatItem(item);
+    }
+    // 旧式 overview/details 结构（对齐前端原有逻辑）
     const overview = item.overview || {};
     const details = item.details || {};
     const parsed = { name: overview.title || overview.ainfo || '未命名', type: 1, notes: '', folderId: null, favorite: overview.favorite || false };
@@ -427,6 +432,70 @@
     if (overview.tags && overview.tags.length) parsed.customFields.push({ name: '_TAGS', value: overview.tags.join(', '), type: 0 });
     if (item.created_at || overview.created) parsed.creationDate = item.created_at || overview.created || '';
     if (item.updated_at || overview.updated) parsed.revisionDate = item.updated_at || overview.updated || '';
+    return parsed;
+  }
+
+  // 官方平铺结构解析器（item 顶层 fields/sections/urls，1Password 6+ 标准导出格式）
+  function convert1PUXFlatItem(item) {
+    const category = (item.category || '').toUpperCase();
+    const parsed = { name: item.name || item.title || '未命名', type: 1, notes: '', folderId: item.folderUuid || null, favorite: item.favorite || false };
+    const fields = item.fields || [];
+    const sections = item.sections || [];
+    const uris = []; if (item.urls) for (const u of item.urls) if (u.url) uris.push({ uri: u.url });
+
+    if (category === 'LOGIN' || category === 'PASSWORD' || !category) {
+      parsed.type = 1; parsed.login = { username: '', password: '', uris: uris, totp: '' };
+      for (const f of fields) {
+        if (f.designation === 'username' && f.value) parsed.login.username = f.value;
+        else if (f.designation === 'password' && f.value) parsed.login.password = f.value;
+      }
+      for (const s of sections) if (s.fields) for (const f of s.fields) {
+        if (f.k === 'TOTP' && f.v) parsed.login.totp = f.v;
+      }
+    } else if (category === 'SECURE_NOTE' || category === 'NOTE') {
+      parsed.type = 2; parsed.login = null;
+    } else if (category === 'CREDIT_CARD' || category === 'BANK_ACCOUNT') {
+      parsed.type = 3; parsed.login = null; parsed.card = {};
+      for (const s of sections) if (s.fields) for (const f of s.fields) {
+        const n = ((f.name || f.n || f.t || '').toLowerCase()); const v = f.value || f.v || '';
+        if (n.includes('cardholder') || n.includes('name')) parsed.card.cardholderName = v;
+        if (n.includes('number') || n.includes('ccnum')) parsed.card.number = v;
+        if (n.includes('expir') || n.includes('exp')) { const exp = v.split('/'); parsed.card.expMonth = exp[0] || ''; parsed.card.expYear = exp[1] || ''; }
+        if (n.includes('cvv') || n.includes('cvc') || n.includes('security')) parsed.card.code = v;
+        if (n.includes('type') || n.includes('brand')) parsed.card.brand = v;
+      }
+    } else if (category === 'IDENTITY') {
+      parsed.type = 4; parsed.login = null; parsed.identity = {};
+      for (const s of sections) if (s.fields) for (const f of s.fields) {
+        const n = ((f.name || f.n || f.t || '').toLowerCase()); const v = f.value || f.v || '';
+        if (n.includes('first')) parsed.identity.firstName = (parsed.identity.firstName || '') + ' ' + v;
+        if (n.includes('last')) parsed.identity.lastName = v;
+        if (n.includes('email')) parsed.identity.email = v;
+        if (n.includes('phone')) parsed.identity.phone = v;
+        if (n.includes('address')) parsed.identity.address1 = v;
+        if (n.includes('city')) parsed.identity.city = v;
+        if (n.includes('state')) parsed.identity.state = v;
+        if (n.includes('zip') || n.includes('postal')) parsed.identity.postalCode = v;
+        if (n.includes('country')) parsed.identity.country = v;
+      }
+    } else {
+      parsed.type = 1; parsed.login = { username: '', password: '', uris: uris, totp: '' };
+    }
+    // 备注
+    for (const s of sections) if (s.fields) for (const f of s.fields) {
+      if (!f.value && !f.v) continue;
+      const n = ((f.name || f.n || '').toLowerCase());
+      if (n === 'notesplain') parsed.notes = f.value || f.v || '';
+    }
+    // 自定义字段
+    parsed.customFields = [];
+    for (const s of sections) if (s.fields) for (const f of s.fields) {
+      const n = f.name || f.n || f.t || f.k || ''; const v = f.value || f.v || '';
+      if (n && v && n !== 'notesPlain' && n !== 'password' && n !== 'username') parsed.customFields.push({ name: n, value: String(v), type: 0 });
+    }
+    if (item.tags && item.tags.length) parsed.customFields.push({ name: '_TAGS', value: item.tags.join(', '), type: 0 });
+    if (item.createdAt) parsed.creationDate = item.createdAt;
+    if (item.updatedAt) parsed.revisionDate = item.updatedAt;
     return parsed;
   }
 
@@ -533,7 +602,7 @@
     const JSZip = global.JSZip || await import('vendor/jszip.min.js');
     const zip = await (JSZip.default || JSZip).loadAsync(file);
     const items = [], folders = [];
-    const dataFiles = Object.keys(zip.files).filter(name => name.match(/\/data\/[^/]+\.json$/) && !name.includes('__MACOSX'));
+    const dataFiles = Object.keys(zip.files).filter(name => name.match(/\/data\/[^/]+\.(json|1pif)$/) && !name.includes('__MACOSX'));
     for (const dataFile of dataFiles) {
       try {
         const content = await zip.files[dataFile].async('string');
@@ -972,6 +1041,10 @@
     const passkeyCount = bwItems.reduce((n, it) => n + (it.fido2Credentials && it.fido2Credentials.length ? it.fido2Credentials.length : 0), 0);
     const csvData = buildCSVFromBwItems(bwItems, bwFolders);
     downloads.push({ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.csv', mime: 'text/csv', data: new Blob(['﻿' + csvData], { type: 'text/csv;charset=utf-8' }), csvNote: passkeyCount > 0 ? `${passkeyCount} 个 Passkey 无法保留在 CSV 中` : null });
+    // 1Password 1PUX 导出
+    const _1pData = generate1PUXExport(vault.items, vault.folders);
+    const _1pBlob = await build1PUXZip(_1pData);
+    downloads.push({ name: opts.file.name.replace(/\.(json|zip|csv|1pux)$/i, '') + '.1pux', mime: 'application/zip', data: _1pBlob, _1puxNote: '1Password 官方 .1pux 格式' });
     const typeCount = {};
     for (const item of bwItems) { const tn = TYPE_NAMES[item.type] || '其他'; typeCount[tn] = (typeCount[tn] || 0) + 1; }
     return {
@@ -1065,6 +1138,10 @@
     const passkeyCount = bwItems.reduce((n, it) => n + (it.fido2Credentials && it.fido2Credentials.length ? it.fido2Credentials.length : 0), 0);
     const csvData = buildCSVFromBwItems(bwItems, folders);
     downloads.push({ name: file.name.replace(/\.kdbx$/i, '') + '.csv', mime: 'text/csv', data: new Blob(['﻿' + csvData], { type: 'text/csv;charset=utf-8' }), csvNote: passkeyCount > 0 ? `${passkeyCount} 个 Passkey 无法保留在 CSV 中` : null });
+    // 1Password 1PUX 导出
+    const _1pData2 = generate1PUXExport(bwItems, folders);
+    const _1pBlob2 = await build1PUXZip(_1pData2);
+    downloads.push({ name: file.name.replace(/\.kdbx$/i, '') + '.1pux', mime: 'application/zip', data: _1pBlob2, _1puxNote: '1Password 官方 .1pux 格式' });
     const typeCount = {};
     for (const item of bwItems) { const tn = TYPE_NAMES[item.type] || '其他'; typeCount[tn] = (typeCount[tn] || 0) + 1; }
     return {
@@ -1327,6 +1404,88 @@
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
 
+  // ========== 1PUX 导出（KDBX / 其他格式 → 1Password 1PUX）==========
+  function generate1PUXExport(items, folders) {
+    const fuuid = () => generateUUID();
+    const now = new Date().toISOString();
+    const accountUuid = fuuid();
+    const folderMap = new Map();
+    const f1p = [];
+    for (const f of (folders || [])) { const u = fuuid(); folderMap.set(f.id, u); f1p.push({ uuid: u, name: f.name }); }
+
+    const i1p = [];
+    for (const item of items) {
+      if (item.deleted) continue;
+      const cat = ['', 'LOGIN', 'SECURE_NOTE', 'CREDIT_CARD', 'IDENTITY'][item.type] || 'LOGIN';
+      const ituuid = fuuid();
+      const urls = [];
+      const fields = [];
+      const sections = [];
+
+      if (item.type === 1 && item.login) {
+        if (item.login.username) fields.push({ id: fuuid(), type: 'T', name: 'username', value: item.login.username, designation: 'username' });
+        if (item.login.password) fields.push({ id: fuuid(), type: 'P', name: 'password', value: item.login.password, designation: 'password' });
+        if (item.login.uris) for (const u of item.login.uris) if (u.uri) urls.push({ url: u.uri });
+        if (item.login.totp) sections.push({ id: fuuid(), name: '', fields: [{ id: fuuid(), type: 'OTP', name: 'TOTP', value: item.login.totp, k: 'TOTP' }] });
+      } else if (item.type === 3 && item.card) {
+        const cf = [];
+        if (item.card.cardholderName) cf.push({ id: fuuid(), type: 'T', name: 'cardholder name', value: item.card.cardholderName });
+        if (item.card.number) cf.push({ id: fuuid(), type: 'T', name: 'ccnum', value: item.card.number });
+        if (item.card.expMonth || item.card.expYear) cf.push({ id: fuuid(), type: 'T', name: 'expiry', value: (item.card.expMonth || '') + '/' + (item.card.expYear || '') });
+        if (item.card.code) cf.push({ id: fuuid(), type: 'T', name: 'cvv', value: item.card.code });
+        if (item.card.brand) cf.push({ id: fuuid(), type: 'T', name: 'type', value: item.card.brand });
+        if (cf.length) sections.push({ id: fuuid(), name: 'Credit Card', fields: cf });
+      } else if (item.type === 4 && item.identity) {
+        const idf = [];
+        if (item.identity.firstName) idf.push({ id: fuuid(), type: 'T', name: 'first name', value: item.identity.firstName });
+        if (item.identity.lastName) idf.push({ id: fuuid(), type: 'T', name: 'last name', value: item.identity.lastName });
+        if (item.identity.email) idf.push({ id: fuuid(), type: 'T', name: 'email', value: item.identity.email });
+        if (item.identity.phone) idf.push({ id: fuuid(), type: 'T', name: 'phone', value: item.identity.phone });
+        if (item.identity.address1) idf.push({ id: fuuid(), type: 'T', name: 'address', value: item.identity.address1 });
+        if (item.identity.city) idf.push({ id: fuuid(), type: 'T', name: 'city', value: item.identity.city });
+        if (item.identity.state) idf.push({ id: fuuid(), type: 'T', name: 'state', value: item.identity.state });
+        if (item.identity.postalCode) idf.push({ id: fuuid(), type: 'T', name: 'zip', value: item.identity.postalCode });
+        if (item.identity.country) idf.push({ id: fuuid(), type: 'T', name: 'country', value: item.identity.country });
+        if (idf.length) sections.push({ id: fuuid(), name: 'Identification', fields: idf });
+      }
+      // 备注
+      if (item.notes) {
+        let ns = sections.find(s => s.name === '');
+        if (!ns) { ns = { id: fuuid(), name: '', fields: [] }; sections.push(ns); }
+        ns.fields.push({ id: fuuid(), type: 'note', name: 'notesPlain', value: item.notes });
+      }
+      // 自定义字段（跳过内部标签）
+      if (item.customFields && item.customFields.length) {
+        let ns = sections.find(s => s.name === '');
+        if (!ns) { ns = { id: fuuid(), name: '', fields: [] }; sections.push(ns); }
+        for (const cf of item.customFields) {
+          if (cf.name === '_TAGS') continue;
+          ns.fields.push({ id: fuuid(), type: 'T', name: cf.name, value: String(cf.value || '') });
+        }
+      }
+      // Passkey 以备注形式保留
+      if (item.fido2Credentials && item.fido2Credentials.length) {
+        let ns = sections.find(s => s.name === '');
+        if (!ns) { ns = { id: fuuid(), name: '', fields: [] }; sections.push(ns); }
+        for (const fc of item.fido2Credentials) {
+          ns.fields.push({ id: fuuid(), type: 'note', name: 'Passkey', value: 'rpId=' + (fc.rpId || '') + ' credentialId=' + (fc.credentialId || '') + ' userName=' + (fc.userName || '') });
+        }
+      }
+      const fUuid = item.folderId && folderMap.has(item.folderId) ? folderMap.get(item.folderId) : null;
+      const i = { uuid: ituuid, category: cat, name: item.name || '未命名', favorite: item.favorite || false, trashed: 'N', createdAt: item.creationDate || now, updatedAt: item.revisionDate || now, urls: urls, fields: fields, sections: sections };
+      if (fUuid) i.folderUuid = fUuid;
+      i1p.push(i);
+    }
+    return { accounts: [{ uuid: accountUuid, name: 'Exported Vault' }], folders: f1p, items: i1p };
+  }
+
+  async function build1PUXZip(data) {
+    const JSZip = global.JSZip || await import('vendor/jszip.min.js');
+    const zip = new ((JSZip.default || JSZip)());
+    zip.file('data/1password.1pif', JSON.stringify(data));
+    return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  }
+
   async function run(opts) {
     const E = global.Pass2KDBXEngine;
     if (opts.direction === 'to-kdbx') return await convertToKdbx(opts, E);
@@ -1338,7 +1497,7 @@
     generateUUID, parseBitwardenJson, parse1PUXJSON, parse1PUX, parseCSV, readZipFile, readZipJsonData,
     isBitwardenEncryptedJson, decryptBitwardenEncryptedJson, encryptBitwardenExport,
     buildNotes, buildCustomFields, buildTags, buildPasskeyFile, extractPasskeysFromFields,
-    run, maybeEncryptBW, convertVaultItemToBW,
+    run, maybeEncryptBW, convertVaultItemToBW, generate1PUXExport, build1PUXZip,
     get argon2Ready() { return argon2Ready; },
     Kdbx, Credentials, ProtectedValue, Consts, KdbxUuid
   };

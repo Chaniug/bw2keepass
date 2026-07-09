@@ -1202,8 +1202,8 @@
                 const item = document.createElement('button');
                 item.className = 'download-item';
                 const ext = (d.name.split('.').pop() || '').toLowerCase();
-                const iconId = ext === 'kdbx' ? 'ic-db' : (ext === 'csv' ? 'ic-csv' : (ext === 'zip' ? 'ic-zip' : 'ic-box'));
-                const warn = d.csvNote ? `<div class="di-note"><svg style="width:12px;height:12px;vertical-align:-1px;"><use href="#ic-warn"/></svg> ${d.csvNote}</div>` : '';
+                const iconId = ext === 'kdbx' ? 'ic-db' : (ext === 'csv' ? 'ic-csv' : (ext === 'zip' ? 'ic-zip' : (ext === '1pux' ? 'ic-box' : 'ic-box')));
+                const warn = d.csvNote ? `<div class="di-note"><svg style="width:12px;height:12px;vertical-align:-1px;"><use href="#ic-warn"/></svg> ${d.csvNote}</div>` : (d._1puxNote ? `<div class="di-note" style="color:var(--md-primary);">${d._1puxNote}</div>` : '');
                 item.innerHTML = `<span class="di-icon"><svg><use href="#${iconId}"/></svg></span><div style="flex:1;min-width:0;"><div class="di-name">${d.name}</div>${warn}</div><span class="di-cta"><svg><use href="#ic-download"/></svg>下载</span>`;
                 item.addEventListener('click', () => downloadBlob(d.data, d.name, d.mime));
                 downloadList.appendChild(item);
