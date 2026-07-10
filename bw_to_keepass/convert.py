@@ -366,7 +366,7 @@ def convert(
         fmt = raw.lower()
         if fmt == 'bitwarden':
             fmt = 'json'
-        dp = db_password or password if fmt == 'kdbx' else None
+        dp = db_password if fmt == 'kdbx' else None
         out[fmt] = render_target(
             folders, items, fmt,
             db_password=dp, export_password=export_password,

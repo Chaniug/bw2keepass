@@ -1444,7 +1444,11 @@
   }
 
   async function writeVaultToKdbx(vault, opts, E) {
-    const { dbPassword, dbName, separatePasskey, fetchFavicon, onProgress } = opts;
+    let { dbPassword, dbName, separatePasskey, fetchFavicon, onProgress } = opts;
+    // 防御：确保 KDBX 密码已设置且不为空，避免静默回退到源密码
+    if (typeof dbPassword !== 'string' || !dbPassword.trim()) {
+      throw new Error('writeVaultToKdbx 未收到有效的 dbPassword');
+    }
     const report = (t) => onProgress && onProgress(t);
     report(`正在生成 KDBX（${vault.items.filter(i => !i.deleted).length} 个条目）...`);
     const credentials = new Credentials(ProtectedValue.fromString(dbPassword));
