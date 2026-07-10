@@ -405,7 +405,7 @@
         .app-bar .brand .logo {
             width: 42px; height: 42px; border-radius: 14px; flex-shrink: 0;
             display: grid; place-items: center;
-            background: linear-gradient(145deg, color-mix(in srgb, var(--md-primary) 88%, #fff), color-mix(in srgb, var(--md-primary) 70%, #fff));
+            background: var(--md-primary);
             color: var(--md-on-primary);
             box-shadow: 0 2px 10px color-mix(in srgb, var(--md-primary) 28%, transparent), 0 0 0 1px var(--glass-border) inset;
         }
@@ -645,7 +645,8 @@
         .md-switch input:checked + .track + .thumb { left: 27px; background: var(--md-on-primary); }
 
         /* ===================== 目标格式网格（传出）===================== */
-        .target-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin-top: .5rem; }
+        /* 使用 auto-fit 让窄屏自动单列，避免文字被截断 */
+        .target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .6rem; margin-top: .5rem; }
         .target-chip {
             display: flex; align-items: center; gap: .65rem; text-align: left; cursor: pointer;
             background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
@@ -952,6 +953,26 @@
         .hidden { display: none !important; }
         .fade-in { animation: fadeIn .3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+        /* ===================== 窄屏响应式修复 ===================== */
+        @media (max-width: 420px) {
+            .target-grid { grid-template-columns: 1fr; }
+            .target-chip { padding: .7rem .75rem; gap: .55rem; }
+            .target-chip .tc-icon { width: 38px; height: 38px; border-radius: 10px; }
+            .target-chip .tc-icon svg { width: 18px; height: 18px; }
+            .target-chip .tc-label { font-size: .92rem; line-height: 1.25; }
+            .target-chip .tc-tag { font-size: .58rem; padding: .06rem .35rem; margin-left: .2rem; }
+            .target-chip .tc-check { width: 20px; height: 20px; }
+
+            .preview-grid { grid-template-columns: repeat(2, 1fr); }
+            .preview-grid > .pv-cell:first-child { grid-column: 1 / -1; }
+            .pv-cell { padding: .7rem .4rem; }
+            .pv-num { font-size: 1.05rem; }
+
+            .stat-grid { grid-template-columns: 1fr; }
+            .stat-chip { padding: .7rem .6rem; }
+            .stat-num { font-size: 1.25rem; }
+        }
     </style>
 </head>
 <body>
