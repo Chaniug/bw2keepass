@@ -261,9 +261,9 @@
         .dropzone .dz-icon {
             width: 68px; height: 68px; margin: 0 auto; border-radius: 20px;
             display: grid; place-items: center;
-            background: color-mix(in srgb, var(--md-primary) 20%, transparent);
+            background: color-mix(in srgb, var(--md-primary-container) 55%, var(--md-surface));
             border: 1px solid var(--glass-border);
-            color: var(--md-primary);
+            color: var(--md-on-primary-container);
             box-shadow: 0 2px 12px color-mix(in srgb, var(--md-primary) 18%, transparent);
             transition: transform .25s cubic-bezier(.175,.885,.32,1.275), box-shadow .25s;
         }
@@ -286,9 +286,9 @@
         .file-chip:active { transform: scale(.99); }
         .file-chip .fc-icon {
             width: 44px; height: 44px; flex-shrink: 0; border-radius: 13px;
-            display: grid; place-items: center; color: var(--md-primary);
-            background: color-mix(in srgb, var(--md-primary) 18%, transparent);
-            border: 1px solid color-mix(in srgb, var(--md-primary) 20%, var(--glass-border));
+            display: grid; place-items: center; color: var(--md-on-primary-container);
+            background: color-mix(in srgb, var(--md-primary-container) 50%, var(--md-surface));
+            border: 1px solid color-mix(in srgb, var(--md-primary) 18%, var(--glass-border));
         }
         .file-chip .fc-icon svg { width: 22px; height: 22px; }
         .file-chip .fc-info { flex: 1; min-width: 0; }
@@ -414,13 +414,13 @@
             -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); position: relative;
         }
         .target-chip:active { transform: scale(.98); }
-        .target-chip .tc-icon { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; color: var(--md-primary); background: color-mix(in srgb, var(--md-primary) 18%, transparent); border: 1px solid color-mix(in srgb, var(--md-primary) 18%, var(--glass-border)); }
+        .target-chip .tc-icon { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; color: var(--md-on-primary-container); background: color-mix(in srgb, var(--md-primary-container) 50%, var(--md-surface)); border: 1px solid color-mix(in srgb, var(--md-primary) 18%, var(--glass-border)); }
         .target-chip .tc-icon svg { width: 20px; height: 20px; }
         .target-chip .tc-label { font: var(--md-body-large); font-weight: 600; flex: 1; min-width: 0; }
         .target-chip .tc-tag { font: var(--md-label); font-weight: 700; font-size: .62rem; background: color-mix(in srgb, var(--md-tertiary) 24%, transparent); color: var(--md-on-surface); border-radius: var(--md-corner-full); padding: .08rem .45rem; margin-left: .3rem; }
         .target-chip .tc-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--md-outline-variant); flex-shrink: 0; display: grid; place-items: center; transition: background .15s, border-color .15s; }
         .target-chip .tc-check svg { width: 13px; height: 13px; opacity: 0; color: var(--md-on-primary); transition: opacity .15s; }
-        .target-chip.selected { border-color: color-mix(in srgb, var(--md-primary) 65%, var(--glass-border)); background: color-mix(in srgb, var(--md-primary) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 20%, transparent), 0 2px 8px color-mix(in srgb, var(--md-primary) 14%, transparent); }
+        .target-chip.selected { border-color: var(--md-primary); background: color-mix(in srgb, var(--md-primary-container) 40%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent), 0 2px 8px color-mix(in srgb, var(--md-primary) 12%, transparent); }
         .target-chip.selected .tc-check { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary)); border-color: transparent; }
         .target-chip.selected .tc-check svg { opacity: 1; }
 
@@ -578,8 +578,8 @@
         .download-item:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
         .download-item .di-icon {
             flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
-            display: grid; place-items: center; color: var(--md-primary);
-            background: color-mix(in srgb, var(--md-primary) 18%, transparent);
+            display: grid; place-items: center; color: var(--md-on-primary-container);
+            background: color-mix(in srgb, var(--md-primary-container) 50%, var(--md-surface));
             border: 1px solid color-mix(in srgb, var(--md-primary) 18%, var(--glass-border));
         }
         .download-item .di-icon svg { width: 22px; height: 22px; }
@@ -640,12 +640,13 @@
         .about-list { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.5rem; }
         .about-item { display: flex; align-items: center; gap: 0.85rem; padding: 0.85rem 0.25rem; border-bottom: 1px solid var(--glass-border); }
         .about-item .ai-icon {
-            width: 36px; height: 36px; flex-shrink: 0; border-radius: 11px;
+            width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px;
             display: grid; place-items: center; color: var(--md-primary);
-            background: color-mix(in srgb, var(--md-primary) 16%, transparent);
+            /* 用 primary-container 而非 raw primary，动态取色下不会发黄 */
+            background: color-mix(in srgb, var(--md-primary-container) 55%, var(--md-surface));
             border: 1px solid var(--glass-border);
         }
-        .about-item .ai-icon svg { width: 19px; height: 19px; }
+        .about-item .ai-icon svg { width: 20px; height: 20px; }
         .about-item .ai-title { font: var(--md-body-large); }
         .about-item .ai-sub { font: var(--md-label); font-weight: 400; color: var(--md-on-surface-variant); }
         .about-item:last-child { border-bottom: none; }
@@ -657,9 +658,27 @@
             transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
             -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
         }
-        .theme-options button:hover { background: color-mix(in srgb, var(--md-primary) 12%, transparent); }
-        .theme-options button.active { border-color: var(--md-primary); color: var(--md-primary); background: color-mix(in srgb, var(--md-primary) 18%, transparent); box-shadow: 0 1px 0 var(--glass-hi) inset; }
+        .theme-options button:hover { background: color-mix(in srgb, var(--md-primary-container) 40%, var(--md-surface)); }
+        /* active 状态用 primary-container（浅中性）而非 raw primary（动态取色可能发黄）*/
+        .theme-options button.active {
+            border-color: var(--md-primary); color: var(--md-on-primary-container);
+            background: color-mix(in srgb, var(--md-primary-container) 70%, var(--md-surface));
+            box-shadow: 0 1px 0 var(--glass-hi) inset;
+        }
         .theme-options button:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+
+        /* Sheet 内的主按钮降级：不用全宽 primary 渐变（动态取色下可能发黄），改用 tonal 风格 */
+        .sheet .btn-primary {
+            background: color-mix(in srgb, var(--md-primary-container) 65%, var(--md-surface));
+            color: var(--md-on-primary-container);
+            border: 1px solid var(--glass-border);
+            box-shadow: none;
+        }
+        .sheet .btn-primary:hover {
+            background: color-mix(in srgb, var(--md-primary-container) 80%, var(--md-surface));
+            box-shadow: var(--glass-shadow-sm);
+        }
+        .sheet .btn-primary:active { transform: scale(.98); }
 
         .hidden { display: none !important; }
         .fade-in { animation: fadeIn .3s ease; }
