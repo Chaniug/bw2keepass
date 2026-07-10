@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 旧版启动器（API 21-25）自带图标：圆角深色底 + 白色挂锁 -->
+    <path android:pathData="M20,4 L88,4 A16,16 0 0 1 104,20 L104,88 A16,16 0 0 1 88,104 L20,104 A16,16 0 0 1 4,88 L4,20 A16,16 0 0 1 20,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0" android:startY="0"
+                android:endX="108" android:endY="108"
+                android:startColor="#23242B"
+                android:endColor="#050507" />
+        </aapt:attr>
+    </path>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M45,52 L45,45 A9,9 0 0 1 63,45 L63,52" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,50 L66,50 A8,8 0 0 1 74,58 L74,76 A8,8 0 0 1 66,84 L42,84 A8,8 0 0 1 34,76 L34,58 A8,8 0 0 1 42,50 Z" />
+    <path
+        android:strokeColor="#16171E"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M46,63 L60,63 M56.5,59.5 L60,63 L56.5,66.5" />
+    <path
+        android:strokeColor="#16171E"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M62,71 L48,71 M51.5,67.5 L48,71 L51.5,74.5" />
+</vector>

@@ -102,6 +102,86 @@
             --md-success-container: #a6f4c2;
         }
 
+        /* ===================================================================
+           App 端：纯黑 / 纯白 极简主题
+           仅当运行在 Android WebView 内（JS 检测到原生桥接后设置 data-app）时生效，
+           网页端不会带 data-app，配色完全不受影响。
+           =================================================================== */
+        html[data-app="true"] {
+            /* 深色（纯黑）：高强调元素用纯白 */
+            --md-primary: #ffffff;
+            --md-on-primary: #000000;
+            --md-primary-container: #202024;
+            --md-on-primary-container: #ffffff;
+            --md-secondary: #d6d6d9;
+            --md-on-secondary: #000000;
+            --md-secondary-container: #202024;
+            --md-on-secondary-container: #ececef;
+            --md-tertiary: #d6d6d9;
+            --md-on-tertiary: #000000;
+            --md-tertiary-container: #202024;
+            --md-on-tertiary-container: #ececef;
+
+            --glass-blur: 20px;
+            --glass-bg: rgba(24, 24, 27, 0.66);
+            --glass-bg-strong: rgba(34, 34, 38, 0.82);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-hi: rgba(255, 255, 255, 0.05);
+            --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.45);
+
+            --md-surface: #000000;
+            --md-surface-1: rgba(22, 22, 25, 0.7);
+            --md-surface-2: rgba(30, 30, 34, 0.7);
+            --md-surface-3: rgba(38, 38, 42, 0.75);
+            --md-surface-container-high: rgba(32, 32, 36, 0.75);
+            --md-on-surface: #ffffff;
+            --md-on-surface-variant: #a4a4a8;
+            --md-outline: rgba(255, 255, 255, 0.16);
+            --md-outline-variant: rgba(255, 255, 255, 0.08);
+        }
+        html[data-app="true"][data-theme="light"] {
+            /* 浅色（纯白）：高强调元素用纯黑 */
+            --md-primary: #000000;
+            --md-on-primary: #ffffff;
+            --md-primary-container: #ececec;
+            --md-on-primary-container: #000000;
+            --md-secondary: #3a3a3c;
+            --md-on-secondary: #ffffff;
+            --md-secondary-container: #f1f1f1;
+            --md-on-secondary-container: #1a1a1a;
+            --md-tertiary: #3a3a3c;
+            --md-on-tertiary: #ffffff;
+            --md-tertiary-container: #f1f1f1;
+            --md-on-tertiary-container: #1a1a1a;
+
+            --glass-bg: rgba(255, 255, 255, 0.68);
+            --glass-bg-strong: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.10);
+            --glass-hi: rgba(255, 255, 255, 0.7);
+            --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+            --glass-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.10);
+
+            --md-surface: #ffffff;
+            --md-surface-1: rgba(248, 248, 248, 0.7);
+            --md-surface-2: rgba(242, 242, 242, 0.7);
+            --md-surface-3: rgba(236, 236, 236, 0.75);
+            --md-surface-container-high: rgba(244, 244, 244, 0.75);
+            --md-on-surface: #000000;
+            --md-on-surface-variant: #55555a;
+            --md-outline: rgba(0, 0, 0, 0.18);
+            --md-outline-variant: rgba(0, 0, 0, 0.08);
+        }
+        /* App 背景：干净的纯黑 / 纯白，去掉彩色渐变与漂浮光斑 */
+        html[data-app="true"] body { background: #000000; }
+        html[data-app="true"][data-theme="light"] body { background: #ffffff; }
+        html[data-app="true"] body::before,
+        html[data-app="true"] body::after { display: none; }
+        /* App 的品牌 logo 底：纯黑白也保持简洁（去掉彩色投影）*/
+        html[data-app="true"] .app-bar .brand .logo {
+            box-shadow: 0 0 0 1px var(--glass-border) inset;
+        }
+
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
@@ -1048,6 +1128,9 @@
 
         // ---------- 主题 ----------
         const root = document.documentElement;
+        // 检测是否运行在 Android App（WebView 注入了原生桥接）——仅 App 端启用纯黑白极简配色
+        const IS_APP = !!(window.AndroidFileSaver);
+        if (IS_APP) root.setAttribute('data-app', 'true');
         function applyTheme(theme) { root.setAttribute('data-theme', theme); syncThemeColor(); }
         function syncThemeColor() {
             const meta = document.querySelector('meta[name="theme-color"]');
@@ -1056,6 +1139,8 @@
         window.Pass2KDBXDynamic = {
             _mode: 'system',
             apply(colors) {
+                // App 端固定使用纯黑白极简配色，忽略系统壁纸动态取色
+                if (root.getAttribute('data-app') === 'true') return;
                 if (!colors) return;
                 if (colors.primary) root.style.setProperty('--md-primary', colors.primary);
                 if (colors.onPrimary) root.style.setProperty('--md-on-primary', colors.onPrimary);

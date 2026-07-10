@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0f1117</item>
-        <item name="android:statusBarColor">#6c5ce7</item>
-        <item name="android:navigationBarColor">#0f1117</item>
+        <!-- 纯黑白极简：启动首帧与系统栏均用纯黑，避免彩色闪屏 -->
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
     </style>
 </resources>
