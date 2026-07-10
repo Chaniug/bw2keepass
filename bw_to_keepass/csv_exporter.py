@@ -217,6 +217,94 @@ def export_kdbx_to_csv(
     }
 
 
+def vault_items_to_csv(items: list, csv_format: str = 'generic') -> str:
+    """将 VaultItem 列表导出为 CSV 字符串（消费统一中间模型）
+
+    与 export_kdbx_to_csv 输出格式完全一致，但数据源为 VaultItem，
+    从而支持任意源格式（Bitwarden / 1Password / KDBX）导出 CSV。
+
+    Args:
+        items: VaultItem 列表
+        csv_format: 'generic' | 'bitwarden' | 'keepass'
+    Returns:
+        CSV 字符串（含 UTF-8 BOM，Excel 友好）
+    """
+    import json as json_mod
+    from .parser import VaultItem
+
+    TYPE_NAME = {1: 'Login', 2: 'Secure Note', 3: 'Card', 4: 'Identity', 5: 'SSH Key'}
+
+    rows = []
+    for it in items:
+        if not isinstance(it, VaultItem):
+            continue
+        uris = [u.uri for u in it.uris]
+        url = uris[0] if uris else ''
+        notes = it.notes
+        totp = it.totp
+        group_path = it.folder or ''
+        bw_type = TYPE_NAME.get(it.type, 'Login')
+
+        tags = ''
+        extra_fields: dict[str, str] = {}
+        for cf in it.custom_fields:
+            if cf.name == '_TAGS':
+                tags = cf.value
+            else:
+                extra_fields[cf.name] = cf.value
+
+        if csv_format == 'bitwarden':
+            row = {
+                'folder': group_path,
+                'favorite': 'true' if it.favorite else '',
+                'type': 'login',
+                'name': it.name,
+                'notes': notes,
+                'fields': json_mod.dumps(extra_fields, ensure_ascii=False) if extra_fields else '',
+                'reprompt': '0',
+                'login_uri': url,
+                'login_username': it.username,
+                'login_password': it.password,
+                'login_totp': totp,
+            }
+            columns = BITWARDEN_CSV_COLUMNS
+        elif csv_format == 'keepass':
+            row = {
+                'Account': it.name,
+                'Login Name': it.username,
+                'Password': it.password,
+                'Web Site': url,
+                'Comments': notes,
+                'Group': group_path,
+                'Expires': '',
+                'Icon': '',
+            }
+            columns = KEEPASS_CSV_COLUMNS
+        else:  # generic
+            row = {
+                'Title': it.name,
+                'UserName': it.username,
+                'Password': it.password,
+                'URL': url,
+                'Notes': notes,
+                'TOTP': totp,
+                'Group': group_path,
+                'Type': bw_type,
+                'Tags': tags,
+                'CustomFields': json_mod.dumps(extra_fields, ensure_ascii=False) if extra_fields else '',
+                'HasPasskey': 'YES' if it.fido2_credentials else 'NO',
+            }
+            columns = CSV_COLUMNS
+
+        rows.append(row)
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=columns)
+    writer.writeheader()
+    writer.writerows(rows)
+    return output.getvalue()
+
+
 def export_kdbx_to_csv_string(
     kdbx_path: str,
     password: str,

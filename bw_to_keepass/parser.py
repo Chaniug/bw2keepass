@@ -197,6 +197,15 @@ def _parse_zip(zip_path: str) -> dict:
         return json.loads(zf.read(json_files[0]).decode('utf-8'))
 
 
+def parse_bitwarden_dict(data: dict) -> tuple[list[Folder], list[VaultItem]]:
+    """解析已加载的 Bitwarden 导出 dict（不读文件、不解密）
+
+    供 KDBX→VaultItem 等「先拿到 Bitwarden 结构再归一」的场景复用，
+    避免重复实现字段映射。
+    """
+    return _parse_data(data)
+
+
 def peek_export_kind(file_path: str) -> dict:
     """读取导出文件的原始 dict（不解密），用于探测加密类型
 
