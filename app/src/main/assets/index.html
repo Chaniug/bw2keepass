@@ -173,7 +173,7 @@
         .app-bar .brand .title { font: var(--md-title-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .01em; }
         .app-bar .brand .subtitle { font: var(--md-label); color: var(--md-on-surface-variant); font-weight: 400; }
         .icon-btn {
-            width: 42px; height: 42px; flex-shrink: 0; border: none; cursor: pointer;
+            width: 48px; height: 48px; flex-shrink: 0; border: none; cursor: pointer;
             border-radius: var(--md-corner-full);
             background: color-mix(in srgb, var(--glass-bg) 60%, transparent);
             color: var(--md-on-surface);
@@ -191,11 +191,12 @@
         /* ===================== 主区域 ===================== */
         .scroll {
             flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-            padding: 1rem; max-width: 720px; width: 100%; margin: 0 auto;
+            padding: 0.75rem 1rem 1rem; max-width: 720px; width: 100%; margin: 0 auto;
+            display: flex; flex-direction: column;
         }
 
         /* ===================== 步骤指示器（传入 → 传出）===================== */
-        .stepper { display: flex; align-items: center; gap: .5rem; margin-bottom: 1.25rem; padding: .15rem .25rem; }
+        .stepper { display: flex; align-items: center; gap: .5rem; margin: auto 0 1.25rem; padding: .15rem .25rem; }
         .step { display: flex; align-items: center; gap: .55rem; color: var(--md-on-surface-variant); font: var(--md-label); font-weight: 700; opacity: .55; transition: opacity .25s, color .25s; }
         .step .step-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--md-surface-2); border: 1px solid var(--glass-border); font-size: .82rem; transition: all .25s; }
         .step .step-label { white-space: nowrap; }
@@ -271,12 +272,12 @@
         .file-chip .fc-name { font: var(--md-label); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-chip .fc-meta { font: var(--md-label); font-weight: 400; opacity: .8; }
         .file-chip .fc-remove {
-            width: 34px; height: 34px; flex-shrink: 0; border: none; cursor: pointer;
+            width: 44px; height: 44px; flex-shrink: 0; border: none; cursor: pointer;
             background: transparent; color: var(--md-on-surface-variant);
             border-radius: var(--md-corner-full);
             display: grid; place-items: center; border: 1px solid var(--glass-border);
         }
-        .file-chip .fc-remove svg { width: 16px; height: 16px; }
+        .file-chip .fc-remove svg { width: 18px; height: 18px; }
         .file-chip .fc-remove:active { background: color-mix(in srgb, var(--md-on-surface-variant) 20%, transparent); }
 
         .fmt-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; justify-content: center; }
@@ -379,7 +380,7 @@
             display: flex; align-items: center; gap: .65rem; text-align: left; cursor: pointer;
             background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
             border: 1px solid var(--glass-border); border-radius: var(--md-corner-l);
-            padding: .8rem .9rem; color: var(--md-on-surface);
+            padding: .8rem .9rem; min-height: 56px; color: var(--md-on-surface);
             transition: border-color .15s, background .15s, box-shadow .15s, transform .12s;
             -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); position: relative;
         }
@@ -399,8 +400,8 @@
 
         /* ===================== FAB / 按钮 ===================== */
         .btn {
-            border: none; cursor: pointer; font: var(--md-label); font-weight: 700;
-            padding: 0.8rem 1.5rem; border-radius: var(--md-corner-full);
+            border: none; cursor: pointer; font: 600 0.875rem/1 "Roboto","Noto Sans SC",system-ui,sans-serif;
+            padding: 0.8rem 1.5rem; min-height: 48px; border-radius: var(--md-corner-full);
             letter-spacing: .02em;
             transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, background .22s ease, color .22s ease, border-color .22s ease;
             display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
@@ -460,7 +461,7 @@
         .fab-next:active { transform: scale(.95); }
         .fab-next:disabled { opacity: 0; pointer-events: none; }
         .fab-next:focus-visible { outline: 2px solid var(--md-on-primary); outline-offset: 3px; }
-        .spacer-bottom { height: 90px; }
+        .spacer-bottom { height: 90px; margin-bottom: auto; }
 
         /* ===================== 进度 ===================== */
         .progress-card { text-align: center; }
@@ -517,7 +518,7 @@
             color: var(--md-on-surface);
             border: 1px solid var(--glass-border);
             border-radius: var(--md-corner-m);
-            padding: 0.7rem 0.8rem; cursor: pointer; text-align: left;
+            padding: 0.7rem 0.8rem; min-height: 56px; cursor: pointer; text-align: left;
             font: var(--md-label); font-weight: 700;
             transition: background .15s ease, border-color .15s ease, transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .15s ease;
             -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
@@ -549,15 +550,17 @@
 
         /* ===================== Snackbar（玻璃）===================== */
         .snackbar {
-            position: fixed; left: 50%; transform: translateX(-50%) translateY(120%);
-            bottom: calc(1rem + env(safe-area-inset-bottom)); z-index: 60;
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(140%);
+            bottom: calc(1.25rem + env(safe-area-inset-bottom)); z-index: 65;
             background: color-mix(in srgb, var(--glass-bg-strong) 80%, transparent); color: var(--md-on-surface);
             border: 1px solid var(--glass-border); border-radius: var(--md-corner-s); padding: 0.85rem 1.1rem;
             font: var(--md-body-medium); box-shadow: var(--glass-shadow);
             -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
-            max-width: calc(100vw - 2rem); display: flex; align-items: center; gap: 0.5rem;
+            max-width: min(560px, calc(100vw - 2rem)); display: flex; align-items: center; gap: 0.55rem;
             transition: transform .3s cubic-bezier(.2,.8,.2,1);
         }
+        .snackbar .sn-ico { width: 19px; height: 19px; flex-shrink: 0; }
+        .snackbar span { flex: 1; min-width: 0; }
         .snackbar.show { transform: translateX(-50%) translateY(0); }
         .snackbar.error { background: color-mix(in srgb, var(--md-error-container) 85%, transparent); color: var(--md-on-error-container); border-color: color-mix(in srgb, var(--md-error) 50%, transparent); }
         .snackbar.success { background: color-mix(in srgb, var(--md-success-container) 85%, transparent); color: var(--md-on-success-container); border-color: color-mix(in srgb, var(--md-success) 50%, transparent); }
@@ -601,7 +604,7 @@
         .about-item:last-child { border-bottom: none; }
         .theme-options { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
         .theme-options button {
-            flex: 1; padding: 0.7rem; border-radius: var(--md-corner-m); cursor: pointer;
+            flex: 1; padding: 0.7rem; min-height: 48px; border-radius: var(--md-corner-m); cursor: pointer;
             border: 1px solid var(--glass-border); background: color-mix(in srgb, var(--glass-bg) 55%, transparent); color: var(--md-on-surface);
             font: var(--md-label); font-weight: 700;
             transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
@@ -1396,7 +1399,9 @@
         // ---------- Snackbar ----------
         let snackTimer = null;
         function showSnack(msg, type) {
-            snackbar.textContent = msg;
+            const ico = type === 'error' ? '#ic-warn' : (type === 'success' ? '#ic-check' : '');
+            snackbar.innerHTML = (ico ? '<svg class="sn-ico"><use href="' + ico + '"/></svg>' : '') + '<span></span>';
+            snackbar.querySelector('span').textContent = msg;
             snackbar.className = 'snackbar show' + (type ? ' ' + type : '');
             clearTimeout(snackTimer);
             snackTimer = setTimeout(() => snackbar.classList.remove('show'), 3000);
