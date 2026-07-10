@@ -1322,6 +1322,7 @@
         let lastResult = null;
         let selectedTargets = new Set(['kdbx']);
         let encResolve = null, encReject = null;
+        let cachedJsonPassword = null; // 预览成功后缓存密码，避免转换阶段重复弹窗
 
         // ---------- 目标格式定义 ----------
         const TARGETS = [
@@ -1496,6 +1497,7 @@
             if (!ALL_EXT.includes(sourceExt)) { showSnack('请选择 .json / .csv / .zip / .1pux / .kdbx 格式的文件', 'error'); return; }
             if (file.size > 100 * 1024 * 1024) { showSnack('文件大小不能超过 100MB', 'error'); return; }
             selectedFile = file;
+            cachedJsonPassword = null; // 新文件，清除缓存密码
             preview = null;
             sourceDetected = '';
             fcName.textContent = file.name;
@@ -1657,6 +1659,10 @@
             if (selectedTargets.has('kdbx') && !dbPassword.value) return;
             if (selectedTargets.has('encrypted') && !exportPassword.value) { showSnack('请设置加密导出密码', 'error'); return; }
             showProgress('正在转换…');
+            // 转换时复用预览阶段的加密密码，避免重复弹窗导致用户误填 KDBX 密码
+            const convOnRequestPw = cachedJsonPassword
+                ? () => Promise.resolve(cachedJsonPassword)
+                : requestPassword;
             Engine.run({
                 file: selectedFile,
                 sourcePassword: sourcePassword.value,
@@ -1669,7 +1675,7 @@
                 exportPassword: exportPassword.value,
                 saltMode: saltMode.value,
                 onProgress: onProgress,
-                onRequestPassword: requestPassword
+                onRequestPassword: convOnRequestPw
             }).then(result => {
                 lastResult = result;
                 showResult(result);
@@ -1807,7 +1813,8 @@
         const encPwInput = $('encPwInput'), encPwError = $('encPwError'), encPwToggle = $('encPwToggle');
         function requestPassword() {
             return new Promise((resolve, reject) => {
-                encResolve = resolve; encReject = reject;
+                const _resolve = (pw) => { cachedJsonPassword = pw; resolve(pw); };
+                encResolve = _resolve; encReject = reject;
                 encPwInput.value = ''; encPwError.textContent = '';
                 encScrim.classList.add('show'); encSheet.classList.add('show');
                 setTimeout(() => encPwInput.focus(), 300);
