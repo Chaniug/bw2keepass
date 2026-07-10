@@ -1433,12 +1433,23 @@
     return { vault: { folders, items }, sourceLabel: 'KeePass KDBX' };
   }
 
+  // 解析导出文件基础名：优先用用户自定义 fileName，否则退回源文件名，最后回退 'export'
+  function resolveBaseName(opts) {
+    const raw = (opts.fileName && String(opts.fileName).trim())
+      || (opts.file && opts.file.name && String(opts.file.name).trim())
+      || 'export';
+    const stripped = raw.replace(/\.(json|zip|csv|1pux|kdbx)$/i, '');
+    const safe = stripped.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').trim();
+    return safe.slice(0, 80) || 'export';
+  }
+
   async function writeVaultToKdbx(vault, opts, E) {
     const { dbPassword, dbName, separatePasskey, fetchFavicon, onProgress } = opts;
     const report = (t) => onProgress && onProgress(t);
     report(`正在生成 KDBX（${vault.items.filter(i => !i.deleted).length} 个条目）...`);
     const credentials = new Credentials(ProtectedValue.fromString(dbPassword));
-    const db = Kdbx.create(credentials, (dbName || '').trim() || 'My Vault');
+    const _dbName = (dbName && String(dbName).trim()) || resolveBaseName(opts) || 'My Vault';
+    const db = Kdbx.create(credentials, _dbName);
     db.upgrade();
     db.setKdf(argon2Ready ? Consts.KdfId.Argon2d : Consts.KdfId.Aes);
 
@@ -1504,7 +1515,7 @@
     const _kdbxMinor = _ver & 0xFFFF;
     const _kdfName = argon2Ready ? 'Argon2d' : 'AES-KDF';
     const kdbxInfo = `KDBX ${_kdbxMajor}.${_kdbxMinor} · ${_kdfName} · AES-256`;
-    const baseName = (opts.file.name || 'export').replace(/\.(json|zip|csv|1pux|kdbx)$/i, '');
+    const baseName = resolveBaseName(opts);
     const downloads = [{ name: baseName + '.kdbx', mime: 'application/octet-stream', data: new Blob([generatedData], { type: 'application/octet-stream' }) }];
 
     if (passkeys.length > 0 && separatePasskey) {
@@ -1577,7 +1588,7 @@
 
   async function generateDownloads(vault, opts, E) {
     const targets = opts.targets || [];
-    const baseName = (opts.file.name || 'export').replace(/\.(json|zip|csv|1pux|kdbx)$/i, '');
+    const baseName = resolveBaseName(opts);
     const downloads = [];
     const bwItems = vault.items.filter(i => !i.deleted).map(convertVaultItemToBW).filter(Boolean);
     const folders = (vault.folders || []).map(f => ({ id: f.id, name: f.name }));

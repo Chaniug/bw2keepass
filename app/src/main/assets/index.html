@@ -299,6 +299,12 @@
         /* ===================== 文本框（玻璃）===================== */
         .field { margin-bottom: 1rem; }
         .field label { display: block; font: var(--md-label); color: var(--md-on-surface-variant); margin-bottom: 0.4rem; padding-left: 0.25rem; }
+
+        /* 导出文件名（基础名称）字段 */
+        .export-name-field { margin: 1rem 0 1.1rem; }
+        .export-name-field > label { display: block; font: var(--md-label); color: var(--md-on-surface-variant); margin-bottom: 0.4rem; padding-left: 0.25rem; }
+        .en-hint { font: var(--md-body-small); color: var(--md-on-surface-variant); padding: 0.4rem 0.25rem 0; line-height: 1.4; opacity: .82; }
+        .en-hint b { color: var(--md-primary); font-weight: 600; word-break: break-all; }
         .text-field {
             display: flex; align-items: center; gap: 0.5rem;
             background: color-mix(in srgb, var(--glass-bg-strong) 60%, transparent);
@@ -756,6 +762,16 @@
                 <div class="card-title">传出 · 选择目标格式</div>
                 <div class="card-desc">可多选，多个格式将打包下载</div>
             </div>
+
+            <!-- 导出文件名（基础名称，可自定义）-->
+            <div class="export-name-field">
+                <label for="exportName">导出文件名（基础名称）</label>
+                <div class="text-field">
+                    <input type="text" id="exportName" placeholder="vault-export" autocomplete="off" maxlength="80">
+                </div>
+                <div class="en-hint">留空则使用源文件名；将作为所有产物的前缀，例如 <b id="enPreview">vault-export</b>.kdbx</div>
+            </div>
+
             <div class="target-grid" id="targetGrid"></div>
 
             <!-- KDBX 配置 -->
@@ -928,6 +944,8 @@
         const targetGrid = $('targetGrid');
         const kdbxConfig = $('kdbxConfig'), encConfig = $('encConfig');
         const dbNameField = $('dbName'), dbName = $('dbName');
+        const exportName = $('exportName'), enPreview = $('enPreview');
+        exportName.addEventListener('input', () => { enPreview.textContent = (exportName.value || '').trim() || 'export'; });
         const dbPasswordField = $('dbPassword'), dbPassword = $('dbPassword'), togglePassword = $('togglePassword');
         const pwBar = $('pwBar'), pwStrength = $('pwStrength'), genPw = $('genPw');
         const fetchFavicon = $('fetchFavicon');
@@ -1060,7 +1078,10 @@
             // KDBX 源需要密码
             sourcePwField.classList.toggle('hidden', sourceExt !== 'kdbx');
             sourcePassword.value = '';
-            if (sourceExt === 'kdbx') dbName.value = file.name.replace(/\.(json|zip|csv|1pux|kdbx)$/i, '') || 'My Vault';
+            const srcBase = file.name.replace(/\.(json|zip|csv|1pux|kdbx)$/i, '') || 'export';
+            if (sourceExt === 'kdbx') dbName.value = srcBase || 'My Vault';
+            exportName.value = srcBase;
+            enPreview.textContent = srcBase || 'export';
             // FAB：解析并预览
             fabNext.classList.remove('hidden');
             fabNext.dataset.step = 'preview';
@@ -1213,6 +1234,7 @@
                 targets: [...selectedTargets],
                 dbPassword: dbPassword.value,
                 dbName: dbName.value,
+                fileName: (exportName.value || '').trim(),
                 separatePasskey: separatePasskey.checked,
                 fetchFavicon: fetchFavicon.checked,
                 exportPassword: exportPassword.value,
