@@ -249,18 +249,25 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     fido2_credentials = _extract_passkeys(entry)
 
     # 提取自定义字段（排除内部字段和 passkey 字段）
-    # 使用精确匹配避免误过滤（如 'otp' 前缀会误匹配 'otpauth'、'otp_settings' 等用户自定义字段）
+    # 跳过集合必须与「正向转换器 build_custom_fields 实际写出的字段名」严格对齐，
+    # 否则这些内部字段会被当成用户自定义字段泄漏/重复导出。
+    # 注意：'otp' 用精确匹配（不用前缀），以免误过滤 'otpauth'、'otp_settings' 等用户自定义字段。
     skip_exact = {
         'BitwardenType', 'BitwardenID', 'TOTP Seed', 'TOTP Settings',
-        'otp', 'AndroidApp', 'AndroidApp Signature', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
-        '_TAGS', 'CardBrand', 'CardNumber', 'CardExpiry',
+        'otp', 'KPEX_PASSKEY_', 'CreationDate', 'RevisionDate',
+        '_TAGS', 'Brand', 'CardBrand', 'CardNumber', 'Expiry', 'CardExpiry',
         'SSHFingerprint', 'SSHPublicKey', 'SSHPrivateKey',
         'IdentityTitle', 'IdentityFirstName', 'IdentityMiddleName', 'IdentityLastName',
         'IdentityAddress1', 'IdentityCity', 'IdentityState', 'IdentityPostalCode',
         'IdentityCountry', 'IdentityEmail', 'IdentityPhone', 'IdentitySSN',
         'IdentityPassport', 'IdentityLicense',
     }
-    skip_prefixes = ('KPEX_PASSKEY_', 'KP2A_URL')
+    # 用前缀跳过整组内部字段，避免「精确名 vs 数字后缀」对不上导致泄漏：
+    #   - KPEX_PASSKEY_*         Passkey 凭据（单条与多条第 0/1/2… 条）
+    #   - KP2A_URL*               KeePassAndroid 额外 URI
+    #   - AndroidApp / AndroidApp2..          安卓 URI（多 URI 编号为 2/3…，无 1）
+    #   - AndroidApp Signature / AndroidApp Signature2..  安卓签名指纹
+    skip_prefixes = ('KPEX_PASSKEY_', 'KP2A_URL', 'AndroidApp')
     skip_full = set()
     for i in range(2, 20):
         skip_full.add(f'URI_{i}')
