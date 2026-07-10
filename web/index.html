@@ -162,13 +162,13 @@
         }
         .app-bar .brand { display: flex; align-items: center; gap: 0.65rem; flex: 1; min-width: 0; }
         .app-bar .brand .logo {
-            width: 40px; height: 40px; border-radius: 13px; flex-shrink: 0;
+            width: 42px; height: 42px; border-radius: 14px; flex-shrink: 0;
             display: grid; place-items: center;
-            background: linear-gradient(145deg, color-mix(in srgb, var(--md-primary) 85%, #fff), color-mix(in srgb, var(--md-tertiary) 85%, #fff));
+            background: linear-gradient(145deg, color-mix(in srgb, var(--md-primary) 88%, #fff), color-mix(in srgb, var(--md-primary) 70%, #fff));
             color: var(--md-on-primary);
-            box-shadow: var(--glass-shadow-sm), 0 0 0 1px var(--glass-border) inset;
+            box-shadow: 0 2px 10px color-mix(in srgb, var(--md-primary) 28%, transparent), 0 0 0 1px var(--glass-border) inset;
         }
-        .app-bar .brand .logo svg { width: 22px; height: 22px; }
+        .app-bar .brand .logo svg { width: 23px; height: 23px; }
         .app-bar .brand .titles { min-width: 0; }
         .app-bar .brand .title { font: var(--md-title-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .01em; }
         .app-bar .brand .subtitle { font: var(--md-label); color: var(--md-on-surface-variant); font-weight: 400; }
@@ -191,39 +191,45 @@
         /* ===================== 主区域 ===================== */
         .scroll {
             flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-            padding: 0.75rem 1rem 1rem; max-width: 720px; width: 100%; margin: 0 auto;
+            padding: 0.6rem 1rem 1.2rem; max-width: 720px; width: 100%; margin: 0 auto;
             display: flex; flex-direction: column;
         }
 
         /* ===================== 步骤指示器（传入 → 传出）===================== */
-        .stepper { display: flex; align-items: center; gap: .5rem; margin: auto 0 1.25rem; padding: .15rem .25rem; }
+        .stepper { display: flex; align-items: center; gap: .5rem; margin: 0.4rem 0 1.1rem; padding: .15rem .25rem; }
         .step { display: flex; align-items: center; gap: .55rem; color: var(--md-on-surface-variant); font: var(--md-label); font-weight: 700; opacity: .55; transition: opacity .25s, color .25s; }
         .step .step-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--md-surface-2); border: 1px solid var(--glass-border); font-size: .82rem; transition: all .25s; }
         .step .step-label { white-space: nowrap; }
         .step.active { opacity: 1; color: var(--md-on-surface); }
-        .step.active .step-dot { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary)); color: var(--md-on-primary); border-color: transparent; box-shadow: var(--glass-shadow-sm); }
+        .step.active .step-dot {
+            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary));
+            color: var(--md-on-primary); border-color: transparent;
+            box-shadow: 0 3px 12px color-mix(in srgb, var(--md-primary) 35%, transparent);
+        }
         .step.done .step-dot { background: color-mix(in srgb, var(--md-success) 30%, transparent); color: var(--md-success); border-color: color-mix(in srgb, var(--md-success) 60%, var(--glass-border)); }
         .step-line { flex: 1; height: 2px; background: var(--glass-border); border-radius: 2px; position: relative; overflow: hidden; }
-        .step-line::after { content: ""; position: absolute; inset: 0; width: 0; background: linear-gradient(90deg, var(--md-success), color-mix(in srgb, var(--md-primary) 70%, transparent)); transition: width .35s cubic-bezier(.2,.8,.2,1); }
+        .step-line::after { content: ""; position: absolute; inset: 0; width: 0; background: linear-gradient(90deg, var(--md-primary), color-mix(in srgb, var(--md-primary) 70%, transparent)); transition: width .35s cubic-bezier(.2,.8,.2,1); }
         .step-line.filled::after { width: 100%; }
 
         /* ===================== Card（玻璃）===================== */
         .card {
-            background: color-mix(in srgb, var(--glass-bg) 78%, transparent);
+            background: color-mix(in srgb, var(--glass-bg) 85%, transparent);
             border-radius: var(--md-corner-xl);
             padding: 1.5rem 1.25rem;
             box-shadow: var(--glass-shadow);
             margin-bottom: 1rem;
             border: 1px solid var(--glass-border);
-            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(150%);
-            backdrop-filter: blur(var(--glass-blur)) saturate(150%);
+            -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(170%);
+            backdrop-filter: blur(var(--glass-blur)) saturate(170%);
             position: relative; overflow: hidden;
         }
         /* 顶部高光描边，强化玻璃边缘折射 */
         .card::before {
             content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-            box-shadow: 0 1px 0 var(--glass-hi) inset, 0 0 0 1px rgba(255,255,255,.03) inset;
+            box-shadow: 0 1px 0 var(--glass-hi) inset, 0 0 0 1px rgba(255,255,255,.05) inset;
         }
+        /* 浅色主题下卡片额外微高光 */
+        [data-theme="light"] .card::before { box-shadow: 0 1.5px 0 rgba(255,255,255,.7) inset, 0 0 0 1px rgba(255,255,255,.08) inset; }
         .card-head { margin-bottom: 1.1rem; }
         .card-title { font: var(--md-title-medium); color: var(--md-on-surface); }
         .card-desc { font: var(--md-body-medium); color: var(--md-on-surface-variant); margin-top: 0.25rem; }
@@ -232,42 +238,59 @@
         .dropzone {
             border: 1.5px dashed var(--glass-border);
             border-radius: var(--md-corner-l);
-            padding: 2.25rem 1rem; text-align: center; cursor: pointer;
+            padding: 2.75rem 1rem 2.25rem; text-align: center; cursor: pointer;
             transition: border-color .2s, background .2s, transform .12s;
-            background: color-mix(in srgb, var(--glass-bg) 45%, transparent);
-            -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+            background: color-mix(in srgb, var(--glass-bg) 48%, transparent);
+            -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+            position: relative; overflow: hidden;
         }
+        /* 拖拽区微光扫描动画 */
+        .dropzone::after {
+            content: ""; position: absolute; inset: 0; border-radius: inherit;
+            background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--md-primary) 8%, transparent) 50%, transparent 70%);
+            opacity: 0; transition: opacity .4s;
+            pointer-events: none;
+        }
+        .dropzone:hover::after { opacity: 1; animation: scanSweep 2.5s ease-in-out infinite; }
+        @keyframes scanSweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
         .dropzone:active, .dropzone.drag {
             border-color: var(--md-primary);
             background: color-mix(in srgb, var(--md-primary) 16%, transparent);
             transform: scale(.995);
         }
         .dropzone .dz-icon {
-            width: 60px; height: 60px; margin: 0 auto; border-radius: 18px;
+            width: 68px; height: 68px; margin: 0 auto; border-radius: 20px;
             display: grid; place-items: center;
-            background: color-mix(in srgb, var(--md-primary) 18%, transparent);
+            background: color-mix(in srgb, var(--md-primary) 20%, transparent);
             border: 1px solid var(--glass-border);
             color: var(--md-primary);
+            box-shadow: 0 2px 12px color-mix(in srgb, var(--md-primary) 18%, transparent);
+            transition: transform .25s cubic-bezier(.175,.885,.32,1.275), box-shadow .25s;
         }
-        .dropzone .dz-icon svg { width: 28px; height: 28px; }
+        .dropzone:hover .dz-icon { transform: translateY(-3px) scale(1.04); box-shadow: 0 6px 20px color-mix(in srgb, var(--md-primary) 26%, transparent); }
+        .dropzone .dz-icon svg { width: 30px; height: 30px; }
         .dropzone .dz-text { font: var(--md-title-medium); margin-top: 0.85rem; }
         .dropzone .dz-hint { font: var(--md-body-medium); color: var(--md-on-surface-variant); margin-top: 0.35rem; }
 
         .file-chip {
             display: flex; align-items: center; gap: 0.75rem;
-            background: color-mix(in srgb, var(--glass-bg-strong) 70%, transparent);
+            background: color-mix(in srgb, var(--glass-bg-strong) 75%, transparent);
             color: var(--md-on-surface);
             border-radius: var(--md-corner-l);
-            padding: 0.85rem 1rem; margin-top: 0.25rem;
+            padding: 0.9rem 1rem; margin-top: 0.3rem;
             border: 1px solid var(--glass-border);
-            -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+            box-shadow: 0 2px 10px color-mix(in srgba, rgba(0,0,0,.06), transparent);
+            transition: transform .15s, box-shadow .15s;
         }
+        .file-chip:active { transform: scale(.99); }
         .file-chip .fc-icon {
-            width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px;
+            width: 44px; height: 44px; flex-shrink: 0; border-radius: 13px;
             display: grid; place-items: center; color: var(--md-primary);
-            background: color-mix(in srgb, var(--md-primary) 16%, transparent);
+            background: color-mix(in srgb, var(--md-primary) 18%, transparent);
+            border: 1px solid color-mix(in srgb, var(--md-primary) 20%, var(--glass-border));
         }
-        .file-chip .fc-icon svg { width: 20px; height: 20px; }
+        .file-chip .fc-icon svg { width: 22px; height: 22px; }
         .file-chip .fc-info { flex: 1; min-width: 0; }
         .file-chip .fc-name { font: var(--md-label); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-chip .fc-meta { font: var(--md-label); font-weight: 400; opacity: .8; }
@@ -377,7 +400,7 @@
             background: var(--md-on-surface-variant); transition: left .2s, background .2s;
             box-shadow: var(--glass-shadow-sm);
         }
-        .md-switch input:checked + .track { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 85%, #fff), var(--md-primary)); border-color: transparent; }
+        .md-switch input:checked + .track { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary)); border-color: transparent; }
         .md-switch input:checked + .track + .thumb { left: 27px; background: var(--md-on-primary); }
 
         /* ===================== 目标格式网格（传出）===================== */
@@ -391,14 +414,14 @@
             -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); position: relative;
         }
         .target-chip:active { transform: scale(.98); }
-        .target-chip .tc-icon { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: var(--md-primary); background: color-mix(in srgb, var(--md-primary) 16%, transparent); }
-        .target-chip .tc-icon svg { width: 19px; height: 19px; }
+        .target-chip .tc-icon { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; color: var(--md-primary); background: color-mix(in srgb, var(--md-primary) 18%, transparent); border: 1px solid color-mix(in srgb, var(--md-primary) 18%, var(--glass-border)); }
+        .target-chip .tc-icon svg { width: 20px; height: 20px; }
         .target-chip .tc-label { font: var(--md-body-large); font-weight: 600; flex: 1; min-width: 0; }
         .target-chip .tc-tag { font: var(--md-label); font-weight: 700; font-size: .62rem; background: color-mix(in srgb, var(--md-tertiary) 24%, transparent); color: var(--md-on-surface); border-radius: var(--md-corner-full); padding: .08rem .45rem; margin-left: .3rem; }
         .target-chip .tc-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--md-outline-variant); flex-shrink: 0; display: grid; place-items: center; transition: background .15s, border-color .15s; }
         .target-chip .tc-check svg { width: 13px; height: 13px; opacity: 0; color: var(--md-on-primary); transition: opacity .15s; }
-        .target-chip.selected { border-color: color-mix(in srgb, var(--md-primary) 60%, var(--glass-border)); background: color-mix(in srgb, var(--md-primary) 14%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent); }
-        .target-chip.selected .tc-check { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary)); border-color: transparent; }
+        .target-chip.selected { border-color: color-mix(in srgb, var(--md-primary) 65%, var(--glass-border)); background: color-mix(in srgb, var(--md-primary) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 20%, transparent), 0 2px 8px color-mix(in srgb, var(--md-primary) 14%, transparent); }
+        .target-chip.selected .tc-check { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary)); border-color: transparent; }
         .target-chip.selected .tc-check svg { opacity: 1; }
 
         .export-config { margin-top: 1rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; }
@@ -426,10 +449,21 @@
         .btn:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 3px; }
 
         .btn-primary {
-            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary));
-            color: var(--md-on-primary); box-shadow: var(--glass-shadow-sm), 0 1px 0 var(--glass-hi) inset;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary));
+            color: var(--md-on-primary);
+            box-shadow:
+                0 3px 14px color-mix(in srgb, var(--md-primary) 35%, transparent),
+                0 1px 4px rgba(0,0,0,.10),
+                inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+            border: none;
         }
-        .btn-primary:hover { box-shadow: var(--glass-shadow), 0 1px 0 var(--glass-hi) inset; }
+        .btn-primary:hover {
+            box-shadow:
+                0 4px 18px color-mix(in srgb, var(--md-primary) 42%, transparent),
+                0 2px 6px rgba(0,0,0,.12),
+                inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
+        }
+        .btn-primary:active { transform: scale(.96); }
         .btn-primary:disabled { background: color-mix(in srgb, var(--md-on-surface) 16%, transparent); color: var(--md-on-surface-variant); border-color: var(--glass-border); box-shadow: none; }
 
         .btn-tonal { background: color-mix(in srgb, var(--glass-bg) 65%, transparent); color: var(--md-on-surface); }
@@ -449,25 +483,31 @@
         .btn-row .btn { flex: 1; }
 
         .fab-next {
-            position: fixed; right: calc(1.25rem + env(safe-area-inset-right));
-            bottom: calc(1.25rem + env(safe-area-inset-bottom));
+            position: fixed; left: calc(1rem + env(safe-area-inset-left)); right: calc(1rem + env(safe-area-inset-right));
+            bottom: calc(1.15rem + env(safe-area-inset-bottom));
             z-index: 25;
-            height: 56px; min-width: 56px; padding: 0 1.5rem; border-radius: var(--md-corner-full);
-            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary));
+            height: 56px; border-radius: var(--md-corner-xl);
+            /* 用 primary-container 做底色 + primary 渐变叠加，动态取色下仍保持高对比 */
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary));
             color: var(--md-on-primary);
-            border: 1px solid var(--glass-border); cursor: pointer; font: var(--md-label); font-weight: 700;
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            box-shadow: var(--glass-shadow), 0 1px 0 var(--glass-hi) inset;
-            transition: transform .14s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, opacity .2s, background .22s ease;
-            -webkit-tap-highlight-color: transparent; position: relative; overflow: hidden;
-            -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+            border: none; cursor: pointer;
+            font: 600 0.9375rem/1 "Roboto","Noto Sans SC",system-ui,sans-serif;
+            font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem;
+            box-shadow:
+                0 4px 20px color-mix(in srgb, var(--md-primary) 40%, transparent),
+                0 2px 6px rgba(0,0,0,.14),
+                inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
+            transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease;
+            -webkit-tap-highlight-color: transparent;
         }
-        .fab-next svg { width: 20px; height: 20px; }
-        .fab-next:hover { transform: translateY(-2px); }
-        .fab-next:active { transform: scale(.95); }
-        .fab-next:disabled { opacity: 0; pointer-events: none; }
+        .fab-next svg { width: 21px; height: 21px; flex-shrink: 0; }
+        .fab-next:hover { transform: translateY(-2px); box-shadow: 0 6px 24px color-mix(in srgb, var(--md-primary) 45%, transparent), 0 3px 8px rgba(0,0,0,.16), inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent); }
+        .fab-next:active { transform: scale(.97); box-shadow: 0 2px 10px color-mix(in srgb, var(--md-primary) 30%, transparent), 0 1px 3px rgba(0,0,0,.12), inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent); }
+        .fab-next.disabled { opacity: 0; pointer-events: none; }
         .fab-next:focus-visible { outline: 2px solid var(--md-on-primary); outline-offset: 3px; }
-        .spacer-bottom { height: 90px; margin-bottom: auto; }
+        .spacer-bottom { height: 80px; margin-top: auto; }
 
         /* ===================== 进度 ===================== */
         .progress-card { text-align: center; }
@@ -477,7 +517,7 @@
         }
         .linear-progress > div {
             position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-            background: linear-gradient(90deg, color-mix(in srgb, var(--md-primary) 60%, #fff), var(--md-primary));
+            background: linear-gradient(90deg, color-mix(in srgb, var(--md-primary) 75%, #fff), var(--md-primary));
             border-radius: var(--md-corner-full);
             transition: width .3s cubic-bezier(.2,.8,.2,1);
         }
@@ -502,14 +542,14 @@
         /* ===================== 结果 ===================== */
         .result-card { text-align: center; }
         .result-glyph {
-            width: 84px; height: 84px; margin: 0 auto 1rem; border-radius: 50%;
-            background: color-mix(in srgb, var(--md-success) 18%, transparent);
+            width: 88px; height: 88px; margin: 0 auto 1rem; border-radius: 50%;
+            background: color-mix(in srgb, var(--md-success) 20%, transparent);
             display: grid; place-items: center; color: var(--md-success);
-            border: 1px solid color-mix(in srgb, var(--md-success) 50%, var(--glass-border));
-            box-shadow: 0 0 0 6px color-mix(in srgb, var(--md-success) 10%, transparent), var(--glass-shadow-sm);
+            border: 1px solid color-mix(in srgb, var(--md-success) 45%, var(--glass-border));
+            box-shadow: 0 0 0 7px color-mix(in srgb, var(--md-success) 12%, transparent), 0 4px 16px color-mix(in srgb, var(--md-success) 18%, transparent);
             animation: popIn .45s cubic-bezier(.175,.885,.32,1.275);
         }
-        .result-glyph svg { width: 40px; height: 40px; }
+        .result-glyph svg { width: 42px; height: 42px; }
         @keyframes popIn { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         .result-title { font: var(--md-title-large); }
         .result-details { font: var(--md-body-medium); color: var(--md-on-surface-variant); margin: 0.5rem 0 1.25rem; white-space: pre-line; line-height: 1.7; }
@@ -537,20 +577,21 @@
         .download-item:active { background: color-mix(in srgb, var(--md-primary) 20%, transparent); transform: scale(.99); }
         .download-item:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
         .download-item .di-icon {
-            flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+            flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
             display: grid; place-items: center; color: var(--md-primary);
-            background: color-mix(in srgb, var(--md-primary) 16%, transparent);
+            background: color-mix(in srgb, var(--md-primary) 18%, transparent);
+            border: 1px solid color-mix(in srgb, var(--md-primary) 18%, var(--glass-border));
         }
-        .download-item .di-icon svg { width: 20px; height: 20px; }
+        .download-item .di-icon svg { width: 22px; height: 22px; }
         .download-item .di-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .download-item .di-note { font: var(--md-label); font-weight: 400; color: var(--md-error); font-size: 0.72rem; margin-top: 0.15rem; }
         .download-item .di-cta {
             flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.3rem;
-            padding: 0.35rem 0.7rem; border-radius: var(--md-corner-full);
-            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary));
-            color: var(--md-on-primary); border: 1px solid var(--glass-border);
+            padding: 0.4rem 0.8rem; border-radius: var(--md-corner-full);
+            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary));
+            color: var(--md-on-primary); border: none;
             font: var(--md-label); font-weight: 700; font-size: 0.82rem;
-            box-shadow: 0 1px 0 var(--glass-hi) inset;
+            box-shadow: 0 2px 10px color-mix(in srgb, var(--md-primary) 30%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
         }
         .download-item .di-cta svg { width: 15px; height: 15px; }
 
