@@ -47,6 +47,21 @@ done
 
 mkdir -p "$BUILD"
 
+# ---- 0. 同步 web/ 单一来源到 assets（index.html / engine.js / vendor / icon）----
+# web/ 是前端唯一来源，App 构建时拷贝复用，避免两份实现漂移
+SRC_WEB="$APP_DIR/../web"
+if [ -f "$SRC_WEB/index.html" ]; then
+  echo "==> 同步 web/ → assets"
+  cp "$SRC_WEB/index.html" "$SRC/assets/index.html"
+  cp "$SRC_WEB/engine.js"  "$SRC/assets/engine.js"
+  mkdir -p "$SRC/assets/vendor"
+  cp "$SRC_WEB/vendor/"* "$SRC/assets/vendor/"
+  [ -f "$SRC_WEB/icon.svg" ] && cp "$SRC_WEB/icon.svg" "$SRC/assets/icon.svg"
+  echo "    已同步 index.html / engine.js / vendor/ / icon.svg"
+else
+  echo "WARN: 未找到 $SRC_WEB，回退使用既有 assets"
+fi
+
 # ---- 1. 生成签名 keystore（仅本地，首次运行）----
 if [ ! -f "$KEYSTORE" ]; then
   echo "==> 生成本地签名 keystore: $KEYSTORE"

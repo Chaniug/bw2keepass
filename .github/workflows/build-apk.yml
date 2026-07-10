@@ -80,6 +80,14 @@ jobs:
             -dname "CN=Pass2KDBX, OU=App, O=Valk, L=Unknown, S=Unknown, C=US" \
             -noprompt
 
+      - name: Sync web/ source into app assets
+        run: |
+          cp web/index.html app/src/main/assets/index.html
+          cp web/engine.js app/src/main/assets/engine.js
+          mkdir -p app/src/main/assets/vendor
+          cp web/vendor/* app/src/main/assets/vendor/
+          cp web/icon.svg app/src/main/assets/icon.svg 2>/dev/null || true
+
       - name: Build APK
         env:
           VERSION_CODE: 3

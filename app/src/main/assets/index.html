@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1b1c20">
-    <title>Pass2KDBX</title>
+    <title>Pass2KDBX · 密码格式互转</title>
     <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="manifest" href="manifest.json">
     <style>
         /* ===================== 液态玻璃（Liquid Glass）设计令牌 ===================== */
         :root {
@@ -193,34 +194,17 @@
             padding: 1rem; max-width: 720px; width: 100%; margin: 0 auto;
         }
 
-        /* Segmented 方向切换（玻璃分段）*/
-        .segmented {
-            display: flex; gap: 0.3rem; padding: 0.3rem;
-            background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
-            border-radius: var(--md-corner-full);
-            margin-bottom: 1.25rem; position: relative;
-            border: 1px solid var(--glass-border);
-            -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-        }
-        .segmented .seg-thumb {
-            position: absolute; top: 0.3rem; bottom: 0.3rem; left: 0.3rem;
-            width: calc(50% - 0.3rem);
-            background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 80%, #fff), var(--md-primary));
-            border-radius: var(--md-corner-full);
-            transition: transform .3s cubic-bezier(.2,.8,.2,1);
-            box-shadow: var(--glass-shadow-sm), 0 1px 0 var(--glass-hi) inset;
-            z-index: 0;
-        }
-        .segmented.right .seg-thumb { transform: translateX(100%); }
-        .segmented button {
-            position: relative; z-index: 1; flex: 1; border: none; cursor: pointer;
-            background: transparent; color: var(--md-on-surface-variant);
-            font: var(--md-label); padding: 0.7rem 0.5rem; border-radius: var(--md-corner-full);
-            transition: color .25s; letter-spacing: .02em; display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-        }
-        .segmented button svg { width: 16px; height: 16px; }
-        .segmented button.active { color: var(--md-on-primary); font-weight: 700; }
-        .segmented button:not(.active):hover { color: var(--md-on-surface); }
+        /* ===================== 步骤指示器（传入 → 传出）===================== */
+        .stepper { display: flex; align-items: center; gap: .5rem; margin-bottom: 1.25rem; padding: .15rem .25rem; }
+        .step { display: flex; align-items: center; gap: .55rem; color: var(--md-on-surface-variant); font: var(--md-label); font-weight: 700; opacity: .55; transition: opacity .25s, color .25s; }
+        .step .step-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--md-surface-2); border: 1px solid var(--glass-border); font-size: .82rem; transition: all .25s; }
+        .step .step-label { white-space: nowrap; }
+        .step.active { opacity: 1; color: var(--md-on-surface); }
+        .step.active .step-dot { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary)); color: var(--md-on-primary); border-color: transparent; box-shadow: var(--glass-shadow-sm); }
+        .step.done .step-dot { background: color-mix(in srgb, var(--md-success) 30%, transparent); color: var(--md-success); border-color: color-mix(in srgb, var(--md-success) 60%, var(--glass-border)); }
+        .step-line { flex: 1; height: 2px; background: var(--glass-border); border-radius: 2px; position: relative; overflow: hidden; }
+        .step-line::after { content: ""; position: absolute; inset: 0; width: 0; background: linear-gradient(90deg, var(--md-success), color-mix(in srgb, var(--md-primary) 70%, transparent)); transition: width .35s cubic-bezier(.2,.8,.2,1); }
+        .step-line.filled::after { width: 100%; }
 
         /* ===================== Card（玻璃）===================== */
         .card {
@@ -303,6 +287,14 @@
             border-radius: var(--md-corner-full); padding: 0.35rem 0.7rem;
         }
 
+        /* 源预览卡片 */
+        .preview-card { margin-top: 1rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; }
+        .preview-head { font: var(--md-label); color: var(--md-on-surface-variant); margin-bottom: .6rem; display: flex; align-items: center; gap: .4rem; }
+        .preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+        .pv-cell { background: color-mix(in srgb, var(--glass-bg) 60%, transparent); border: 1px solid var(--glass-border); border-radius: var(--md-corner-m); padding: .8rem .3rem; text-align: center; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+        .pv-num { font: var(--md-title-large); color: var(--md-primary); font-variant-numeric: tabular-nums; line-height: 1.1; }
+        .pv-label { font: var(--md-label); font-weight: 400; color: var(--md-on-surface-variant); margin-top: .25rem; }
+
         /* ===================== 文本框（玻璃）===================== */
         .field { margin-bottom: 1rem; }
         .field label { display: block; font: var(--md-label); color: var(--md-on-surface-variant); margin-bottom: 0.4rem; padding-left: 0.25rem; }
@@ -330,7 +322,6 @@
         .text-field .tf-action svg { width: 19px; height: 19px; }
         .text-field .tf-action:hover { background: color-mix(in srgb, var(--md-on-surface-variant) 14%, transparent); color: var(--md-on-surface); }
         .text-field .tf-action:active { background: color-mix(in srgb, var(--md-on-surface-variant) 16%, transparent); }
-        select.text-field, select.text-field > select { width: 100%; }
         select.native-select {
             width: 100%; border: 1px solid var(--glass-border); background: color-mix(in srgb, var(--glass-bg-strong) 60%, transparent);
             color: var(--md-on-surface); font: var(--md-body-large);
@@ -382,6 +373,30 @@
         .md-switch input:checked + .track { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 85%, #fff), var(--md-primary)); border-color: transparent; }
         .md-switch input:checked + .track + .thumb { left: 27px; background: var(--md-on-primary); }
 
+        /* ===================== 目标格式网格（传出）===================== */
+        .target-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; margin-top: .5rem; }
+        .target-chip {
+            display: flex; align-items: center; gap: .65rem; text-align: left; cursor: pointer;
+            background: color-mix(in srgb, var(--glass-bg) 55%, transparent);
+            border: 1px solid var(--glass-border); border-radius: var(--md-corner-l);
+            padding: .8rem .9rem; color: var(--md-on-surface);
+            transition: border-color .15s, background .15s, box-shadow .15s, transform .12s;
+            -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); position: relative;
+        }
+        .target-chip:active { transform: scale(.98); }
+        .target-chip .tc-icon { width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; color: var(--md-primary); background: color-mix(in srgb, var(--md-primary) 16%, transparent); }
+        .target-chip .tc-icon svg { width: 19px; height: 19px; }
+        .target-chip .tc-label { font: var(--md-body-large); font-weight: 600; flex: 1; min-width: 0; }
+        .target-chip .tc-tag { font: var(--md-label); font-weight: 700; font-size: .62rem; background: color-mix(in srgb, var(--md-tertiary) 24%, transparent); color: var(--md-on-surface); border-radius: var(--md-corner-full); padding: .08rem .45rem; margin-left: .3rem; }
+        .target-chip .tc-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--md-outline-variant); flex-shrink: 0; display: grid; place-items: center; transition: background .15s, border-color .15s; }
+        .target-chip .tc-check svg { width: 13px; height: 13px; opacity: 0; color: var(--md-on-primary); transition: opacity .15s; }
+        .target-chip.selected { border-color: color-mix(in srgb, var(--md-primary) 60%, var(--glass-border)); background: color-mix(in srgb, var(--md-primary) 14%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent); }
+        .target-chip.selected .tc-check { background: linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 82%, #fff), var(--md-primary)); border-color: transparent; }
+        .target-chip.selected .tc-check svg { opacity: 1; }
+
+        .export-config { margin-top: 1rem; border-top: 1px solid var(--glass-border); padding-top: 1rem; }
+        .export-config .ec-title { font: var(--md-label); color: var(--md-on-surface-variant); margin-bottom: .6rem; display: flex; align-items: center; gap: .4rem; }
+
         /* ===================== FAB / 按钮 ===================== */
         .btn {
             border: none; cursor: pointer; font: var(--md-label); font-weight: 700;
@@ -396,7 +411,6 @@
         .btn svg { width: 18px; height: 18px; }
         .btn:active { transform: scale(.96); }
         .btn:disabled { cursor: not-allowed; }
-        /* 轻量按压涟漪：从中心淡出的高光，强化「点击感」而不破坏简洁 */
         .btn::after {
             content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
             background: currentColor; opacity: 0; transition: opacity .4s ease;
@@ -515,7 +529,6 @@
         }
         .download-item:active { background: color-mix(in srgb, var(--md-primary) 20%, transparent); transform: scale(.99); }
         .download-item:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
-        /* 文件类型图标做成实心圆形 chip，提升可读性 */
         .download-item .di-icon {
             flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
             display: grid; place-items: center; color: var(--md-primary);
@@ -524,7 +537,6 @@
         .download-item .di-icon svg { width: 20px; height: 20px; }
         .download-item .di-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .download-item .di-note { font: var(--md-label); font-weight: 400; color: var(--md-error); font-size: 0.72rem; margin-top: 0.15rem; }
-        /* 尾部下载 CTA：明确的「下载」主色胶囊，强调可点击 */
         .download-item .di-cta {
             flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.3rem;
             padding: 0.35rem 0.7rem; border-radius: var(--md-corner-full);
@@ -650,6 +662,9 @@
             <symbol id="ic-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>
             </symbol>
+            <symbol id="ic-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/>
+            </symbol>
             <symbol id="ic-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>
             </symbol>
@@ -665,11 +680,15 @@
             <symbol id="ic-zip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v3M12 3v3M15 3v3M9 18v3M12 18v3M15 18v3M9 6h6v12H9z"/>
             </symbol>
+            <symbol id="ic-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>
+            </symbol>
         </defs>
     </svg>
 
     <!-- App Bar -->
     <header class="app-bar">
+        <button class="icon-btn hidden" id="backBtn" aria-label="返回"><svg><use href="#ic-arrow-left"/></svg></button>
         <div class="brand">
             <div class="logo"><svg><use href="#ic-shield"/></svg></div>
             <div class="titles">
@@ -681,23 +700,23 @@
     </header>
 
     <main class="scroll">
-        <!-- 方向切换 -->
-        <div class="segmented" id="directionSeg">
-            <div class="seg-thumb"></div>
-            <button data-dir="to-kdbx" class="active"><svg><use href="#ic-db"/></svg>导入到 KDBX</button>
-            <button data-dir="to-bitwarden"><svg><use href="#ic-box"/></svg>导出到 Bitwarden</button>
+        <!-- 步骤指示器：传入 → 传出 -->
+        <div class="stepper" id="stepper">
+            <div class="step active" data-step="1"><span class="step-dot">1</span><span class="step-label">传入</span></div>
+            <div class="step-line" id="stepLine"></div>
+            <div class="step" data-step="2"><span class="step-dot">2</span><span class="step-label">传出</span></div>
         </div>
 
-        <!-- 步骤1：选择文件 -->
-        <section class="card" id="uploadCard">
+        <!-- 阶段1：传入（选择并解析源文件）-->
+        <section class="card" id="importCard">
             <div class="card-head">
-                <div class="card-title" id="uploadTitle">选择导出文件</div>
-                <div class="card-desc" id="uploadDesc">自动识别格式，支持多种密码管理器导出</div>
+                <div class="card-title" id="importTitle">传入 · 选择源文件</div>
+                <div class="card-desc">自动识别格式，支持多种密码管理器导出</div>
             </div>
             <div class="dropzone" id="dropzone">
                 <div class="dz-icon"><svg><use href="#ic-upload"/></svg></div>
                 <div class="dz-text">点击或拖拽文件到此处</div>
-                <div class="dz-hint" id="uploadHint">.json / .csv / .zip / .1pux · 最大 100MB</div>
+                <div class="dz-hint" id="importHint">.json / .csv / .zip / .1pux / .kdbx · 最大 100MB</div>
             </div>
             <input type="file" id="fileInput" class="hidden">
             <div id="fileChipWrap" class="hidden">
@@ -711,89 +730,78 @@
                 </div>
             </div>
             <div class="fmt-row" id="fmtRow"></div>
+
+            <!-- 源密码（仅 KDBX 源需要）-->
+            <div id="sourcePwField" class="field hidden" style="margin-top:1rem;">
+                <label for="sourcePassword">数据库主密码（读取源 KDBX）</label>
+                <div class="text-field">
+                    <input type="password" id="sourcePassword" placeholder="输入源数据库密码" autocomplete="off">
+                    <button class="tf-action" id="toggleSourcePw" aria-label="显示密码"><svg><use href="#ic-eye"/></svg></button>
+                </div>
+            </div>
+
+            <!-- 解析预览 -->
+            <div id="previewWrap" class="preview-card hidden">
+                <div class="preview-head"><svg style="width:16px;height:16px;"><use href="#ic-check"/></svg>已识别来源</div>
+                <div class="preview-grid" id="previewGrid"></div>
+            </div>
         </section>
 
-        <!-- 步骤2：配置 -->
-        <section class="card hidden" id="configCard">
+        <!-- 阶段2：传出（选择目标格式）-->
+        <section class="card hidden" id="exportCard">
             <div class="card-head">
-                <div class="card-title" id="configTitle">设置</div>
-                <div class="card-desc" id="configDesc"></div>
+                <div class="card-title">传出 · 选择目标格式</div>
+                <div class="card-desc">可多选，多个格式将打包下载</div>
             </div>
+            <div class="target-grid" id="targetGrid"></div>
 
-            <div id="dbNameField" class="field">
-                <label for="dbName">数据库名称（可选）</label>
-                <div class="text-field">
-                    <input type="text" id="dbName" placeholder="My Vault" autocomplete="off">
+            <!-- KDBX 配置 -->
+            <div id="kdbxConfig" class="export-config hidden">
+                <div class="ec-title"><svg style="width:16px;height:16px;"><use href="#ic-db"/></svg>KeePass KDBX 设置</div>
+                <div class="field" style="margin-bottom:.6rem;">
+                    <label for="dbName">数据库名称（可选）</label>
+                    <div class="text-field">
+                        <input type="text" id="dbName" placeholder="My Vault" autocomplete="off">
+                    </div>
                 </div>
-            </div>
-
-            <div id="dbPasswordField" class="field">
-                <label for="dbPassword">主密码</label>
-                <div class="text-field">
-                    <input type="password" id="dbPassword" placeholder="输入数据库密码" autocomplete="new-password">
-                    <button class="tf-action" id="togglePassword" aria-label="显示密码"><svg><use href="#ic-eye"/></svg></button>
+                <div class="field" style="margin-bottom:.4rem;">
+                    <label for="dbPassword">主密码（用于加密输出 KDBX）</label>
+                    <div class="text-field">
+                        <input type="password" id="dbPassword" placeholder="输入数据库密码" autocomplete="new-password">
+                        <button class="tf-action" id="togglePassword" aria-label="显示密码"><svg><use href="#ic-eye"/></svg></button>
+                    </div>
+                    <div class="pw-meter"><div id="pwBar"></div></div>
+                    <div class="pw-label">
+                        <span id="pwStrength">输入密码以检测强度</span>
+                        <button id="genPw" type="button"><svg><use href="#ic-dice"/></svg>生成</button>
+                    </div>
                 </div>
-                <div class="pw-meter"><div id="pwBar"></div></div>
-                <div class="pw-label">
-                    <span id="pwStrength">输入密码以检测强度</span>
-                    <button id="genPw" type="button"><svg><use href="#ic-dice"/></svg>生成</button>
-                </div>
-            </div>
-
-            <!-- 获取图标 -->
-            <div class="switch-row" id="faviconRow">
-                <div class="sr-text">
-                    <div class="sr-title">获取网站图标</div>
-                    <div class="sr-hint">联网获取条目网站图标并存入 KDBX（实验）</div>
-                </div>
-                <label class="md-switch"><input type="checkbox" id="fetchFavicon"><span class="track"></span><span class="thumb"></span></label>
-            </div>
-
-            <!-- 分离 Passkey -->
-            <div class="switch-row hidden" id="passkeyRow">
-                <div class="sr-text">
-                    <div class="sr-title">同时导出 Passkey 文件<span class="sr-tag">备选</span></div>
-                    <div class="sr-hint" id="passkeyHint">KDBX 已内含 Passkey，此选项额外生成 .passkey 文件便于单独导入</div>
-                </div>
-                <label class="md-switch"><input type="checkbox" id="separatePasskey"><span class="track"></span><span class="thumb"></span></label>
-            </div>
-
-            <!-- 加密导出 -->
-            <div class="switch-row hidden" id="encryptRow">
-                <div class="sr-text">
-                    <div class="sr-title">加密导出<span class="sr-tag">Bitwarden 格式</span></div>
-                    <div class="sr-hint">输出受密码保护的 Bitwarden JSON，可被 Bitwarden 重新解密导入</div>
-                </div>
-                <label class="md-switch"><input type="checkbox" id="encryptExport"><span class="track"></span><span class="thumb"></span></label>
-            </div>
-
-            <!-- 导出格式（仅导出到 Bitwarden 方向） -->
-            <div id="exportFormatsCard" class="hidden" style="margin-top:0.5rem; padding-top:0.85rem; border-top:1px solid var(--border);">
-                <div class="sr-title" style="margin-bottom:0.6rem;">导出格式<span class="sr-tag">结果按所选格式提供</span></div>
                 <div class="switch-row">
                     <div class="sr-text">
-                        <div class="sr-title">1Password 1PUX<span class="sr-tag">双向</span></div>
-                        <div class="sr-hint">结果页额外提供「下载 1Password 1PUX」，便于导入 1Password</div>
+                        <div class="sr-title">获取网站图标</div>
+                        <div class="sr-hint">联网获取条目网站图标并存入 KDBX（实验）</div>
                     </div>
-                    <label class="md-switch"><input type="checkbox" id="export1pux" checked><span class="track"></span><span class="thumb"></span></label>
+                    <label class="md-switch"><input type="checkbox" id="fetchFavicon"><span class="track"></span><span class="thumb"></span></label>
                 </div>
-                <div class="switch-row" id="exportCsvRow">
+                <div class="switch-row" id="passkeyRow">
                     <div class="sr-text">
-                        <div class="sr-title">CSV 通用<span class="sr-tag">备选</span></div>
-                        <div class="sr-hint">提供 CSV 下载（Passkey 无法保留在 CSV 中）</div>
+                        <div class="sr-title">同时导出 Passkey 文件<span class="sr-tag">备选</span></div>
+                        <div class="sr-hint" id="passkeyHint">KDBX 已内含 Passkey，此选项额外生成 .passkey 文件便于单独导入</div>
                     </div>
-                    <label class="md-switch"><input type="checkbox" id="exportCsv" checked><span class="track"></span><span class="thumb"></span></label>
+                    <label class="md-switch"><input type="checkbox" id="separatePasskey"><span class="track"></span><span class="thumb"></span></label>
                 </div>
             </div>
 
-            <div id="encryptFields" class="hidden">
-                <div class="field" style="margin-top:0.75rem;">
+            <!-- 加密 JSON 配置 -->
+            <div id="encConfig" class="export-config hidden">
+                <div class="ec-title"><svg style="width:16px;height:16px;"><use href="#ic-key"/></svg>加密导出设置</div>
+                <div class="field" style="margin-bottom:.4rem;">
                     <label for="exportPassword">导出密码</label>
                     <div class="text-field">
                         <input type="password" id="exportPassword" placeholder="设置加密导出密码" autocomplete="new-password">
                     </div>
                 </div>
-                <div class="field">
+                <div class="field" style="margin-bottom:0;">
                     <label for="saltMode">salt 处理方式</label>
                     <select class="native-select" id="saltMode">
                         <option value="utf8">salt: UTF-8（可被 Bitwarden 导入）</option>
@@ -801,6 +809,8 @@
                     </select>
                 </div>
             </div>
+
+            <div id="startConvertBtnWrap"></div>
         </section>
 
         <!-- 进度 -->
@@ -823,7 +833,7 @@
             <div class="result-details" id="resultDetails"></div>
             <div class="stat-grid" id="statGrid"></div>
             <div class="download-list" id="downloadList"></div>
-            <div class="btn-row">
+            <div class="btn-row" id="resultBtns">
                 <button class="btn btn-tonal" id="newConvertBtn"><svg><use href="#ic-swap"/></svg>转换新文件</button>
             </div>
         </section>
@@ -840,8 +850,8 @@
         <div class="spacer-bottom"></div>
     </main>
 
-    <!-- FAB 下一步 / 开始转换 -->
-    <button class="fab-next hidden" id="fabNext"><svg><use href="#ic-arrow-right"/></svg><span id="fabNextText">下一步</span></button>
+    <!-- FAB：阶段1 解析/下一步 -->
+    <button class="fab-next hidden" id="fabNext"><svg id="fabNextIcon"><use href="#ic-bolt"/></svg><span id="fabNextText">解析并预览</span></button>
 
     <!-- Snackbar -->
     <div class="snackbar" id="snackbar"></div>
@@ -871,7 +881,7 @@
         <div class="sheet-desc">Bitwarden / KeePass / 1Password 密码管理器格式互转 · 纯本地处理，数据不上传服务器。</div>
         <div class="about-item">
             <span class="ai-icon"><svg><use href="#ic-swap"/></svg></span>
-            <div><div class="ai-title">双向互转</div><div class="ai-sub">Bitwarden JSON ↔ KeePass KDBX</div></div>
+            <div><div class="ai-title">任意格式互转</div><div class="ai-sub">KDBX / JSON / 加密 JSON / CSV / 1PUX</div></div>
         </div>
         <div class="about-item">
             <span class="ai-icon"><svg><use href="#ic-shield"/></svg></span>
@@ -896,7 +906,7 @@
     <script src="vendor/kdbxweb.min.js"></script>
     <script src="vendor/argon2.umd.min.js"></script>
     <script src="vendor/jszip.min.js"></script>
-    <!-- 引擎 -->
+    <!-- 引擎（纯转换逻辑）-->
     <script src="engine.js"></script>
     <script>
     (function () {
@@ -905,41 +915,63 @@
 
         // ---------- DOM ----------
         const $ = (id) => document.getElementById(id);
-        const seg = $('directionSeg');
-        const uploadCard = $('uploadCard'), configCard = $('configCard');
+        const stepper = $('stepper'), stepLine = $('stepLine');
+        const importCard = $('importCard'), exportCard = $('exportCard');
         const dropzone = $('dropzone'), fileInput = $('fileInput');
         const fileChipWrap = $('fileChipWrap'), fcName = $('fcName'), fcMeta = $('fcMeta'), fcRemove = $('fcRemove');
         const fmtRow = $('fmtRow');
+        const sourcePwField = $('sourcePwField'), sourcePassword = $('sourcePassword'), toggleSourcePw = $('toggleSourcePw');
+        const previewWrap = $('previewWrap'), previewGrid = $('previewGrid');
+        const targetGrid = $('targetGrid');
+        const kdbxConfig = $('kdbxConfig'), encConfig = $('encConfig');
+        const dbNameField = $('dbName'), dbName = $('dbName');
+        const dbPasswordField = $('dbPassword'), dbPassword = $('dbPassword'), togglePassword = $('togglePassword');
+        const pwBar = $('pwBar'), pwStrength = $('pwStrength'), genPw = $('genPw');
+        const fetchFavicon = $('fetchFavicon');
+        const passkeyRow = $('passkeyRow'), separatePasskey = $('separatePasskey');
+        const exportPassword = $('exportPassword'), saltMode = $('saltMode');
+        const startWrap = $('startConvertBtnWrap');
         const progressCard = $('progressCard'), progressFill = $('progressFill');
         const progressLabel = $('progressLabel'), progressSub = $('progressSub');
-        const resultCard = $('resultCard'), resultDetails = $('resultDetails'), statGrid = $('statGrid'), downloadList = $('downloadList');
+        const resultCard = $('resultCard'), resultDetails = $('resultDetails'), statGrid = $('statGrid'), downloadList = $('downloadList'), resultBtns = $('resultBtns');
         const errorCard = $('errorCard'), errorMsg = $('errorMsg'), retryBtn = $('retryBtn');
-        const fabNext = $('fabNext');
-        const dbNameField = $('dbNameField'), dbName = $('dbName');
-        const dbPasswordField = $('dbPasswordField'), dbPassword = $('dbPassword'), togglePassword = $('togglePassword');
-        const pwBar = $('pwBar'), pwStrength = $('pwStrength'), genPw = $('genPw');
-        const faviconRow = $('faviconRow'), fetchFavicon = $('fetchFavicon');
-        const passkeyRow = $('passkeyRow'), separatePasskey = $('separatePasskey');
-        const encryptRow = $('encryptRow'), encryptExport = $('encryptExport'), encryptFields = $('encryptFields');
-        const exportFormatsCard = $('exportFormatsCard'), export1pux = $('export1pux'), exportCsv = $('exportCsv'), exportCsvRow = $('exportCsvRow');
-        const exportPassword = $('exportPassword'), saltMode = $('saltMode');
-        const newConvertBtn = $('newConvertBtn');
+        const fabNext = $('fabNext'), fabNextText = $('fabNextText'), fabNextIcon = $('fabNextIcon');
+        const backBtn = $('backBtn');
         const snackbar = $('snackbar');
 
         // ---------- 状态 ----------
-        let direction = 'to-kdbx';
+        let stage = 1;
         let selectedFile = null;
+        let sourceExt = '';
+        let sourceDetected = '';
+        let preview = null;
         let lastResult = null;
+        let selectedTargets = new Set(['kdbx']);
         let encResolve = null, encReject = null;
 
-        // ---------- 主题（由 Android 注入，或本地记忆）----------
+        // ---------- 目标格式定义 ----------
+        const TARGETS = [
+            { id: 'kdbx',     label: 'KeePass KDBX',  icon: 'ic-db',  tag: '推荐' },
+            { id: 'json',     label: 'Bitwarden JSON', icon: 'ic-box' },
+            { id: 'encrypted', label: '加密 JSON',     icon: 'ic-key' },
+            { id: 'csv',      label: 'CSV 通用',       icon: 'ic-csv' },
+            { id: '1pux',     label: '1Password 1PUX', icon: 'ic-zip' }
+        ];
+        const FORMAT_BADGES = {
+            'kdbx': 'KeePass KDBX', 'json': 'Bitwarden JSON', 'encrypted': '加密 JSON',
+            'csv': 'CSV 通用', '1pux': '1Password 1PUX', 'zip': 'Bitwarden ZIP',
+            'bitwarden-zip': 'Bitwarden ZIP', 'bitwarden-encrypted': 'Bitwarden 加密 JSON',
+            '1pux-json': '1Password 1PUX'
+        };
+        const ALL_EXT = ['json', 'zip', 'csv', '1pux', 'kdbx'];
+
+        // ---------- 主题 ----------
         const root = document.documentElement;
         function applyTheme(theme) { root.setAttribute('data-theme', theme); syncThemeColor(); }
         function syncThemeColor() {
             const meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--md-surface').trim() || '#141318');
         }
-        // Android 动态取色注入接口
         window.Pass2KDBXDynamic = {
             _mode: 'system',
             apply(colors) {
@@ -954,50 +986,50 @@
                 if (colors.tertiary) root.style.setProperty('--md-tertiary', colors.tertiary);
                 root.setAttribute('data-dynamic', 'true');
             },
-            setSystemDark(isDark) {
-                if (this._mode === 'system') applyTheme(isDark ? 'dark' : 'light');
-            }
+            setSystemDark(isDark) { if (this._mode === 'system') applyTheme(isDark ? 'dark' : 'light'); }
         };
-        // 初始主题：系统优先
         const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         applyTheme(sysDark ? 'dark' : 'light');
 
-        // ---------- 方向切换 ----------
-        seg.querySelectorAll('button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const dir = btn.dataset.dir;
-                if (dir === direction) return;
-                direction = dir;
-                seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
-                seg.classList.toggle('right', dir === 'to-bitwarden');
-                resetAll(true);
-                updateDirectionUI();
+        // ---------- 步骤指示器 ----------
+        function updateStepper() {
+            stepper.querySelectorAll('.step').forEach(s => {
+                const n = parseInt(s.dataset.step, 10);
+                s.classList.toggle('active', n === stage);
+                s.classList.toggle('done', n < stage);
             });
-        });
-
-        const FORMATS = {
-            'to-kdbx': { title: '选择导出文件', desc: '自动识别格式，支持多种密码管理器导出', hint: '.json / .csv / .zip / .1pux · 最大 100MB',
-                badges: ['Bitwarden JSON/ZIP', '1Password 1PUX', 'CSV 通用', 'Chrome CSV', 'Firefox CSV'] },
-                'to-bitwarden': { title: '选择导出文件', desc: '支持 KDBX / CSV / 1PUX / JSON 等格式', hint: '.kdbx / .json / .csv / .zip / .1pux · 最大 100MB',
-                badges: ['KeePass KDBX', '1Password 1PUX', 'CSV 通用', 'Bitwarden JSON', 'Chrome CSV'] }
-        };
-        function updateDirectionUI() {
-            const f = FORMATS[direction];
-            $('uploadTitle').textContent = f.title;
-            $('uploadDesc').textContent = f.desc;
-            $('uploadHint').textContent = f.hint;
-            fmtRow.innerHTML = f.badges.map(b => `<span class="fmt-badge">${b}</span>`).join('');
-            // 配置区字段可见性
-            const isKdbx = direction === 'to-kdbx';
-            faviconRow.classList.toggle('hidden', !isKdbx);
-            encryptRow.classList.toggle('hidden', isKdbx);
-            // 导出格式选择器：仅「导出到 Bitwarden」方向显示
-            exportFormatsCard.classList.toggle('hidden', isKdbx);
-            passkeyRow.classList.add('hidden');
-            // accept
-            fileInput.setAttribute('accept', isKdbx ? '.json,.csv,.zip,.1pux' : '.kdbx,.json,.csv,.zip,.1pux');
+            stepLine.classList.toggle('filled', stage >= 2);
         }
-        updateDirectionUI();
+
+        // ---------- 目标网格渲染 ----------
+        function renderTargets() {
+            targetGrid.innerHTML = '';
+            TARGETS.forEach(t => {
+                const sel = selectedTargets.has(t.id);
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'target-chip' + (sel ? ' selected' : '');
+                chip.innerHTML =
+                    `<span class="tc-icon"><svg><use href="#${t.icon}"/></svg></span>` +
+                    `<span class="tc-label">${t.label}${t.tag ? `<span class="tc-tag">${t.tag}</span>` : ''}</span>` +
+                    `<span class="tc-check"><svg><use href="#ic-check"/></svg></span>`;
+                chip.addEventListener('click', () => {
+                    if (selectedTargets.has(t.id)) {
+                        if (selectedTargets.size > 1) selectedTargets.delete(t.id);
+                        else { showSnack('至少选择一个目标格式', 'error'); return; }
+                    } else selectedTargets.add(t.id);
+                    renderTargets();
+                    updateExportConfig();
+                });
+                targetGrid.appendChild(chip);
+            });
+        }
+        function updateExportConfig() {
+            kdbxConfig.classList.toggle('hidden', !selectedTargets.has('kdbx'));
+            encConfig.classList.toggle('hidden', !selectedTargets.has('encrypted'));
+            // 分离 Passkey 仅在选择了 KDBX 且源疑似含 passkey 时提示（preview 阶段已无此信息，保留可选项）
+            updateConvertState();
+        }
 
         // ---------- 文件选择 ----------
         dropzone.addEventListener('click', () => fileInput.click());
@@ -1010,97 +1042,111 @@
         fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
 
         function handleFile(file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            const allFormats = ['json', 'zip', 'csv', '1pux', 'kdbx'];
-            if (!allFormats.includes(ext)) { showSnack('请选择 .json / .csv / .zip / .1pux / .kdbx 格式的文件', 'error'); return; }
-            if (ext === 'kdbx' && direction === 'to-kdbx') { showSnack('KDBX 文件请切换到「→ Bitwarden」方向使用', 'error'); return; }
+            sourceExt = (file.name.split('.').pop() || '').toLowerCase();
+            if (!ALL_EXT.includes(sourceExt)) { showSnack('请选择 .json / .csv / .zip / .1pux / .kdbx 格式的文件', 'error'); return; }
             if (file.size > 100 * 1024 * 1024) { showSnack('文件大小不能超过 100MB', 'error'); return; }
             selectedFile = file;
+            preview = null;
+            sourceDetected = '';
             fcName.textContent = file.name;
-            fcMeta.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB · ${ext.toUpperCase()}`;
+            fcMeta.textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB · ${sourceExt.toUpperCase()}`;
             fileChipWrap.classList.remove('hidden');
             dropzone.classList.add('hidden');
+            previewWrap.classList.add('hidden');
+            fmtRow.innerHTML = '';
+            // KDBX 源需要密码
+            sourcePwField.classList.toggle('hidden', sourceExt !== 'kdbx');
+            sourcePassword.value = '';
+            if (sourceExt === 'kdbx') dbName.value = file.name.replace(/\.(json|zip|csv|1pux|kdbx)$/i, '') || 'My Vault';
+            // FAB：解析并预览
             fabNext.classList.remove('hidden');
-            $('fabNextText').textContent = '下一步';
-            const baseName = file.name.replace(/\.(json|zip|csv|1pux|kdbx)$/i, '');
-            dbName.value = baseName || 'My Vault';
-            // 预扫描 passkey
-            if (direction === 'to-kdbx') checkForPasskeys(file);
-        }
-        fcRemove.addEventListener('click', () => {
-            selectedFile = null; fileChipWrap.classList.add('hidden'); dropzone.classList.remove('hidden');
-            fabNext.classList.add('hidden'); fileInput.value = '';
-        });
-
-        async function checkForPasskeys(file) {
-            try {
-                const ext = file.name.split('.').pop().toLowerCase();
-                let text;
-                if (ext === 'zip') { const jd = await Engine.readZipJsonData(file); if (!jd) return; text = jd; }
-                else if (ext === '1pux') { return; } // 1PUX 不预扫描
-                else text = await file.text();
-                const json = JSON.parse(text);
-                let passkeyCount = 0;
-                for (const item of (json.items || [])) {
-                    if (item.deletedDate) continue;
-                    const fidos = item.fido2Credentials || (item.login && item.login.fido2Credentials) || [];
-                    passkeyCount += fidos.length;
-                }
-                if (passkeyCount > 0) {
-                    passkeyRow.classList.remove('hidden');
-                    $('passkeyHint').textContent = `检测到 ${passkeyCount} 个 Passkey。勾选后将额外生成 .passkey 文件便于单独导入。KDBX 中已包含 Passkey 数据。`;
-                }
-            } catch (_) {}
-        }
-
-        // ---------- FAB 下一步 / 开始 ----------
-        fabNext.addEventListener('click', () => {
-            if (!selectedFile) return;
-            if (fabNext.dataset.step === 'convert') { startConversion(); return; }
-            // 进入配置
-            uploadCard.classList.add('hidden');
-            configCard.classList.remove('hidden');
-            configCard.classList.add('fade-in');
-            configureConfigCard();
-            fabNext.dataset.step = 'convert';
-            $('fabNextText').textContent = '开始转换';
-            fabNext.classList.add('hidden'); // 隐藏 FAB，用卡片内按钮
-            renderConfigFab();
-        });
-
-        function configureConfigCard() {
-            const isKdbx = direction === 'to-kdbx';
-            $('configTitle').textContent = isKdbx ? '设置 KeePass 数据库' : '导出选项';
-            dbNameField.style.display = isKdbx ? '' : 'none';
-            if (isKdbx) {
-                $('configDesc').textContent = '此密码将用于加密您的 KeePass 数据库';
-                dbPasswordField.style.display = '';
-            } else {
-                const ext = selectedFile.name.split('.').pop().toLowerCase();
-                if (ext === 'kdbx') {
-                    $('configDesc').textContent = '输入 KDBX 文件的主密码以读取内容';
-                    dbPasswordField.style.display = '';
-                } else {
-                    $('configDesc').textContent = '可勾选「加密导出」设置密码保护；不勾选则生成明文 JSON';
-                    dbPasswordField.style.display = 'none';
-                }
-                // CSV 仅 KDBX 源可用，非 KDBX 源隐藏该选项
-                if (exportCsvRow) exportCsvRow.classList.toggle('hidden', ext !== 'kdbx');
-            }
+            fabNext.dataset.step = 'preview';
+            fabNextText.textContent = '解析并预览';
+            fabNextIcon.querySelector('use').setAttribute('href', '#ic-bolt');
             updateConvertState();
         }
+        fcRemove.addEventListener('click', () => {
+            selectedFile = null; preview = null; sourceExt = '';
+            fileChipWrap.classList.add('hidden'); dropzone.classList.remove('hidden');
+            previewWrap.classList.add('hidden'); sourcePwField.classList.add('hidden');
+            fabNext.classList.add('hidden'); fileInput.value = '';
+            backBtn.classList.add('hidden');
+        });
 
-        // 在配置卡片底部动态放一个开始按钮（代替 FAB）
-        function renderConfigFab() {
-            let b = $('startConvertBtn');
-            if (!b) {
-                b = document.createElement('button');
-                b.id = 'startConvertBtn'; b.className = 'btn btn-primary btn-block start-convert-btn';
-                b.innerHTML = '<svg><use href="#ic-bolt"/></svg>开始转换';
-                b.addEventListener('click', startConversion);
-                configCard.appendChild(b);
+        toggleSourcePw.addEventListener('click', () => {
+            const t = sourcePassword.type === 'password' ? 'text' : 'password';
+            sourcePassword.type = t; setEye(toggleSourcePw, t !== 'password');
+        });
+
+        // ---------- FAB 行为 ----------
+        fabNext.addEventListener('click', () => {
+            if (!selectedFile) return;
+            if (fabNext.dataset.step === 'preview') doPreview();
+            else if (fabNext.dataset.step === 'next') goStage2();
+        });
+
+        // ---------- 解析并预览（阶段1）----------
+        async function doPreview() {
+            if (!selectedFile) return;
+            if (sourceExt === 'kdbx' && !sourcePassword.value) { showSnack('请输入源数据库密码', 'error'); return; }
+            showProgress('正在解析源文件…');
+            try {
+                preview = await Engine.parseSource({
+                    file: selectedFile,
+                    sourcePassword: sourcePassword.value,
+                    dbPassword: sourcePassword.value,
+                    onRequestPassword: requestPassword,
+                    onProgress: onProgress
+                });
+                sourceDetected = preview.sourceLabel;
+                showPreview(preview);
+                fabNext.dataset.step = 'next';
+                fabNextText.textContent = '下一步';
+                fabNextIcon.querySelector('use').setAttribute('href', '#ic-arrow-right');
+                showSnack('解析完成', 'success');
+            } catch (err) {
+                console.error(err);
+                if (err.message === '用户取消') { showImport(); return; }
+                let msg = err.message || '未知错误';
+                if (err.code === 'InvalidKey') msg = '密码错误，请检查源 KDBX 数据库密码';
+                else if (err.code === 'BadSignature') msg = '无效的 KDBX 文件';
+                else if (err.code === 'FileCorrupt') msg = '文件已损坏';
+                showError(msg);
             }
         }
+        function showPreview(p) {
+            progressCard.classList.add('hidden');
+            importCard.classList.remove('hidden');
+            fmtRow.innerHTML = (FORMAT_BADGES[sourceDetected] ? [FORMAT_BADGES[sourceDetected]] : []).map(b => `<span class="fmt-badge">${b}</span>`).join('');
+            previewGrid.innerHTML =
+                `<div class="pv-cell"><div class="pv-num">${p.sourceLabel}</div><div class="pv-label">来源格式</div></div>` +
+                `<div class="pv-cell"><div class="pv-num">${p.liveCount}</div><div class="pv-label">有效条目</div></div>` +
+                `<div class="pv-cell"><div class="pv-num">${p.folders}</div><div class="pv-label">文件夹</div></div>`;
+            previewWrap.classList.remove('hidden');
+        }
+
+        // ---------- 进入阶段2 ----------
+        function goStage2() {
+            stage = 2;
+            importCard.classList.add('hidden');
+            exportCard.classList.remove('hidden');
+            exportCard.classList.add('fade-in');
+            fabNext.classList.add('hidden');
+            backBtn.classList.remove('hidden');
+            updateStepper();
+            renderTargets();
+            updateExportConfig();
+            window.scrollTo({ top: 0 });
+        }
+        backBtn.addEventListener('click', () => {
+            stage = 1;
+            exportCard.classList.add('hidden');
+            importCard.classList.remove('hidden');
+            backBtn.classList.add('hidden');
+            updateStepper();
+            // 若已预览，恢复 FAB 为「下一步」
+            if (preview) { fabNext.classList.remove('hidden'); fabNext.dataset.step = 'next'; fabNextText.textContent = '下一步'; fabNextIcon.querySelector('use').setAttribute('href', '#ic-arrow-right'); }
+        });
 
         // ---------- 密码强度 ----------
         function setEye(btn, show) {
@@ -1134,42 +1180,38 @@
             updatePasswordStrength(); updateConvertState();
         });
 
-        // ---------- 加密导出联动 ----------
-        encryptExport.addEventListener('change', () => {
-            encryptFields.classList.toggle('hidden', !encryptExport.checked);
-            updateConvertState();
-        });
         exportPassword.addEventListener('input', updateConvertState);
 
+        // ---------- 转换按钮状态 ----------
         function updateConvertState() {
-            const b = $('startConvertBtn');
-            if (!b) return;
-            if (direction === 'to-kdbx') { b.disabled = dbPassword.value.length < 1; return; }
-            const ext = selectedFile ? selectedFile.name.split('.').pop().toLowerCase() : '';
-            if (ext === 'kdbx') { b.disabled = dbPassword.value.length < 1; return; }
-            if (encryptExport.checked) b.disabled = exportPassword.value.length < 1;
-            else b.disabled = false;
+            let b = $('startConvertBtn');
+            if (!b) {
+                b = document.createElement('button');
+                b.id = 'startConvertBtn'; b.className = 'btn btn-primary btn-block start-convert-btn';
+                b.innerHTML = '<svg><use href="#ic-bolt"/></svg>开始转换';
+                b.addEventListener('click', startConversion);
+                startWrap.appendChild(b);
+            }
+            if (selectedTargets.size === 0) { b.disabled = true; return; }
+            if (selectedTargets.has('kdbx') && dbPassword.value.length < 1) { b.disabled = true; return; }
+            if (selectedTargets.has('encrypted') && exportPassword.value.length < 1) { b.disabled = true; return; }
+            b.disabled = false;
         }
 
-        // ---------- 转换 ----------
+        // ---------- 转换（阶段2）----------
         function startConversion() {
-            if (!selectedFile) return;
-            const ext = selectedFile.name.split('.').pop().toLowerCase();
-            const needsPassword = (direction === 'to-kdbx') || (direction === 'to-bitwarden' && ext === 'kdbx');
-            if (needsPassword && !dbPassword.value) return;
-            if (direction === 'to-bitwarden' && encryptExport.checked && !exportPassword.value) { showSnack('请设置加密导出密码', 'error'); return; }
-
-            showProgress();
+            if (!selectedFile || selectedTargets.size === 0) return;
+            if (selectedTargets.has('kdbx') && !dbPassword.value) return;
+            if (selectedTargets.has('encrypted') && !exportPassword.value) { showSnack('请设置加密导出密码', 'error'); return; }
+            showProgress('正在转换…');
             Engine.run({
                 file: selectedFile,
-                direction,
+                sourcePassword: sourcePassword.value,
+                targets: [...selectedTargets],
                 dbPassword: dbPassword.value,
                 dbName: dbName.value,
                 separatePasskey: separatePasskey.checked,
                 fetchFavicon: fetchFavicon.checked,
-                encryptExport: encryptExport.checked,
-                export1pux: export1pux.checked,
-                exportCsv: exportCsv.checked,
                 exportPassword: exportPassword.value,
                 saltMode: saltMode.value,
                 onProgress: onProgress,
@@ -1179,23 +1221,24 @@
                 showResult(result);
             }).catch(err => {
                 console.error(err);
-                if (err.message === '用户取消') { showUpload(); return; }
+                if (err.message === '用户取消') { showImport(); return; }
                 let msg = err.message || '未知错误';
-                if (err.code === 'InvalidKey') msg = '密码错误，请检查 KeePass 数据库密码';
+                if (err.code === 'InvalidKey') msg = '密码错误，请检查源 KDBX 数据库密码';
                 else if (err.code === 'BadSignature') msg = '无效的 KDBX 文件';
                 else if (err.code === 'FileCorrupt') msg = '文件已损坏';
                 showError(msg);
             });
         }
 
-        function showProgress() {
-            uploadCard.classList.add('hidden');
-            configCard.classList.add('hidden');
-            errorCard.classList.add('hidden');
-            resultCard.classList.add('hidden');
+        // ---------- 进度 ----------
+        function showProgress(label) {
+            importCard.classList.add('hidden'); exportCard.classList.add('hidden');
+            errorCard.classList.add('hidden'); resultCard.classList.add('hidden');
+            previewWrap.classList.add('hidden');
             progressCard.classList.remove('hidden');
             progressCard.classList.add('fade-in');
             progressFill.style.width = '0%';
+            if (label) progressLabel.textContent = label;
             setStage('read');
         }
         function onProgress(text) {
@@ -1207,15 +1250,17 @@
             else if (/解析|条目|分组|文件夹/.test(t)) { setStage('parse'); progressFill.style.width = '45%'; }
             else if (/生成|加密|图标|KDBX|JSON/.test(t)) { setStage('build'); progressFill.style.width = '82%'; }
         }
-        function setStage(stage) {
+        function setStage(stageName) {
             const order = ['read', 'parse', 'build', 'done'];
-            const idx = order.indexOf(stage);
+            const idx = order.indexOf(stageName);
             document.querySelectorAll('.stage-chip').forEach(el => {
                 const si = order.indexOf(el.dataset.stage);
                 el.classList.toggle('active', si === idx);
                 el.classList.toggle('done', si < idx);
             });
         }
+
+        // ---------- 结果 ----------
         function showResult(result) {
             progressCard.classList.add('hidden');
             resultCard.classList.remove('hidden');
@@ -1224,34 +1269,63 @@
             resultDetails.textContent = result.summary.details;
             statGrid.innerHTML = result.summary.stats.map(s => `<div class="stat-chip"><div class="stat-num">${s.num}</div><div class="stat-label">${s.label}</div></div>`).join('');
             downloadList.innerHTML = '';
-            result.downloads.forEach((d, i) => {
+            result.downloads.forEach((d) => {
                 const item = document.createElement('button');
                 item.className = 'download-item';
                 const ext = (d.name.split('.').pop() || '').toLowerCase();
                 const iconId = ext === 'kdbx' ? 'ic-db' : (ext === 'csv' ? 'ic-csv' : (ext === 'zip' ? 'ic-zip' : (ext === '1pux' ? 'ic-box' : 'ic-box')));
-                const warn = d.csvNote ? `<div class="di-note"><svg style="width:12px;height:12px;vertical-align:-1px;"><use href="#ic-warn"/></svg> ${d.csvNote}</div>` : (d._1puxNote ? `<div class="di-note" style="color:var(--md-primary);">${d._1puxNote}</div>` : '');
+                const warn = d.note
+                    ? `<div class="di-note"><svg style="width:12px;height:12px;vertical-align:-1px;"><use href="#ic-warn"/></svg> ${d.note}</div>`
+                    : (d.info ? `<div class="di-note" style="color:var(--md-primary);">${d.info}</div>` : '');
                 item.innerHTML = `<span class="di-icon"><svg><use href="#${iconId}"/></svg></span><div style="flex:1;min-width:0;"><div class="di-name">${d.name}</div>${warn}</div><span class="di-cta"><svg><use href="#ic-download"/></svg>下载</span>`;
                 item.addEventListener('click', () => downloadBlob(d.data, d.name, d.mime));
                 downloadList.appendChild(item);
             });
+            // 多个产物：打包下载 ZIP
+            const oldZip = $('zipDownloadBtn'); if (oldZip) oldZip.remove();
+            if (result.downloads.length > 1) {
+                const zb = document.createElement('button');
+                zb.id = 'zipDownloadBtn'; zb.className = 'btn btn-tonal btn-block';
+                zb.style.marginTop = '1rem';
+                zb.innerHTML = '<svg><use href="#ic-package"/></svg>打包下载全部（ZIP）';
+                zb.addEventListener('click', downloadZip);
+                resultBtns.parentNode.insertBefore(zb, resultBtns);
+            }
+            // 移除 passkey 行（阶段2 不预扫描）
             window.scrollTo({ top: 0 });
             showSnack('转换完成！', 'success');
         }
+        async function downloadZip() {
+            if (!lastResult) return;
+            showSnack('正在打包…');
+            try {
+                const JSZipCtor = window.JSZip.default || window.JSZip;
+                const zip = new JSZipCtor();
+                for (const d of lastResult.downloads) {
+                    const buf = await d.data.arrayBuffer();
+                    zip.file(d.name, buf);
+                }
+                const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+                const base = (selectedFile.name || 'pass2kdbx').replace(/\.(json|zip|csv|1pux|kdbx)$/i, '');
+                downloadBlob(blob, base + '_exports.zip', 'application/zip');
+            } catch (e) { console.error(e); showSnack('打包失败', 'error'); }
+        }
+
         function showError(msg) {
             progressCard.classList.add('hidden');
             errorCard.classList.remove('hidden');
             errorCard.classList.add('fade-in');
-            errorMsg.textContent = msg + (msg.indexOf('诊断') >= 0 ? '' : '');
+            errorMsg.textContent = msg;
             window.scrollTo({ top: 0 });
         }
         retryBtn.addEventListener('click', () => { errorCard.classList.add('hidden'); showProgress(); startConversion(); });
-        newConvertBtn.addEventListener('click', resetAll);
+        $('newConvertBtn').addEventListener('click', resetAll);
 
-        function showUpload() {
-            progressCard.classList.add('hidden'); configCard.classList.add('hidden');
+        function showImport() {
+            progressCard.classList.add('hidden'); exportCard.classList.add('hidden');
             errorCard.classList.add('hidden'); resultCard.classList.add('hidden');
-            uploadCard.classList.remove('hidden');
-            resetAll();
+            importCard.classList.remove('hidden');
+            stage = 1; updateStepper();
         }
 
         // ---------- 下载（Android 走原生，否则 blob）----------
@@ -1305,7 +1379,6 @@
         aboutScrim.addEventListener('click', closeAbout);
         $('aboutClose').addEventListener('click', closeAbout);
         $('aboutVersion').textContent = 'v' + (Engine.APP_VERSION || '2.2');
-        // 主题选择
         const themeOptions = $('themeOptions');
         function refreshThemeButtons() {
             themeOptions.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.themeMode === Pass2KDBXDynamic._mode));
@@ -1331,14 +1404,27 @@
 
         // ---------- 重置 ----------
         function resetAll() {
-            selectedFile = null; lastResult = null;
+            stage = 1;
+            selectedFile = null; preview = null; sourceExt = ''; lastResult = null;
             fileInput.value = ''; fileChipWrap.classList.add('hidden'); dropzone.classList.remove('hidden');
+            previewWrap.classList.add('hidden'); sourcePwField.classList.add('hidden');
             fabNext.classList.add('hidden'); delete fabNext.dataset.step;
+            backBtn.classList.add('hidden');
             dbPassword.value = ''; pwBar.style.width = '0'; pwStrength.textContent = '输入密码以检测强度';
-            separatePasskey.checked = false; fetchFavicon.checked = false; encryptExport.checked = false;
-            encryptFields.classList.add('hidden'); exportPassword.value = '';
-            configCard.classList.add('hidden'); uploadCard.classList.remove('hidden');
+            separatePasskey.checked = false; fetchFavicon.checked = false; exportPassword.value = '';
+            selectedTargets = new Set(['kdbx']);
+            exportCard.classList.add('hidden'); importCard.classList.remove('hidden');
             const b = $('startConvertBtn'); if (b) b.remove();
+            const zb = $('zipDownloadBtn'); if (zb) zb.remove();
+            updateStepper();
+            window.scrollTo({ top: 0 });
+        }
+
+        // ---------- 注册 Service Worker（仅 https/http 且非 App WebView，避免 404）----------
+        if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0 && !window.AndroidFileSaver) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
         }
     })();
     </script>

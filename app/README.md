@@ -26,7 +26,7 @@ app/
 
 ## 与网页版的关系
 
-- **App 前端已从网页版独立**：`assets/index.html` 是一套**全新的 Material Design 3（MD3）界面**，目标是有别于网页端的「现代化安卓 App」观感（大圆角、surface 分层、Material 开关/分段控件、FAB、Snackbar、Bottom Sheet、动态取色）。
+- **App 与网页版共用同一套 MD3 实现（单一来源 `web/`）**：`web/index.html` 为唯一前端来源，`assets/index.html` 由构建脚本（`build-apk-local.sh` / CI）在打包前从 `web/` 同步而来，二者保持一致。
 - **逻辑层复用**：转换核心抽离为 `assets/engine.js`（无 DOM 的纯函数），通过 `window.Pass2KDBXEngine.run(opts)` 暴露，UI 仅负责交互与渲染，保持与网页版**功能对等**（Bitwarden/KeePass/1Password/CSV 双向转换、Passkey 分离、favicon、加密导出等）。1Password 支持官方 .1pux 平铺结构（fields/sections/urls）与旧式 overview/details 双兼容，反向导出 KDBX → 1Password .1pux 也已支持。
 - **依赖本地化**：`kdbxweb` / `hash-wasm(Argon2)` / `JSZip` 已下载至 `assets/vendor/`，WebView 在 `file://` 下**完全离线**运行，不再依赖 CDN。
 - **已移除 web 专用产物**：`sw.js`、`CNAME`、`manifest.json`、`debug-test.html` 等与 WebView 无关的文件不再随 App 打包。
@@ -44,7 +44,7 @@ app/
 - **深色 / 浅色兼容**：默认跟随系统；App 内部「关于」面板的主题选项可手动选 系统/浅色/深色 并记忆，切换时同步 `meta theme-color`（影响安卓状态栏/导航栏配色）。
 - **动态取色（Android 12+）**：`MainActivity` 通过 `WallpaperManager.getWallpaperColors()` 读取壁纸主色，扩展为全套 MD3 变量（primary / onPrimary / primaryContainer / secondary / tertiary …），在 `onPageFinished` 用 `evaluateJavascript` 调用前端 `window.Pass2KDBXDynamic.apply({primary, onPrimary, primaryContainer, ...})`，前端写入 `--md-*` CSS 变量并打 `data-dynamic="true"` 标记。
   - **降级**：Android < 12 不支持壁纸取色，沿用默认 MD3 紫色基线，UI 不受影响。
-- 前端为**独立 MD3 实现**（见上文「与网页版的关系」），UI 改动只落在 `app/src/main/assets/`。
+- 前端**单一来源为 `web/`**（见上文「与网页版的关系」），UI 改动应落在 `web/`，由构建脚本同步到 `app/src/main/assets/`。
 
 ## 本地构建
 
