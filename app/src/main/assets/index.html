@@ -1641,8 +1641,12 @@
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
             const arr = new Uint8Array(24); crypto.getRandomValues(arr);
             let pw = ''; for (let i = 0; i < 24; i++) pw += chars[arr[i] % chars.length];
+            dbPassword.removeAttribute('readonly'); // 允许写入
             dbPassword.value = pw; dbPassword.type = 'text'; setEye(togglePassword, true);
-            updatePasswordStrength(); updateConvertState();
+            updatePasswordStrength(); updateConvertState(); updatePwPreview();
+            // 自动复制到剪切板
+            try { navigator.clipboard.writeText(pw).then(() => showSnack('已复制到剪切板 · 请妥善保存', 'success'), () => showSnack('密码已生成（复制功能未启用）', 'info')); }
+            catch (e) { showSnack('密码已生成，长按输入框手动复制', 'info'); }
         });
 
         exportPassword.addEventListener('input', updateConvertState);
