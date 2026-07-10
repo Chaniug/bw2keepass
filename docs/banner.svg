@@ -1,0 +1,108 @@
+<svg width="880" height="300" viewBox="0 0 880 300" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="880" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B1A22"/>
+      <stop offset="0.55" stop-color="#221F2E"/>
+      <stop offset="1" stop-color="#171622"/>
+    </linearGradient>
+    <radialGradient id="glowP" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8B6CE0" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#8B6CE0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#37C6D6" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#37C6D6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="40" y1="120" x2="400" y2="170" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#D8CBFF"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D0BCFF"/>
+      <stop offset="1" stop-color="#4DD0E1"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="46"/>
+    </filter>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- backdrop -->
+  <rect x="0" y="0" width="880" height="300" rx="28" fill="url(#bg)"/>
+  <circle cx="150" cy="70" r="140" fill="url(#glowP)" filter="url(#blur)"/>
+  <circle cx="760" cy="250" r="150" fill="url(#glowC)" filter="url(#blur)"/>
+  <rect x="1" y="1" width="878" height="298" rx="27" fill="none" stroke="#FFFFFF" stroke-opacity="0.08"/>
+
+  <!-- left: brand -->
+  <g transform="translate(48,64)">
+    <!-- lock badge -->
+    <g filter="url(#soft)">
+      <rect x="0" y="0" width="52" height="52" rx="15" fill="url(#ring)"/>
+      <path d="M26 13c-6 0-10 4-10 10v4h-2a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h24a3 3 0 0 0 3-3V30a3 3 0 0 0-3-3h-2v-4c0-6-4-10-10-10zm0 5c3 0 5 2 5 5v4H21v-4c0-3 2-5 5-5zm0 16a3 3 0 0 1 1 6v3a1 1 0 0 1-2 0v-3a3 3 0 0 1 1-6z" fill="#231A3A"/>
+    </g>
+    <text x="66" y="24" font-size="17" font-weight="600" fill="#B9A9F0" letter-spacing="3">SECURE · LOCAL · OFFLINE</text>
+    <text x="0" y="104" font-size="58" font-weight="800" fill="url(#title)" letter-spacing="-1">Pass2KDBX</text>
+    <text x="2" y="140" font-size="19" font-weight="500" fill="#C8C3D6">密码管理器格式 · 万能互转工具</text>
+    <text x="2" y="168" font-size="14.5" fill="#8E8AA0">纯本地处理 · 数据不经过任何服务器 · Web / Android / CLI</text>
+  </g>
+
+  <!-- right: import -> engine -> export flow -->
+  <g transform="translate(486,58)" font-size="12.5" font-weight="600">
+    <!-- column labels -->
+    <text x="34" y="-12" text-anchor="middle" fill="#9B96AD" font-size="12" letter-spacing="1">传入</text>
+    <text x="330" y="-12" text-anchor="middle" fill="#9B96AD" font-size="12" letter-spacing="1">传出</text>
+
+    <!-- source chips -->
+    <g fill="#EDEAF6">
+      <rect x="0" y="6"  width="86" height="34" rx="10" fill="url(#chip)" stroke="#FFFFFF" stroke-opacity="0.12"/>
+      <text x="43" y="27" text-anchor="middle">Bitwarden</text>
+      <rect x="0" y="48" width="86" height="34" rx="10" fill="url(#chip)" stroke="#FFFFFF" stroke-opacity="0.12"/>
+      <text x="43" y="69" text-anchor="middle">1Password</text>
+      <rect x="0" y="90" width="86" height="34" rx="10" fill="url(#chip)" stroke="#FFFFFF" stroke-opacity="0.12"/>
+      <text x="43" y="111" text-anchor="middle">KeePass</text>
+      <rect x="0" y="132" width="86" height="34" rx="10" fill="url(#chip)" stroke="#FFFFFF" stroke-opacity="0.12"/>
+      <text x="43" y="153" text-anchor="middle">加密 / CSV</text>
+    </g>
+
+    <!-- arrows in -->
+    <g stroke="#7C74A6" stroke-width="1.6" fill="none" opacity="0.7">
+      <path d="M90 23 C120 23 120 80 150 80"/>
+      <path d="M90 65 C120 65 125 80 150 80"/>
+      <path d="M90 107 C120 107 125 80 150 80"/>
+      <path d="M90 149 C120 149 120 80 150 80"/>
+    </g>
+
+    <!-- engine core -->
+    <g transform="translate(150,44)" filter="url(#soft)">
+      <circle cx="36" cy="36" r="36" fill="#2A2440" stroke="url(#ring)" stroke-width="2"/>
+      <path d="M36 18c-7 0-12 5-12 12v4h-2a3.5 3.5 0 0 0-3.5 3.5v13A3.5 3.5 0 0 0 22 54h28a3.5 3.5 0 0 0 3.5-3.5v-13A3.5 3.5 0 0 0 50 34h-2v-4c0-7-5-12-12-12zm0 6c4 0 6 3 6 6v4H30v-4c0-3 2-6 6-6z" fill="url(#ring)"/>
+    </g>
+    <text x="186" y="140" text-anchor="middle" fill="#B9A9F0" font-size="11.5" letter-spacing="1">引擎</text>
+
+    <!-- arrows out -->
+    <g stroke="#4C9AA6" stroke-width="1.6" fill="none" opacity="0.75">
+      <path d="M222 80 C252 80 252 23 282 23"/>
+      <path d="M222 80 C252 80 257 65 282 65"/>
+      <path d="M222 80 C252 80 257 107 282 107"/>
+      <path d="M222 80 C252 80 252 149 282 149"/>
+    </g>
+
+    <!-- target chips -->
+    <g fill="#E8F6F8">
+      <rect x="282" y="6"  width="96" height="34" rx="10" fill="url(#chip)" stroke="#4DD0E1" stroke-opacity="0.25"/>
+      <text x="330" y="27" text-anchor="middle">KDBX</text>
+      <rect x="282" y="48" width="96" height="34" rx="10" fill="url(#chip)" stroke="#4DD0E1" stroke-opacity="0.25"/>
+      <text x="330" y="69" text-anchor="middle">JSON</text>
+      <rect x="282" y="90" width="96" height="34" rx="10" fill="url(#chip)" stroke="#4DD0E1" stroke-opacity="0.25"/>
+      <text x="330" y="111" text-anchor="middle">1PUX</text>
+      <rect x="282" y="132" width="96" height="34" rx="10" fill="url(#chip)" stroke="#4DD0E1" stroke-opacity="0.25"/>
+      <text x="330" y="153" text-anchor="middle">加密 / CSV</text>
+    </g>
+  </g>
+</svg>
