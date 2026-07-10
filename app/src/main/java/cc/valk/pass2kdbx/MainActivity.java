@@ -124,6 +124,8 @@ public class MainActivity extends Activity {
 
         // 注入文件下载接口
         webView.addJavascriptInterface(new FileSaver(this), "AndroidFileSaver");
+        // 注入主题接口：前端选择主题后同步状态栏 / 导航栏图标深浅
+        webView.addJavascriptInterface(new ThemeBridge(), "AndroidTheme");
 
         webView.loadUrl("file:///android_asset/index.html");
     }
@@ -238,6 +240,38 @@ public class MainActivity extends Activity {
         } else {
             // 浅色背景：加 LIGHT_STATUS_BAR，使状态栏图标为深色
             flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        decor.setSystemUiVisibility(flags);
+    }
+
+    // JavaScript 接口：前端选择主题后，同步状态栏 / 导航栏图标深浅
+    // （深色背景 → 浅色图标；浅色背景 → 深色图标），避免浅色主题下图标不可见
+    public class ThemeBridge {
+        @JavascriptInterface
+        public void setDark(final boolean isDark) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        syncStatusBarIcon(isDark);
+                        syncNavBarIcon(isDark);
+                    } catch (Exception e) {
+                        Log.e(TAG, "ThemeBridge.setDark error", e);
+                    }
+                }
+            });
+        }
+    }
+
+    // 根据背景深浅调整导航栏图标颜色（Android 8.0+ 支持浅色导航栏图标）
+    private void syncNavBarIcon(boolean isDark) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        Window window = getWindow();
+        View decor = window.getDecorView();
+        int flags = decor.getSystemUiVisibility();
+        if (isDark) {
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        } else {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
         decor.setSystemUiVisibility(flags);
     }

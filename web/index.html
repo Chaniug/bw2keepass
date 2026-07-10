@@ -103,12 +103,14 @@
         }
 
         /* ===================================================================
-           App 端：纯黑 / 纯白 极简主题
+           App 端：多套极简主题（纯黑白 / 灰阶 / 护眼）
            仅当运行在 Android WebView 内（JS 检测到原生桥接后设置 data-app）时生效，
            网页端不会带 data-app，配色完全不受影响。
+           - 跟随系统：随 Android 深色模式切换纯黑 / 纯白（兼容安卓深色主题）
+           - 其余为固定主题，App 内自选，满足不同喜好
            =================================================================== */
         html[data-app="true"] {
-            /* 深色（纯黑）：高强调元素用纯白 */
+            /* 基础（跟随系统 = 深色 时）纯黑 */
             --md-primary: #ffffff;
             --md-on-primary: #000000;
             --md-primary-container: #202024;
@@ -141,7 +143,7 @@
             --md-outline-variant: rgba(255, 255, 255, 0.08);
         }
         html[data-app="true"][data-theme="light"] {
-            /* 浅色（纯白）：高强调元素用纯黑 */
+            /* 基础（跟随系统 = 浅色 时）纯白 */
             --md-primary: #000000;
             --md-on-primary: #ffffff;
             --md-primary-container: #ececec;
@@ -172,9 +174,168 @@
             --md-outline: rgba(0, 0, 0, 0.18);
             --md-outline-variant: rgba(0, 0, 0, 0.08);
         }
-        /* App 背景：干净的纯黑 / 纯白，去掉彩色渐变与漂浮光斑 */
+
+        /* ---------- 固定主题（data-apptheme="..."）---------- */
+        /* 纯黑：等同基础深色（显式声明，便于在浅色系统下锁定纯黑） */
+        html[data-app="true"][data-apptheme="black"] {
+            --md-primary: #ffffff;
+            --md-on-primary: #000000;
+            --md-primary-container: #202024;
+            --md-on-primary-container: #ffffff;
+            --md-secondary: #d6d6d9;
+            --md-on-secondary: #000000;
+            --md-secondary-container: #202024;
+            --md-on-secondary-container: #ececef;
+            --md-tertiary: #d6d6d9;
+            --md-on-tertiary: #000000;
+            --md-tertiary-container: #202024;
+            --md-on-tertiary-container: #ececef;
+            --glass-bg: rgba(24, 24, 27, 0.66);
+            --glass-bg-strong: rgba(34, 34, 38, 0.82);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-hi: rgba(255, 255, 255, 0.05);
+            --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.45);
+            --md-surface: #000000;
+            --md-surface-1: rgba(22, 22, 25, 0.7);
+            --md-surface-2: rgba(30, 30, 34, 0.7);
+            --md-surface-3: rgba(38, 38, 42, 0.75);
+            --md-surface-container-high: rgba(32, 32, 36, 0.75);
+            --md-on-surface: #ffffff;
+            --md-on-surface-variant: #a4a4a8;
+            --md-outline: rgba(255, 255, 255, 0.16);
+            --md-outline-variant: rgba(255, 255, 255, 0.08);
+        }
+        /* 深灰：比纯黑柔和，长时间观看更舒服 */
+        html[data-app="true"][data-apptheme="gray"] {
+            --md-primary: #ffffff;
+            --md-on-primary: #1a1a1c;
+            --md-primary-container: #2a2a2e;
+            --md-on-primary-container: #ffffff;
+            --md-secondary: #cfcfd4;
+            --md-on-secondary: #1a1a1c;
+            --md-secondary-container: #2a2a2e;
+            --md-on-secondary-container: #e6e6ea;
+            --md-tertiary: #cfcfd4;
+            --md-on-tertiary: #1a1a1c;
+            --md-tertiary-container: #2a2a2e;
+            --md-on-tertiary-container: #e6e6ea;
+            --glass-blur: 20px;
+            --glass-bg: rgba(38, 38, 42, 0.60);
+            --glass-bg-strong: rgba(46, 46, 50, 0.78);
+            --glass-border: rgba(255, 255, 255, 0.10);
+            --glass-hi: rgba(255, 255, 255, 0.04);
+            --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.40);
+            --md-surface: #161618;
+            --md-surface-1: rgba(34, 34, 38, 0.66);
+            --md-surface-2: rgba(44, 44, 49, 0.66);
+            --md-surface-3: rgba(52, 52, 58, 0.70);
+            --md-surface-container-high: rgba(46, 46, 51, 0.70);
+            --md-on-surface: #f3f3f5;
+            --md-on-surface-variant: #9a9aa0;
+            --md-outline: rgba(255, 255, 255, 0.14);
+            --md-outline-variant: rgba(255, 255, 255, 0.07);
+        }
+        /* 护眼：暖色深色，夜间阅读不刺眼 */
+        html[data-app="true"][data-apptheme="sepia"] {
+            --md-primary: #e9dcc4;
+            --md-on-primary: #2a2114;
+            --md-primary-container: #33291a;
+            --md-on-primary-container: #f1e6cf;
+            --md-secondary: #d9cbb0;
+            --md-on-secondary: #2a2114;
+            --md-secondary-container: #33291a;
+            --md-on-secondary-container: #e7d9bf;
+            --md-tertiary: #d9cbb0;
+            --md-on-tertiary: #2a2114;
+            --md-tertiary-container: #33291a;
+            --md-on-tertiary-container: #e7d9bf;
+            --glass-blur: 18px;
+            --glass-bg: rgba(40, 32, 22, 0.66);
+            --glass-bg-strong: rgba(50, 40, 28, 0.82);
+            --glass-border: rgba(233, 220, 196, 0.14);
+            --glass-hi: rgba(233, 220, 196, 0.06);
+            --glass-shadow: 0 8px 30px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.40);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.45);
+            --md-surface: #1c1813;
+            --md-surface-1: rgba(40, 32, 22, 0.70);
+            --md-surface-2: rgba(52, 42, 30, 0.70);
+            --md-surface-3: rgba(62, 50, 36, 0.75);
+            --md-surface-container-high: rgba(54, 43, 30, 0.75);
+            --md-on-surface: #ece0c8;
+            --md-on-surface-variant: #b3a288;
+            --md-outline: rgba(233, 220, 196, 0.16);
+            --md-outline-variant: rgba(233, 220, 196, 0.08);
+        }
+        /* 纯白：等同基础浅色（深强调元素用纯黑） */
+        html[data-app="true"][data-apptheme="white"] {
+            --md-primary: #000000;
+            --md-on-primary: #ffffff;
+            --md-primary-container: #ececec;
+            --md-on-primary-container: #000000;
+            --md-secondary: #3a3a3c;
+            --md-on-secondary: #ffffff;
+            --md-secondary-container: #f1f1f1;
+            --md-on-secondary-container: #1a1a1a;
+            --md-tertiary: #3a3a3c;
+            --md-on-tertiary: #ffffff;
+            --md-tertiary-container: #f1f1f1;
+            --md-on-tertiary-container: #1a1a1a;
+            --glass-bg: rgba(255, 255, 255, 0.68);
+            --glass-bg-strong: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.10);
+            --glass-hi: rgba(255, 255, 255, 0.7);
+            --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+            --glass-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.10);
+            --md-surface: #ffffff;
+            --md-surface-1: rgba(248, 248, 248, 0.7);
+            --md-surface-2: rgba(242, 242, 242, 0.7);
+            --md-surface-3: rgba(236, 236, 236, 0.75);
+            --md-surface-container-high: rgba(244, 244, 244, 0.75);
+            --md-on-surface: #000000;
+            --md-on-surface-variant: #55555a;
+            --md-outline: rgba(0, 0, 0, 0.18);
+            --md-outline-variant: rgba(0, 0, 0, 0.08);
+        }
+        /* 浅灰：比纯白柔和，减少纯白眩光 */
+        html[data-app="true"][data-apptheme="lightgray"] {
+            --md-primary: #1a1a1c;
+            --md-on-primary: #ffffff;
+            --md-primary-container: #e4e4e8;
+            --md-on-primary-container: #1a1a1c;
+            --md-secondary: #55555a;
+            --md-on-secondary: #ffffff;
+            --md-secondary-container: #e4e4e8;
+            --md-on-secondary-container: #1f1f22;
+            --md-tertiary: #55555a;
+            --md-on-tertiary: #ffffff;
+            --md-tertiary-container: #e4e4e8;
+            --md-on-tertiary-container: #1f1f22;
+            --glass-blur: 20px;
+            --glass-bg: rgba(245, 245, 248, 0.70);
+            --glass-bg-strong: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --glass-hi: rgba(255, 255, 255, 0.80);
+            --glass-shadow: 0 8px 28px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+            --glass-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.08);
+            --md-surface: #f1f1f4;
+            --md-surface-1: rgba(255, 255, 255, 0.70);
+            --md-surface-2: rgba(238, 238, 242, 0.70);
+            --md-surface-3: rgba(228, 228, 233, 0.75);
+            --md-surface-container-high: rgba(236, 236, 240, 0.75);
+            --md-on-surface: #161618;
+            --md-on-surface-variant: #5a5a60;
+            --md-outline: rgba(0, 0, 0, 0.14);
+            --md-outline-variant: rgba(0, 0, 0, 0.07);
+        }
+
+        /* App 背景：干净的纯黑 / 纯白 / 灰阶 / 护眼，去掉彩色渐变与漂浮光斑 */
         html[data-app="true"] body { background: #000000; }
         html[data-app="true"][data-theme="light"] body { background: #ffffff; }
+        html[data-app="true"][data-apptheme="gray"] body { background: #161618; }
+        html[data-app="true"][data-apptheme="sepia"] body { background: #1c1813; }
+        html[data-app="true"][data-apptheme="lightgray"] body { background: #f1f1f4; }
         html[data-app="true"] body::before,
         html[data-app="true"] body::after { display: none; }
         /* App 的品牌 logo 底：纯黑白也保持简洁（去掉彩色投影）*/
@@ -747,6 +908,34 @@
         }
         .theme-options button:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
 
+        /* App 端多主题网格（网页端隐藏，仅 data-app 时显示） */
+        .theme-grid { display: none; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-top: 0.75rem; }
+        html[data-app] .theme-options#themeOptionsWeb { display: none; }
+        html[data-app] .theme-grid { display: grid; }
+        .theme-swatch {
+            position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 0.4rem;
+            padding: 0.55rem 0.4rem 0.5rem; border-radius: 14px; cursor: pointer;
+            border: 1.5px solid var(--md-outline-variant); background: transparent; color: var(--md-on-surface);
+            font: var(--md-label); font-weight: 600;
+            transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+        .theme-swatch .sw {
+            height: 38px; border-radius: 9px; border: 1px solid rgba(127, 127, 127, 0.25);
+            display: grid; place-items: end end; position: relative; overflow: hidden;
+        }
+        .theme-swatch .sw::after {
+            content: ""; width: 14px; height: 14px; margin: 0 7px 7px 0; border-radius: 50%;
+            background: var(--sw-accent, #fff); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+        }
+        .theme-swatch .sw-name { text-align: center; font-size: 0.72rem; line-height: 1.2; }
+        .theme-swatch.active { border-color: var(--md-primary); box-shadow: 0 0 0 1.5px var(--md-primary) inset; }
+        .theme-swatch.active::before {
+            content: "✓"; position: absolute; top: 6px; left: 8px; z-index: 2;
+            font-size: 0.78rem; font-weight: 800; color: var(--md-primary);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+        .theme-swatch:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
+
         /* Sheet 内的主按钮降级：不用全宽 primary 渐变（动态取色下可能发黄），改用 tonal 风格 */
         .sheet .btn-primary {
             background: color-mix(in srgb, var(--md-primary-container) 65%, var(--md-surface));
@@ -1051,11 +1240,14 @@
             <div><div class="ai-title">版本</div><div class="ai-sub" id="aboutVersion">v2.2</div></div>
         </div>
         <div class="card-desc" style="margin:1rem 0 0.5rem;">主题</div>
-        <div class="theme-options" id="themeOptions">
+        <!-- 网页端：跟随系统 / 浅色 / 深色 -->
+        <div class="theme-options" id="themeOptionsWeb">
             <button data-theme-mode="system">跟随系统</button>
             <button data-theme-mode="light">浅色</button>
             <button data-theme-mode="dark">深色</button>
         </div>
+        <!-- App 端：多套主题（JS 注入色板，仅 Android 内显示） -->
+        <div class="theme-grid" id="themeGrid" aria-label="App 主题"></div>
         <div class="btn-row">
             <button class="btn btn-primary" id="aboutClose">关闭</button>
         </div>
@@ -1128,7 +1320,7 @@
 
         // ---------- 主题 ----------
         const root = document.documentElement;
-        // 检测是否运行在 Android App（WebView 注入了原生桥接）——仅 App 端启用纯黑白极简配色
+        // 检测是否运行在 Android App（WebView 注入了原生桥接）——仅 App 端启用多套极简主题
         const IS_APP = !!(window.AndroidFileSaver);
         if (IS_APP) root.setAttribute('data-app', 'true');
         function applyTheme(theme) { root.setAttribute('data-theme', theme); syncThemeColor(); }
@@ -1136,10 +1328,48 @@
             const meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--md-surface').trim() || '#141318');
         }
+        // 通知 Android 同步状态栏 / 导航栏图标颜色（深色背景用浅色图标，浅色背景用深色图标）
+        function syncAndroidChrome(isDarkBg) {
+            if (window.AndroidTheme) { try { window.AndroidTheme.setDark(!!isDarkBg); } catch (e) {} }
+        }
+        // App 端可选主题（跟随系统 + 纯黑 / 深灰 / 护眼 / 纯白 / 浅灰）
+        const APP_THEMES = [
+            { id: 'system',    name: '跟随系统', bg: 'linear-gradient(135deg,#0c0c0e 0 50%,#ffffff 50% 100%)', accent: '#9a9aa0' },
+            { id: 'black',     name: '纯黑',     bg: '#000000', accent: '#ffffff' },
+            { id: 'gray',      name: '深灰',     bg: '#161618', accent: '#ffffff' },
+            { id: 'sepia',     name: '护眼',     bg: '#1c1813', accent: '#e9dcc4' },
+            { id: 'white',     name: '纯白',     bg: '#ffffff', accent: '#000000' },
+            { id: 'lightgray', name: '浅灰',     bg: '#f1f1f4', accent: '#1a1a1c' }
+        ];
+        const APP_THEME_KEY = 'pass2kdbx_apptheme';
+        let themeGrid = null;
+        // 固定主题是否为深色背景（决定状态栏图标）；“跟随系统”随当前系统
+        function themeIsDarkBg(id) {
+            if (id === 'system') return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            return !(id === 'white' || id === 'lightgray');
+        }
+        function applyAppTheme(id) {
+            if (id === 'system') {
+                root.removeAttribute('data-apptheme');
+                applyTheme((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+            } else {
+                const dark = themeIsDarkBg(id);
+                root.setAttribute('data-apptheme', id);
+                applyTheme(dark ? 'dark' : 'light');
+            }
+            Pass2KDBXDynamic._mode = id;
+            syncAndroidChrome(themeIsDarkBg(id));
+            try { localStorage.setItem(APP_THEME_KEY, id); } catch (e) {}
+            refreshThemeGrid();
+        }
+        function refreshThemeGrid() {
+            if (!themeGrid) return;
+            themeGrid.querySelectorAll('.theme-swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === Pass2KDBXDynamic._mode));
+        }
         window.Pass2KDBXDynamic = {
             _mode: 'system',
             apply(colors) {
-                // App 端固定使用纯黑白极简配色，忽略系统壁纸动态取色
+                // App 端固定使用极简配色，忽略系统壁纸动态取色
                 if (root.getAttribute('data-app') === 'true') return;
                 if (!colors) return;
                 if (colors.primary) root.style.setProperty('--md-primary', colors.primary);
@@ -1152,10 +1382,43 @@
                 if (colors.tertiary) root.style.setProperty('--md-tertiary', colors.tertiary);
                 root.setAttribute('data-dynamic', 'true');
             },
-            setSystemDark(isDark) { if (this._mode === 'system') applyTheme(isDark ? 'dark' : 'light'); }
+            // 系统深浅变化：仅“跟随系统”主题才响应，并同步安卓状态栏图标
+            setSystemDark(isDark) {
+                if (this._mode === 'system') {
+                    applyTheme(isDark ? 'dark' : 'light');
+                    syncAndroidChrome(isDark);
+                }
+            }
         };
         const sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         applyTheme(sysDark ? 'dark' : 'light');
+
+        // App 端：构建主题色板网格，并应用已保存主题（默认跟随系统）
+        if (IS_APP) {
+            themeGrid = $('themeGrid');
+            APP_THEMES.forEach(t => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'theme-swatch';
+                btn.dataset.theme = t.id;
+                btn.setAttribute('aria-label', t.name);
+                const sw = document.createElement('span');
+                sw.className = 'sw';
+                sw.style.background = t.bg;
+                sw.style.setProperty('--sw-accent', t.accent);
+                const nm = document.createElement('span');
+                nm.className = 'sw-name';
+                nm.textContent = t.name;
+                btn.appendChild(sw); btn.appendChild(nm);
+                btn.addEventListener('click', () => applyAppTheme(t.id));
+                themeGrid.appendChild(btn);
+            });
+            let saved = null;
+            try { saved = localStorage.getItem(APP_THEME_KEY); } catch (e) {}
+            if (!APP_THEMES.some(t => t.id === saved)) saved = 'system';
+            Pass2KDBXDynamic._mode = saved;
+            applyAppTheme(saved);
+        }
 
         // ---------- 步骤指示器 ----------
         function updateStepper() {
@@ -1549,19 +1812,22 @@
         aboutScrim.addEventListener('click', closeAbout);
         $('aboutClose').addEventListener('click', closeAbout);
         $('aboutVersion').textContent = 'v' + (Engine.APP_VERSION || '2.2');
-        const themeOptions = $('themeOptions');
-        function refreshThemeButtons() {
-            themeOptions.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.themeMode === Pass2KDBXDynamic._mode));
-        }
-        themeOptions.querySelectorAll('button').forEach(b => {
-            b.addEventListener('click', () => {
-                Pass2KDBXDynamic._mode = b.dataset.themeMode;
-                if (b.dataset.themeMode === 'system') applyTheme((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
-                else applyTheme(b.dataset.themeMode);
-                refreshThemeButtons();
+        // 网页端主题切换（跟随系统 / 浅色 / 深色）；App 端由主题网格接管，此逻辑不执行
+        if (!IS_APP) {
+            const themeOptions = $('themeOptionsWeb');
+            function refreshThemeButtons() {
+                themeOptions.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.themeMode === Pass2KDBXDynamic._mode));
+            }
+            themeOptions.querySelectorAll('button').forEach(b => {
+                b.addEventListener('click', () => {
+                    Pass2KDBXDynamic._mode = b.dataset.themeMode;
+                    if (b.dataset.themeMode === 'system') applyTheme((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+                    else applyTheme(b.dataset.themeMode);
+                    refreshThemeButtons();
+                });
             });
-        });
-        refreshThemeButtons();
+            refreshThemeButtons();
+        }
 
         // ---------- Snackbar ----------
         let snackTimer = null;
