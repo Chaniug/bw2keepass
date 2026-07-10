@@ -1449,6 +1449,9 @@
     if (typeof dbPassword !== 'string' || !dbPassword.trim()) {
       throw new Error('writeVaultToKdbx 未收到有效的 dbPassword');
     }
+    if (typeof console !== 'undefined') {
+      console.log('[Pass2KDBX] 写入 KDBX，密码长度:', dbPassword.length);
+    }
     const report = (t) => onProgress && onProgress(t);
     report(`正在生成 KDBX（${vault.items.filter(i => !i.deleted).length} 个条目）...`);
     const credentials = new Credentials(ProtectedValue.fromString(dbPassword));

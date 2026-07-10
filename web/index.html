@@ -1134,9 +1134,12 @@
                     </div>
                 </div>
                 <div class="field" style="margin-bottom:.4rem;">
-                    <label for="dbPassword">主密码（用于加密输出 KDBX）</label>
+                    <label for="dbPassword">主密码（用于加密输出 KDBX）<span style="font-size:.7rem;font-weight:400;margin-left:.3rem;color:var(--md-tertiary);" id="dbPwPreview"></span></label>
                     <div class="text-field">
-                        <input type="password" id="dbPassword" placeholder="输入数据库密码" autocomplete="new-password">
+                        <input type="password" id="dbPassword" placeholder="输入数据库密码"
+                               autocomplete="new-password" readonly
+                               data-1p-ignore data-lpignore="true" data-bwignore
+                               onfocus="this.removeAttribute('readonly')">
                         <button class="tf-action" id="togglePassword" aria-label="显示密码"><svg><use href="#ic-eye"/></svg></button>
                     </div>
                     <div class="pw-meter"><div id="pwBar"></div></div>
@@ -1612,7 +1615,14 @@
             const t = dbPassword.type === 'password' ? 'text' : 'password';
             dbPassword.type = t; setEye(togglePassword, t !== 'password');
         });
-        dbPassword.addEventListener('input', () => { updatePasswordStrength(); updateConvertState(); });
+        dbPassword.addEventListener('input', () => { updatePasswordStrength(); updateConvertState(); updatePwPreview(); });
+        function updatePwPreview() {
+            const l = dbPassword.value.length;
+            const el = $('dbPwPreview');
+            if (!el) return;
+            if (l === 0) { el.textContent = ''; return; }
+            el.textContent = '· '.repeat(Math.min(l,6)) + (l > 6 ? '…' : '') + '（' + l + '位）';
+        }
         function updatePasswordStrength() {
             const val = dbPassword.value;
             let score = 0;
