@@ -3,6 +3,7 @@
 """
 
 import base64
+import json
 import re
 from .parser import VaultItem, Folder
 
@@ -413,5 +414,16 @@ def build_custom_fields(item: VaultItem) -> dict[str, str]:
         fields["CreationDate"] = item.creation_date
     if item.revision_date:
         fields["RevisionDate"] = item.revision_date
+
+    # 密码历史（结构化存储，供反向转换无损还原；与 KeePassXC 内部字段命名一致）
+    if item.password_history:
+        try:
+            fields["KPEX_PW_HISTORY"] = json.dumps(
+                [{"password": ph.password, "lastUsedDate": ph.last_used_date}
+                 for ph in item.password_history],
+                ensure_ascii=False,
+            )
+        except Exception:
+            pass
 
     return fields

@@ -44,6 +44,19 @@ class PasswordHistory:
 
 
 @dataclass
+class Attachment:
+    """附件（来自 Bitwarden 导出 ZIP 或 KeePass KDBX）
+
+    data 为附件原始字节；size 为字节长度。纯 JSON 导出无法内嵌二进制，
+    此时仅保留 id/fileName/size 等元数据（详见 reverse_converter）。
+    """
+    id: str
+    file_name: str
+    data: bytes = b""
+    size: int = 0
+
+
+@dataclass
 class Fido2Credential:
     """FIDO2/WebAuthn/Passkey 凭据
 
@@ -121,6 +134,9 @@ class VaultItem:
     # Password history
     password_history: list[PasswordHistory] = field(default_factory=list)
 
+    # Attachments（Bitwarden 导出 ZIP / KeePass KDBX）
+    attachments: list[Attachment] = field(default_factory=list)
+
     # Metadata
     creation_date: str = ""
     revision_date: str = ""
@@ -151,11 +167,12 @@ def parse_bitwarden_export(
         (folders, items) 元组
     """
     if file_path.lower().endswith('.zip'):
-        data = _parse_zip(file_path)
+        data, zip_attachments = _parse_zip(file_path)
     else:
         data = _parse_json(file_path)
+        zip_attachments = {}
     data = _maybe_decrypt(data, export_password, master_password, email)
-    return _parse_data(data)
+    return _parse_data(data, zip_attachments)
 
 
 def _maybe_decrypt(data: dict, export_password: str | None,
@@ -187,14 +204,32 @@ def _parse_json(file_path: str) -> dict:
     return data
 
 
-def _parse_zip(zip_path: str) -> dict:
-    """解析 ZIP 文件（含附件），返回内部 data.json 的原始 dict"""
+def _parse_zip(zip_path: str) -> tuple[dict, dict]:
+    """解析 ZIP 文件（含附件），返回 (data_dict, attachments_by_id)
+
+    attachments_by_id: { attachment_id: {'fileName': str, 'data': bytes} }
+    仅支持**未加密** Bitwarden ZIP 导出（附件为原始字节）。加密导出的附件
+    为密文，需解密密钥派生，暂不支持（见 OPTIMIZATION_PLAN.md）。
+    """
     with zipfile.ZipFile(zip_path, 'r') as zf:
         # 查找 data.json
         json_files = [n for n in zf.namelist() if n.endswith('data.json')]
         if not json_files:
             raise ValueError("ZIP 文件中未找到 data.json")
-        return json.loads(zf.read(json_files[0]).decode('utf-8'))
+        data = json.loads(zf.read(json_files[0]).decode('utf-8'))
+
+        # 附件目录结构：attachments/<attachmentId>/<fileName>
+        attachments_by_id: dict[str, dict] = {}
+        for name in zf.namelist():
+            parts = name.split('/')
+            if len(parts) >= 3 and parts[0] == 'attachments':
+                att_id = parts[1]
+                file_name = '/'.join(parts[2:])  # 兼容文件名含 '/'
+                attachments_by_id[att_id] = {
+                    'fileName': file_name,
+                    'data': zf.read(name),
+                }
+        return data, attachments_by_id
 
 
 def parse_bitwarden_dict(data: dict) -> tuple[list[Folder], list[VaultItem]]:
@@ -225,8 +260,14 @@ def peek_export_kind(file_path: str) -> dict:
     }
 
 
-def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
-    """解析 JSON 数据"""
+def _parse_data(data: dict, zip_attachments: dict | None = None) -> tuple[list[Folder], list[VaultItem]]:
+    """解析 JSON 数据
+
+    Args:
+        data: Bitwarden 导出 dict（已解密）
+        zip_attachments: 来自未加密 ZIP 导出的附件字节，
+            { attachment_id: {'fileName', 'data'} }，无则传 None/空
+    """
     # 解析文件夹
     folders: list[Folder] = []
     folder_map: dict[str, str] = {}  # id -> name
@@ -322,6 +363,19 @@ def _parse_data(data: dict) -> tuple[list[Folder], list[VaultItem]]:
                 discoverable=str(fido_data.get('discoverable', 'false') or 'false').lower(),
                 creation_date=fido_data.get('creationDate', '') or '',
             ))
+
+        # 附件（来自未加密 Bitwarden ZIP 导出）
+        if zip_attachments:
+            for att in (item_data.get('attachments') or []):
+                att_id = att.get('id')
+                rec = zip_attachments.get(att_id)
+                if rec and rec.get('data'):
+                    item.attachments.append(Attachment(
+                        id=str(att_id),
+                        file_name=rec['fileName'],
+                        data=rec['data'],
+                        size=len(rec['data']),
+                    ))
 
         items.append(item)
 

@@ -299,6 +299,14 @@
     }
     if (item.creationDate) fields['CreationDate'] = item.creationDate;
     if (item.revisionDate) fields['RevisionDate'] = item.revisionDate;
+    // 密码历史（结构化存储，供反向转换无损还原；与 Python 端 KPEX_PW_HISTORY 对齐）
+    if (item.passwordHistory && item.passwordHistory.length) {
+      try {
+        fields['KPEX_PW_HISTORY'] = JSON.stringify(
+          item.passwordHistory.map(ph => ({ password: ph.password || '', lastUsedDate: ph.lastUsedDate || '' }))
+        );
+      } catch (_) { /* 忽略序列化失败 */ }
+    }
     return fields;
   }
   function buildTags(item) {
@@ -1111,6 +1119,16 @@
     }
     if (bwTypeField === 'SecureNote' || (item.type !== 3 && item.type !== 4 && item.type !== 5 && !item.login?.username && !item.login?.password && !item.login?.uris?.length && notes)) {
       item.type = 2; item.secureNote = { type: 0 };
+    }
+    // 密码历史（优先用正向写入的结构化字段 KPEX_PW_HISTORY；与 Python 端对齐）
+    const pwHistoryRaw = getText('KPEX_PW_HISTORY');
+    if (pwHistoryRaw) {
+      try {
+        const parsed = JSON.parse(pwHistoryRaw);
+        if (Array.isArray(parsed)) {
+          item.passwordHistory = parsed.map(ph => ({ password: ph.password || '', lastUsedDate: ph.lastUsedDate || '' }));
+        }
+      } catch (_) { /* 忽略损坏字段 */ }
     }
     const creationDate = getText('CreationDate'), revisionDate = getText('RevisionDate');
     if (creationDate) item.creationDate = creationDate;

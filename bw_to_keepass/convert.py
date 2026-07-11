@@ -217,6 +217,11 @@ def vault_items_to_bitwarden(folders: list[Folder], items: list[VaultItem]) -> d
             for ph in it.password_history
         ]
         bw['fido2Credentials'] = [_fido_to_bw(f) for f in it.fido2_credentials]
+        # 附件元数据（纯 JSON 无二进制；KDBX→BW 时携带 id/fileName/size）
+        bw['attachments'] = [
+            {'id': att.id, 'fileName': att.file_name, 'size': att.size}
+            for att in it.attachments
+        ]
         bw_items.append(bw)
 
     return {'encrypted': False, 'folders': folder_list, 'items': bw_items}

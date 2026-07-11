@@ -105,6 +105,15 @@ def write_keepass(
             if value:  # 只添加非空值
                 entry.set_custom_property(key, str(value))
 
+        # 写入附件（Bitwarden 导出 ZIP / 反向 KDBX 带附件时）
+        for att in item.attachments:
+            if att.data:
+                try:
+                    bin_id = kp.add_binary(att.data)
+                    entry.add_attachment(bin_id, att.file_name or "attachment")
+                except Exception as e:
+                    logger.warning("写入附件失败 (%s): %s", att.file_name, e)
+
         # 统计
         if item.type in type_counts:
             type_counts[item.type] += 1

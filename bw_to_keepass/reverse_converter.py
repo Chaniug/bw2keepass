@@ -10,6 +10,7 @@
 """
 
 import base64
+import json
 import re
 import uuid as uuid_mod
 from typing import Any
@@ -159,6 +160,56 @@ def _extract_passkeys(entry) -> list[dict]:
     return passkeys
 
 
+def _extract_password_history(entry, custom_fields: dict) -> list[dict]:
+    """还原密码历史
+
+    优先使用正向转换写入的结构化字段 KPEX_PW_HISTORY（BW→KDBX→BW 往返无损）；
+    否则回退到 KeePass 原生历史（entry.history，KDBX 原生记录的旧密码）。
+    """
+    raw = custom_fields.get('KPEX_PW_HISTORY', '')
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [{'password': str(h.get('password', '')),
+                         'lastUsedDate': h.get('lastUsedDate', '') or ''}
+                        for h in parsed]
+        except Exception:
+            pass
+    # 回退：KeePass 原生历史
+    history = []
+    try:
+        for h in (getattr(entry, 'history', None) or []):
+            pw = getattr(h, 'password', '') or ''
+            if pw:
+                history.append({'password': pw, 'lastUsedDate': ''})
+    except Exception:
+        pass
+    return history
+
+
+def _extract_attachments(entry) -> list[dict]:
+    """从 KeePass 条目提取附件元数据（id/fileName/size）
+
+    说明：Bitwarden JSON 无法内嵌二进制，故仅保留元数据。完整"KDBX→Bitwarden 带附件"
+    需要额外打包为 Bitwarden ZIP（data.json + attachments/），列为后续增强。
+    """
+    result = []
+    try:
+        for att in (getattr(entry, 'attachments', None) or []):
+            att_id = str(getattr(att, 'id', '') or '')
+            file_name = getattr(att, 'filename', '') or 'attachment'
+            data = getattr(att, 'data', b'') or b''
+            result.append({
+                'id': att_id,
+                'fileName': file_name,
+                'size': len(data) if isinstance(data, (bytes, bytearray)) else int(data or 0),
+            })
+    except Exception:
+        pass
+    return result
+
+
 def _detect_entry_type(entry, custom_fields: dict) -> int:
     """从 KeePass 条目推断 Bitwarden 类型"""
     bw_type = custom_fields.get('BitwardenType', '')
@@ -248,6 +299,9 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
     # 提取 passkeys
     fido2_credentials = _extract_passkeys(entry)
 
+    # 提取附件（KeePass → Bitwarden 元数据；二进制需 ZIP 重新打包，见下方说明）
+    attachments = _extract_attachments(entry)
+
     # 提取自定义字段（排除内部字段和 passkey 字段）
     # 跳过集合必须与「正向转换器 build_custom_fields 实际写出的字段名」严格对齐，
     # 否则这些内部字段会被当成用户自定义字段泄漏/重复导出。
@@ -283,6 +337,9 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
             continue
         fields.append({'name': key, 'value': str(value), 'type': 0})
 
+    # 密码历史（优先用正向写入的结构化字段 KPEX_PW_HISTORY；否则回退到 KeePass 原生历史）
+    password_history = _extract_password_history(entry, custom_fields)
+
     # 构建 Bitwarden item
     item: dict[str, Any] = {
         'id': _generate_uuid(),
@@ -300,8 +357,9 @@ def _build_bitwarden_item(entry, folder_id: str | None, entry_idx: int) -> dict 
         'sshKey': None,
         'collectionIds': [],
         'fields': fields,
-        'passwordHistory': [],
+        'passwordHistory': password_history,
         'fido2Credentials': fido2_credentials,
+        'attachments': attachments,
         'creationDate': custom_fields.get('CreationDate', ''),
         'revisionDate': custom_fields.get('RevisionDate', ''),
     }
