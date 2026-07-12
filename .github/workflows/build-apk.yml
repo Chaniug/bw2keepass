@@ -65,24 +65,24 @@ jobs:
           test -f app/src/main/res/drawable/ic_launcher.xml && echo "  OK ic_launcher.xml"
           test -f app/src/main/assets/index.html && echo "  OK assets/index.html"
 
-      - name: Restore signing keystore (cache)
-        id: keystore-cache
-        # v5 起原生运行于 Node.js 24，修复 v4 被强制到 Node24 时的 tar 恢复失败
-        uses: actions/cache@v5
-        with:
-          path: app/build/release.keystore
-          # 升 key 以丢弃旧的 Node20 时代归档，首个修复提交会重新生成固定 keystore
-          key: release-keystore-v2
-
-      - name: Generate signing keystore (first run only)
-        if: steps.keystore-cache.outputs.cache-hit != 'true'
+      - name: Prepare signing keystore
+        # 优先使用仓库 Secret RELEASE_KEYSTORE_B64（固定 keystore，签名稳定、可覆盖安装）；
+        # 未配置时临时生成，仅用于本地/测试构建，签名不固定。
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
         run: |
           mkdir -p app/build
-          keytool -genkey -v -keystore app/build/release.keystore \
-            -alias release -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass pass2kdbx_release -keypass pass2kdbx_release \
-            -dname "CN=Pass2KDBX, OU=App, O=Valk, L=Unknown, S=Unknown, C=US" \
-            -noprompt
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > app/build/release.keystore
+            echo "  使用仓库 Secret 中的固定 keystore（签名稳定，可覆盖安装）"
+          else
+            echo "  未配置 RELEASE_KEYSTORE_B64，临时生成 keystore（仅测试，签名不固定）"
+            keytool -genkey -v -keystore app/build/release.keystore \
+              -alias release -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass pass2kdbx_release -keypass pass2kdbx_release \
+              -dname "CN=Pass2KDBX, OU=App, O=Valk, L=Unknown, S=Unknown, C=US" \
+              -noprompt
+          fi
 
       - name: Sync web/ source into app assets
         run: |
