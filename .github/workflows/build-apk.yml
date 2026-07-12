@@ -30,14 +30,16 @@ jobs:
 
       - name: Cache Android SDK
         id: sdk-cache
-        uses: actions/cache@v4
+        # v5 起原生运行于 Node.js 24；v4 被强制在 Node24 上运行会导致 tar 恢复失败（exit code 2）
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.ANDROID_HOME }}/cmdline-tools
             ${{ env.ANDROID_HOME }}/platforms
             ${{ env.ANDROID_HOME }}/build-tools
             ${{ env.ANDROID_HOME }}/platform-tools
-          key: android-sdk-v2
+          # 升 key 以丢弃 v4 时代（Node20）写入的缓存归档，避免恢复不兼容
+          key: android-sdk-v3
 
       - name: Setup Android SDK
         if: steps.sdk-cache.outputs.cache-hit != 'true'
@@ -65,10 +67,12 @@ jobs:
 
       - name: Restore signing keystore (cache)
         id: keystore-cache
-        uses: actions/cache@v4
+        # v5 起原生运行于 Node.js 24，修复 v4 被强制到 Node24 时的 tar 恢复失败
+        uses: actions/cache@v5
         with:
           path: app/build/release.keystore
-          key: release-keystore-v1
+          # 升 key 以丢弃旧的 Node20 时代归档，首个修复提交会重新生成固定 keystore
+          key: release-keystore-v2
 
       - name: Generate signing keystore (first run only)
         if: steps.keystore-cache.outputs.cache-hit != 'true'
@@ -163,7 +167,8 @@ jobs:
           unzip -l app/build/Pass2KDBX.apk
 
       - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v5
+        # v6 起默认运行于 Node.js 24，消除 Node20 弃用告警
+        uses: actions/upload-artifact@v6
         with:
           name: Pass2KDBX-APK
           path: app/build/Pass2KDBX.apk
