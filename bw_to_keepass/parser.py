@@ -4,6 +4,7 @@ Bitwarden 导出 JSON 解析器
 解析 Bitwarden 导出的 JSON 数据结构，返回标准化的中间数据模型。
 """
 
+import base64
 import json
 import zipfile
 import os
@@ -364,18 +365,32 @@ def _parse_data(data: dict, zip_attachments: dict | None = None) -> tuple[list[F
                 creation_date=fido_data.get('creationDate', '') or '',
             ))
 
-        # 附件（来自未加密 Bitwarden ZIP 导出）
-        if zip_attachments:
-            for att in (item_data.get('attachments') or []):
-                att_id = att.get('id')
+        # 附件：优先用未加密 ZIP 读取的字节；否则若 item 内联了 base64 二进制
+        # （如 KDBX 反向携带的附件字节），则解码使用，保证 KDBX↔BW 附件闭环。
+        for att in (item_data.get('attachments') or []):
+            att_id = str(att.get('id') or '')
+            file_name = att.get('fileName') or 'attachment'
+            data = b''
+            size = int(att.get('size') or 0)
+            if zip_attachments:
                 rec = zip_attachments.get(att_id)
                 if rec and rec.get('data'):
-                    item.attachments.append(Attachment(
-                        id=str(att_id),
-                        file_name=rec['fileName'],
-                        data=rec['data'],
-                        size=len(rec['data']),
-                    ))
+                    data = rec['data']
+                    file_name = rec['fileName']
+                    size = len(data)
+            if not data and att.get('data'):
+                try:
+                    data = base64.b64decode(att['data'])
+                    size = len(data)
+                except Exception:
+                    data = b''
+            if data:
+                item.attachments.append(Attachment(
+                    id=att_id,
+                    file_name=file_name,
+                    data=data,
+                    size=size,
+                ))
 
         items.append(item)
 

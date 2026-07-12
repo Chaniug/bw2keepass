@@ -150,6 +150,13 @@ def _validate_target(fmt, raw, folders, items, tmpdir):
             f.write(raw)
         kp = PyKeePass(p, password=PWD)
         return len(kp.entries)
+    if fmt == 'zip':
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            names = zf.namelist()
+            assert 'data.json' in names, 'zip: 缺少 data.json'
+            data = json.loads(zf.read('data.json').decode('utf-8'))
+        assert data.get('items'), 'zip: 产物无 items'
+        return len(data['items'])
     raise ValueError(fmt)
 
 
@@ -238,7 +245,7 @@ class TestFormatMatrix(unittest.TestCase):
     # ------------------------------------------------------------------
     def test_full_convert_smoke(self):
         # 注意：convert() 将 'bitwarden' 归一为 'json'，返回 key 中不含 'bitwarden'
-        expected = {'kdbx', 'json', 'encrypted', '1pux', 'csv'}
+        expected = {'kdbx', 'json', 'encrypted', '1pux', 'csv', 'zip'}
         for fmt in SOURCE_FORMATS:
             with self.subTest(source=fmt):
                 with tempfile.TemporaryDirectory() as d:

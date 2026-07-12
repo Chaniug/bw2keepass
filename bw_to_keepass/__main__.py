@@ -65,7 +65,7 @@ def main():
     )
     parser.add_argument(
         "--to", "-t",
-        help="目标格式，逗号分隔可多选：kdbx,json,bitwarden,encrypted,1pux,csv",
+        help="目标格式，逗号分隔可多选：kdbx,json,bitwarden,encrypted,1pux,csv,zip",
     )
     parser.add_argument(
         "--password", "-p",
@@ -146,7 +146,7 @@ def main():
             db_password = _prompt_new_kdbx_password()
 
     # 输出基名（剥离已知扩展名）
-    base = re.sub(r'\.(kdbx|json|csv|1pux)$', '', args.output, flags=re.I) or args.output
+    base = re.sub(r'\.(kdbx|json|csv|1pux|zip)$', '', args.output, flags=re.I) or args.output
 
     # 统一转换
     try:

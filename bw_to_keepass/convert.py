@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover
 # 格式清单（供 CLI / 前端枚举）
 # ---------------------------------------------------------------------------
 SOURCE_FORMATS = ('bitwarden', 'encrypted', '1password', 'kdbx')
-TARGET_FORMATS = ('kdbx', 'json', 'bitwarden', 'encrypted', '1pux', 'csv')
+TARGET_FORMATS = ('kdbx', 'json', 'bitwarden', 'encrypted', '1pux', 'csv', 'zip')
 
 # 目标格式默认文件扩展名
 TARGET_EXT = {
@@ -50,6 +50,7 @@ TARGET_EXT = {
     'encrypted': '.json',
     '1pux': '.1pux',
     'csv': '.csv',
+    'zip': '.zip',
 }
 
 
@@ -218,13 +219,35 @@ def vault_items_to_bitwarden(folders: list[Folder], items: list[VaultItem]) -> d
         ]
         bw['fido2Credentials'] = [_fido_to_bw(f) for f in it.fido2_credentials]
         # 附件元数据（纯 JSON 无二进制；KDBX→BW 时携带 id/fileName/size）
+        # id 回退规则须与 write_bitwarden_zip 的附件路径一致，保证 ZIP 往返可对齐
         bw['attachments'] = [
-            {'id': att.id, 'fileName': att.file_name, 'size': att.size}
+            {'id': att.id or att.file_name or 'attachment',
+             'fileName': att.file_name, 'size': att.size}
             for att in it.attachments
         ]
         bw_items.append(bw)
 
     return {'encrypted': False, 'folders': folder_list, 'items': bw_items}
+
+
+def write_bitwarden_zip(folders: list[Folder], items: list[VaultItem]) -> bytes:
+    """将统一中间模型导出为 Bitwarden ZIP 字节（data.json + 附件真实二进制）
+
+    与 Bitwarden 官方未加密 ZIP 导出结构一致：
+        data.json
+        attachments/<attachmentId>/<fileName>
+    仅未加密 ZIP 可携带附件二进制；加密 / 纯 JSON 目标请使用 json / encrypted。
+    """
+    data = vault_items_to_bitwarden(folders, items)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('data.json', json.dumps(data, ensure_ascii=False, indent=2))
+        for it in items:
+            for att in (it.attachments or []):
+                if att.data:
+                    att_id = att.id or att.file_name or 'attachment'
+                    zf.writestr(f"attachments/{att_id}/{att.file_name}", att.data)
+    return buf.getvalue()
 
 
 def _fido_to_bw(f: Fido2Credential) -> dict:
@@ -291,6 +314,9 @@ def render_target(
     fmt = fmt.lower()
     if fmt == 'bitwarden':
         fmt = 'json'
+
+    if fmt == 'zip':
+        return write_bitwarden_zip(folders, items)
 
     if fmt == 'json':
         data = vault_items_to_bitwarden(folders, items)

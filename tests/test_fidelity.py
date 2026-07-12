@@ -13,10 +13,11 @@ import tempfile
 import unittest
 import zipfile
 
-from bw_to_keepass.parser import VaultItem, Folder, Attachment, PasswordHistory
+from bw_to_keepass.parser import VaultItem, Folder, Attachment, PasswordHistory, parse_bitwarden_export
 from bw_to_keepass.converter import build_custom_fields
 from bw_to_keepass.writer import write_keepass
 from bw_to_keepass.reverse_converter import convert_kdbx_to_bitwarden
+from bw_to_keepass.convert import convert, write_bitwarden_zip
 from pykeepass import PyKeePass
 
 
@@ -157,6 +158,90 @@ class TestAttachmentFidelity(unittest.TestCase):
             for p in (zip_path, kdbx_path):
                 if os.path.exists(p):
                     os.unlink(p)
+
+
+class TestBitwardenZipExport(unittest.TestCase):
+    """KDBX→BW 附件闭环：写出 Bitwarden ZIP（含真实二进制）后可被原样解析"""
+
+    def _write_tmp(self, data: bytes, suffix: str) -> str:
+        p = tempfile.mktemp(suffix=suffix)
+        with open(p, 'wb') as f:
+            f.write(data)
+        return p
+
+    def test_zip_roundtrip_bytes(self):
+        item = _make_item()  # 带 attachment data=b"hello-binary"
+        zip_bytes = write_bitwarden_zip([], [item])
+        zp = self._write_tmp(zip_bytes, '.zip')
+        try:
+            folders, items = parse_bitwarden_export(zp)
+        finally:
+            if os.path.exists(zp):
+                os.unlink(zp)
+        self.assertEqual(len(items), 1)
+        atts = items[0].attachments
+        self.assertEqual(len(atts), 1)
+        self.assertEqual(atts[0].file_name, "readme.txt")
+        self.assertEqual(atts[0].data, b"hello-binary")
+        self.assertEqual(atts[0].size, 12)
+
+    def test_zip_from_kdbx_roundtrip(self):
+        # KDBX→BW 附件字节级闭环：写 KDBX → convert(kdbx→zip) → 回读 ZIP
+        item = _make_item()
+        kdbx_path = tempfile.mktemp(suffix=".kdbx")
+        try:
+            write_keepass([], [item], kdbx_path, password="pwd", db_name="Test")
+            results = convert(kdbx_path, ['zip'], password="pwd")
+        finally:
+            if os.path.exists(kdbx_path):
+                os.unlink(kdbx_path)
+        self.assertIn('zip', results)
+        zp = self._write_tmp(results['zip'], '.zip')
+        try:
+            folders, items = parse_bitwarden_export(zp)
+        finally:
+            if os.path.exists(zp):
+                os.unlink(zp)
+        self.assertEqual(len(items), 1)
+        atts = items[0].attachments
+        self.assertEqual(len(atts), 1)
+        self.assertEqual(atts[0].data, b"hello-binary")
+
+    def test_zip_filename_with_slash(self):
+        item = VaultItem(
+            id="33333333-3333-3333-3333-333333333333", type=1, name="Slash",
+            attachments=[Attachment(id="att-x", file_name="sub/note.txt",
+                                     data=b"nested", size=6)],
+        )
+        zip_bytes = write_bitwarden_zip([], [item])
+        zp = self._write_tmp(zip_bytes, '.zip')
+        try:
+            folders, items = parse_bitwarden_export(zp)
+        finally:
+            if os.path.exists(zp):
+                os.unlink(zp)
+        att = items[0].attachments[0]
+        self.assertEqual(att.file_name, "sub/note.txt")
+        self.assertEqual(att.data, b"nested")
+
+    def test_zip_skips_empty_attachment(self):
+        item = VaultItem(
+            id="44444444-4444-4444-4444-444444444444", type=1, name="Empty",
+            attachments=[Attachment(id="att-e", file_name="empty.txt",
+                                     data=b"", size=0)],
+        )
+        zip_bytes = write_bitwarden_zip([], [item])
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            names = zf.namelist()
+        self.assertIn('data.json', names)
+        self.assertFalse(any(n.startswith('attachments/') for n in names))
+
+    def test_zip_no_attachments(self):
+        item = VaultItem(id="55555555-5555-5555-5555-555555555555", type=1, name="NoAtt")
+        zip_bytes = write_bitwarden_zip([], [item])
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            names = zf.namelist()
+        self.assertEqual(names, ['data.json'])
 
 
 if __name__ == "__main__":

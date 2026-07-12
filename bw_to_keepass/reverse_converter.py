@@ -189,10 +189,10 @@ def _extract_password_history(entry, custom_fields: dict) -> list[dict]:
 
 
 def _extract_attachments(entry) -> list[dict]:
-    """从 KeePass 条目提取附件元数据（id/fileName/size）
+    """从 KeePass 条目提取附件（id/fileName/size + base64 二进制）
 
-    说明：Bitwarden JSON 无法内嵌二进制，故仅保留元数据。完整"KDBX→Bitwarden 带附件"
-    需要额外打包为 Bitwarden ZIP（data.json + attachments/），列为后续增强。
+    附件字节以 base64 内联，供下游「KDBX→VaultItem→Bitwarden ZIP」闭环携带真实
+    二进制；纯 JSON/加密目标在序列化时会丢弃 base64、仅留元数据（与 Bitwarden 自身行为一致）。
     """
     result = []
     try:
@@ -200,10 +200,17 @@ def _extract_attachments(entry) -> list[dict]:
             att_id = str(getattr(att, 'id', '') or '')
             file_name = getattr(att, 'filename', '') or 'attachment'
             data = getattr(att, 'data', b'') or b''
+            if isinstance(data, (bytes, bytearray)):
+                data_b64 = base64.b64encode(bytes(data)).decode('ascii')
+                size = len(data)
+            else:
+                data_b64 = ''
+                size = int(data or 0)
             result.append({
                 'id': att_id,
                 'fileName': file_name,
-                'size': len(data) if isinstance(data, (bytes, bytearray)) else int(data or 0),
+                'size': size,
+                'data': data_b64,
             })
     except Exception:
         pass
