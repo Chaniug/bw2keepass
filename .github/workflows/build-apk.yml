@@ -50,9 +50,15 @@ jobs:
           key: android-sdk-v4
 
       - name: Setup Android SDK
-        # 仅 cache miss（未命中缓存）时全新安装；命中则跳过，秒级恢复
-        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        # 不依赖 actions/cache 的 cache-hit 输出（其在部分版本不可靠，会导致命中后仍重装）；
+        # 改为直接探测 SDK 是否已就绪：缓存命中后 build-tools/platforms 已存在则跳过，零耗时；
+        # 仅当关键文件缺失（缓存未命中）时才真正全新安装。
         run: |
+          # 已就绪则跳过（缓存命中典型路径）
+          if [ -x "$ANDROID_HOME/build-tools/34.0.0/aapt2" ] && [ -d "$ANDROID_HOME/platforms/android-34" ]; then
+            echo "  Android SDK 已就绪（缓存命中），跳过安装"
+            exit 0
+          fi
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
           curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
