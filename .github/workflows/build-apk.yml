@@ -102,7 +102,10 @@ jobs:
 
       - name: Build APK
         env:
-          VERSION_CODE: 3
+          # VERSION_CODE 自动取本工作流的历史运行序号（github.run_number）：
+          # 单调递增、永不回退，保证每次覆盖安装都被识别为“升级”而非“降级”，
+          # 无需手动维护。发版时只需改下面的 VERSION_NAME 即可。
+          VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: 3.0
         run: |
           BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
