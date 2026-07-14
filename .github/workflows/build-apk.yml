@@ -16,6 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
+      # 版本号：VERSION_CODE 自动取本工作流运行序号（github.run_number），
+      # 单调递增、永不回退，保证覆盖安装始终被识别为“升级”而非“降级”，无需手维护。
+      # VERSION_NAME 为展示用版本名，发版时手动修改即可（务必加引号，避免被 YAML 解析成数字）。
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: "3.0"
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -101,12 +106,6 @@ jobs:
           cp web/icon.svg app/src/main/assets/icon.svg 2>/dev/null || true
 
       - name: Build APK
-        env:
-          # VERSION_CODE 自动取本工作流的历史运行序号（github.run_number）：
-          # 单调递增、永不回退，保证每次覆盖安装都被识别为“升级”而非“降级”，
-          # 无需手动维护。发版时只需改下面的 VERSION_NAME 即可。
-          VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: 3.0
         run: |
           BUILD_TOOLS=$ANDROID_HOME/build-tools/34.0.0
           PLATFORM=$ANDROID_HOME/platforms/android-34
