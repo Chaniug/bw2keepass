@@ -60,13 +60,29 @@ jobs:
         # 未配置时临时生成，仅用于本地/测试构建，签名不固定。
         # 配置位置：仓库 Settings → Secrets and variables → Actions → New repository secret
         #           （Name=RELEASE_KEYSTORE_B64，Value=固定 keystore 的 base64）。
+        # 若从聊天/网页复制 base64 时混入换行(\r\n)、空格等空白字符，GNU base64 -d 会报
+        # "invalid input"；这里先 tr 去除空白再解码，并给出明确报错便于排查。
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
         run: |
           mkdir -p app/build
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > app/build/release.keystore
-            echo "  使用仓库 Secret 中的固定 keystore（签名稳定，可覆盖安装）"
+            # 去除复制粘贴可能带入的空白字符（\r \n 空格 \t），避免 base64 解码失败
+            SANITIZED=$(printf '%s' "$KEYSTORE_B64" | tr -d '\r\n \t')
+            if printf '%s' "$SANITIZED" | base64 -d > app/build/release.keystore 2>/dev/null; then
+              # 解码成功后再校验 keystore 可用性（固定密码 pass2kdbx_release），
+              # 提前暴露“Secret 被截断”或“密码不匹配”等问题，避免到 apksigner 才报错。
+              if keytool -list -keystore app/build/release.keystore -storepass pass2kdbx_release >/dev/null 2>&1; then
+                echo "  使用仓库 Secret 中的固定 keystore（签名稳定，可覆盖安装）"
+              else
+                echo "  ⚠️ keystore 解码成功但校验失败：Secret 可能被截断，或 keystore 密码非 pass2kdbx_release"
+                exit 1
+              fi
+            else
+              echo "  ⚠️ RELEASE_KEYSTORE_B64 解码失败：请确认 Secret 为完整、无换行/空格的 base64"
+              echo "     （可由本地 keytool 生成 keystore 后执行： base64 -w0 release.keystore ）"
+              exit 1
+            fi
           else
             echo "  未配置 RELEASE_KEYSTORE_B64，临时生成 keystore（仅测试，签名不固定）"
             keytool -genkey -v -keystore app/build/release.keystore \
