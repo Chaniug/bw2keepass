@@ -33,23 +33,36 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Cache Android SDK
+        id: sdk-cache
+        # 只缓存 cmdline-tools / platforms / build-tools：
+        # 刻意排除 platform-tools，因其含带 Linux capabilities 的 adb/fastboot，
+        # actions/cache 用 tar 恢复时无法还原这些 xattr，会报 "tar failed with exit code 2"。
+        # 本构建只用 build-tools(aapt2/d8/zipalign/apksigner) 与 platforms(android.jar)
+        # ，根本用不到 platform-tools，故安全排除，既提速又避坑。
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ env.ANDROID_HOME }}/cmdline-tools
+            ${{ env.ANDROID_HOME }}/platforms
+            ${{ env.ANDROID_HOME }}/build-tools
+          # 升 key 避开之前失败的 v3 缓存（v3 含 platform-tools 无法恢复）
+          key: android-sdk-v4
+
       - name: Setup Android SDK
-        # 不缓存 Android SDK：SDK 目录含带 Linux capabilities/xattr 的文件
-        # （如 platform-tools/adb），actions/cache 用 tar 恢复时无法还原这些
-        # 扩展属性，导致 "tar failed with exit code 2"。改为每次全新安装，
-        # 安装步骤本身幂等（先 rm -rf 残留目录再 sdkmanager）。
+        # 仅 cache miss（未命中缓存）时全新安装；命中则跳过，秒级恢复
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
           curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
           unzip -q -o tools.zip
-          # 幂等：清掉上一次安装遗留的 latest，避免 mv 到非空目录冲突
+          # 幂等：清掉可能残留的 latest，避免 mv 到非空目录冲突
           rm -rf latest
           mv cmdline-tools latest
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          # 幂等：清掉上一次安装遗留的目录，确保 sdkmanager 干净重装
-          rm -rf $ANDROID_HOME/platforms/android-34 $ANDROID_HOME/build-tools/34.0.0 $ANDROID_HOME/platform-tools
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+          # 只装构建真正需要的 platforms 与 build-tools（不含 platform-tools）
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: Verify Android project (固化的 app/ 工程)
         run: |
