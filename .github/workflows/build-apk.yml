@@ -68,6 +68,8 @@ jobs:
       - name: Prepare signing keystore
         # 优先使用仓库 Secret RELEASE_KEYSTORE_B64（固定 keystore，签名稳定、可覆盖安装）；
         # 未配置时临时生成，仅用于本地/测试构建，签名不固定。
+        # 配置位置：仓库 Settings → Secrets and variables → Actions → New repository secret
+        #           （Name=RELEASE_KEYSTORE_B64，Value=固定 keystore 的 base64）。
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
         run: |
