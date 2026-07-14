@@ -33,32 +33,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Cache Android SDK
-        id: sdk-cache
-        # 只缓存 cmdline-tools / platforms / build-tools：
-        # 刻意排除 platform-tools，因其含带 Linux capabilities 的 adb/fastboot，
-        # actions/cache 用 tar 恢复时无法还原这些 xattr，会报 "tar failed with exit code 2"。
-        # 本构建只用 build-tools(aapt2/d8/zipalign/apksigner) 与 platforms(android.jar)
-        # ，根本用不到 platform-tools，故安全排除，既提速又避坑。
-        uses: actions/cache@v5
-        with:
-          path: |
-            ${{ env.ANDROID_HOME }}/cmdline-tools
-            ${{ env.ANDROID_HOME }}/platforms
-            ${{ env.ANDROID_HOME }}/build-tools
-          # 升 key 避开之前失败的 v3 缓存（v3 含 platform-tools 无法恢复）
-          key: android-sdk-v4
-
       - name: Setup Android SDK
-        # 不依赖 actions/cache 的 cache-hit 输出（其在部分版本不可靠，会导致命中后仍重装）；
-        # 改为直接探测 SDK 是否已就绪：缓存命中后 build-tools/platforms 已存在则跳过，零耗时；
-        # 仅当关键文件缺失（缓存未命中）时才真正全新安装。
+        # 不缓存 Android SDK：实测 actions/cache 对 1.4GB 的 SDK 目录做 tar+zstd
+        # 归档/解档极慢（冷启动归档约 9 分钟、命中解档约 75 秒），反而比每次直接
+        # 下载安装（~20 秒）慢 4 倍；且 tar 还原无法保留可执行位，build-tools 二进制
+        # 会丢失 +x。故每次全新安装，安装步骤本身幂等（先 rm -rf 残留目录再 sdkmanager）。
+        # 仅装构建真正需要的 platforms 与 build-tools（不含 platform-tools，构建完全用不到）。
         run: |
-          # 已就绪则跳过（缓存命中典型路径）
-          if [ -x "$ANDROID_HOME/build-tools/34.0.0/aapt2" ] && [ -d "$ANDROID_HOME/platforms/android-34" ]; then
-            echo "  Android SDK 已就绪（缓存命中），跳过安装"
-            exit 0
-          fi
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
           curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
