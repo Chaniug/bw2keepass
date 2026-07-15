@@ -331,7 +331,7 @@
         }
         /* ---------- App 端彩色主题（深色表面 + 彩色强调色）---------- */
         /* 蓝：经典科技蓝 */
-        html[data-app="true"][data-apptheme="blue"] {
+        html[data-app="true"][data-apptheme="blue"][data-theme="dark"] {
             --md-primary: #5a92ff;
             --md-on-primary: #001a40;
             --md-primary-container: #16345f;
@@ -362,7 +362,7 @@
             --md-outline-variant: rgba(140, 170, 255, 0.10);
         }
         /* 绿：清新自然绿 */
-        html[data-app="true"][data-apptheme="green"] {
+        html[data-app="true"][data-apptheme="green"][data-theme="dark"] {
             --md-primary: #3fd098;
             --md-on-primary: #00271a;
             --md-primary-container: #0f4733;
@@ -393,7 +393,7 @@
             --md-outline-variant: rgba(110, 220, 170, 0.10);
         }
         /* 紫：神秘优雅紫 */
-        html[data-app="true"][data-apptheme="purple"] {
+        html[data-app="true"][data-apptheme="purple"][data-theme="dark"] {
             --md-primary: #b08cff;
             --md-on-primary: #2a0f57;
             --md-primary-container: #3f2a6b;
@@ -424,7 +424,7 @@
             --md-outline-variant: rgba(180, 140, 255, 0.10);
         }
         /* 玫红：温柔活力粉 */
-        html[data-app="true"][data-apptheme="rose"] {
+        html[data-app="true"][data-apptheme="rose"][data-theme="dark"] {
             --md-primary: #ff7da8;
             --md-on-primary: #520018;
             --md-primary-container: #6e2542;
@@ -455,7 +455,7 @@
             --md-outline-variant: rgba(255, 140, 175, 0.10);
         }
         /* 青：清透湖青 */
-        html[data-app="true"][data-apptheme="cyan"] {
+        html[data-app="true"][data-apptheme="cyan"][data-theme="dark"] {
             --md-primary: #3fdada;
             --md-on-primary: #002c2c;
             --md-primary-container: #0f4a4a;
@@ -486,7 +486,7 @@
             --md-outline-variant: rgba(100, 220, 220, 0.10);
         }
         /* 琥珀：温暖暖橙 */
-        html[data-app="true"][data-apptheme="amber"] {
+        html[data-app="true"][data-apptheme="amber"][data-theme="dark"] {
             --md-primary: #ffba3a;
             --md-on-primary: #3d2600;
             --md-primary-container: #5e4200;
@@ -517,8 +517,8 @@
             --md-outline-variant: rgba(255, 200, 100, 0.10);
         }
         /* ---------- App 端浅色彩色主题（浅色表面 + 彩色强调色）---------- */
-        /* 蓝·亮：蓝色浅色主题 */
-        html[data-app="true"][data-apptheme="blue-l"] {
+        /* 蓝·亮：蓝色浅色变体（随系统切换） */
+        html[data-app="true"][data-apptheme="blue"][data-theme="light"] {
             --md-primary: #2f6bff;
             --md-on-primary: #ffffff;
             --md-primary-container: #dce6ff;
@@ -548,8 +548,8 @@
             --md-outline: rgba(30, 60, 130, 0.20);
             --md-outline-variant: rgba(30, 60, 130, 0.12);
         }
-        /* 绿·亮：绿色浅色主题 */
-        html[data-app="true"][data-apptheme="green-l"] {
+        /* 绿·亮：绿色浅色变体（随系统切换） */
+        html[data-app="true"][data-apptheme="green"][data-theme="light"] {
             --md-primary: #1ba972;
             --md-on-primary: #ffffff;
             --md-primary-container: #c8f0dc;
@@ -579,8 +579,8 @@
             --md-outline: rgba(20, 90, 60, 0.20);
             --md-outline-variant: rgba(20, 90, 60, 0.12);
         }
-        /* 紫·亮：紫色浅色主题 */
-        html[data-app="true"][data-apptheme="purple-l"] {
+        /* 紫·亮：紫色浅色变体（随系统切换） */
+        html[data-app="true"][data-apptheme="purple"][data-theme="light"] {
             --md-primary: #7a4ddb;
             --md-on-primary: #ffffff;
             --md-primary-container: #e7dcff;
@@ -610,8 +610,8 @@
             --md-outline: rgba(80, 50, 140, 0.20);
             --md-outline-variant: rgba(80, 50, 140, 0.12);
         }
-        /* 玫红·亮：玫红色浅色主题 */
-        html[data-app="true"][data-apptheme="rose-l"] {
+        /* 玫红·亮：玫红色浅色变体（随系统切换） */
+        html[data-app="true"][data-apptheme="rose"][data-theme="light"] {
             --md-primary: #e34d83;
             --md-on-primary: #ffffff;
             --md-primary-container: #ffd9e7;
@@ -641,8 +641,8 @@
             --md-outline: rgba(140, 50, 90, 0.20);
             --md-outline-variant: rgba(140, 50, 90, 0.12);
         }
-        /* 青·亮：青色浅色主题 */
-        html[data-app="true"][data-apptheme="cyan-l"] {
+        /* 青·亮：青色浅色变体（随系统切换） */
+        html[data-app="true"][data-apptheme="cyan"][data-theme="light"] {
             --md-primary: #129b9b;
             --md-on-primary: #ffffff;
             --md-primary-container: #c2f1f1;
@@ -672,8 +672,8 @@
             --md-outline: rgba(20, 110, 110, 0.20);
             --md-outline-variant: rgba(20, 110, 110, 0.12);
         }
-        /* 琥珀·亮：琥珀色浅色主题 */
-        html[data-app="true"][data-apptheme="amber-l"] {
+        /* 琥珀·亮：琥珀色浅色变体（随系统切换） */
+        html[data-app="true"][data-apptheme="amber"][data-theme="light"] {
             --md-primary: #c47e08;
             --md-on-primary: #ffffff;
             --md-primary-container: #ffe7b3;
@@ -710,18 +710,18 @@
         html[data-app="true"][data-apptheme="gray"] body { background: #161618; }
         html[data-app="true"][data-apptheme="sepia"] body { background: #1c1813; }
         html[data-app="true"][data-apptheme="lightgray"] body { background: #f1f1f4; }
-        html[data-app="true"][data-apptheme="blue"]   body { background: #0a0d16; }
-        html[data-app="true"][data-apptheme="green"]  body { background: #08120e; }
-        html[data-app="true"][data-apptheme="purple"] body { background: #120c1e; }
-        html[data-app="true"][data-apptheme="rose"]   body { background: #180a12; }
-        html[data-app="true"][data-apptheme="cyan"]   body { background: #07141a; }
-        html[data-app="true"][data-apptheme="amber"]  body { background: #18120a; }
-        html[data-app="true"][data-apptheme="blue-l"]   body { background: #f3f7fd; }
-        html[data-app="true"][data-apptheme="green-l"]  body { background: #f1faf4; }
-        html[data-app="true"][data-apptheme="purple-l"] body { background: #f7f4fd; }
-        html[data-app="true"][data-apptheme="rose-l"]   body { background: #fdf4f8; }
-        html[data-app="true"][data-apptheme="cyan-l"]   body { background: #f0fafb; }
-        html[data-app="true"][data-apptheme="amber-l"]  body { background: #fdf8f0; }
+        html[data-app="true"][data-apptheme="blue"][data-theme="dark"]   body { background: #0a0d16; }
+        html[data-app="true"][data-apptheme="green"][data-theme="dark"]  body { background: #08120e; }
+        html[data-app="true"][data-apptheme="purple"][data-theme="dark"] body { background: #120c1e; }
+        html[data-app="true"][data-apptheme="rose"][data-theme="dark"]   body { background: #180a12; }
+        html[data-app="true"][data-apptheme="cyan"][data-theme="dark"]   body { background: #07141a; }
+        html[data-app="true"][data-apptheme="amber"][data-theme="dark"]  body { background: #18120a; }
+        html[data-app="true"][data-apptheme="blue"][data-theme="light"]   body { background: #f3f7fd; }
+        html[data-app="true"][data-apptheme="green"][data-theme="light"]  body { background: #f1faf4; }
+        html[data-app="true"][data-apptheme="purple"][data-theme="light"] body { background: #f7f4fd; }
+        html[data-app="true"][data-apptheme="rose"][data-theme="light"]   body { background: #fdf4f8; }
+        html[data-app="true"][data-apptheme="cyan"][data-theme="light"]   body { background: #f0fafb; }
+        html[data-app="true"][data-apptheme="amber"][data-theme="light"]  body { background: #fdf8f0; }
         html[data-app="true"] body::before,
         html[data-app="true"] body::after { display: none; }
         /* App 的品牌 logo 底：纯黑白也保持简洁（去掉彩色投影）*/
@@ -1749,31 +1749,27 @@
         // App 端可选主题（跟随系统 + 中性主题 + 彩色主题）；dark 标记用于决定状态栏图标颜色
         const APP_THEMES = [
             { id: 'system',    name: '跟随系统', bg: 'linear-gradient(135deg,#0c0c0e 0 50%,#ffffff 50% 100%)', accent: '#9a9aa0' },
-            { id: 'black',     name: '纯黑',     bg: '#000000', accent: '#ffffff' },
-            { id: 'gray',      name: '深灰',     bg: '#161618', accent: '#ffffff' },
-            { id: 'sepia',     name: '护眼',     bg: '#1c1813', accent: '#e9dcc4' },
+            { id: 'black',     name: '纯黑',     bg: '#000000', accent: '#ffffff', dark: true },
+            { id: 'gray',      name: '深灰',     bg: '#161618', accent: '#ffffff', dark: true },
+            { id: 'sepia',     name: '护眼',     bg: '#1c1813', accent: '#e9dcc4', dark: true },
             { id: 'white',     name: '纯白',     bg: '#ffffff', accent: '#000000', dark: false },
             { id: 'lightgray', name: '浅灰',     bg: '#f1f1f4', accent: '#1a1a1c', dark: false },
-            { id: 'blue',      name: '蓝',       bg: '#0a0d16', accent: '#5a92ff', dark: true },
-            { id: 'green',     name: '绿',       bg: '#08120e', accent: '#3fd098', dark: true },
-            { id: 'purple',    name: '紫',       bg: '#120c1e', accent: '#b08cff', dark: true },
-            { id: 'rose',      name: '玫红',     bg: '#180a12', accent: '#ff7da8', dark: true },
-            { id: 'cyan',      name: '青',       bg: '#07141a', accent: '#3fdada', dark: true },
-            { id: 'amber',     name: '琥珀',     bg: '#18120a', accent: '#ffba3a', dark: true },
-            { id: 'blue-l',    name: '蓝·亮',    bg: '#f3f7fd', accent: '#2f6bff', dark: false },
-            { id: 'green-l',   name: '绿·亮',    bg: '#f1faf4', accent: '#1ba972', dark: false },
-            { id: 'purple-l',  name: '紫·亮',    bg: '#f7f4fd', accent: '#7a4ddb', dark: false },
-            { id: 'rose-l',    name: '玫红·亮',  bg: '#fdf4f8', accent: '#e34d83', dark: false },
-            { id: 'cyan-l',    name: '青·亮',    bg: '#f0fafb', accent: '#129b9b', dark: false },
-            { id: 'amber-l',   name: '琥珀·亮',  bg: '#fdf8f0', accent: '#c47e08', dark: false }
+            { id: 'blue',      name: '蓝',       bg: '#0a0d16', accent: '#5a92ff', adaptive: true },
+            { id: 'green',     name: '绿',       bg: '#08120e', accent: '#3fd098', adaptive: true },
+            { id: 'purple',    name: '紫',       bg: '#120c1e', accent: '#b08cff', adaptive: true },
+            { id: 'rose',      name: '玫红',     bg: '#180a12', accent: '#ff7da8', adaptive: true },
+            { id: 'cyan',      name: '青',       bg: '#07141a', accent: '#3fdada', adaptive: true },
+            { id: 'amber',     name: '琥珀',     bg: '#18120a', accent: '#ffba3a', adaptive: true }
         ];
         const APP_THEME_KEY = 'pass2kdbx_apptheme';
         let themeGrid = null;
-        // 固定主题是否为深色背景（决定状态栏图标）；“跟随系统”以原生注入的 systemDark 为准，其余读取主题 dark 标记
+        // 背景深浅判定（决定状态栏图标）：
+        // “跟随系统”与 adaptive 彩色主题随 systemDark；固定中性主题用其 dark 标记
         function themeIsDarkBg(id) {
             if (id === 'system') return systemDark;
             const t = APP_THEMES.find(x => x.id === id);
-            return t ? !!t.dark : true;
+            if (!t) return systemDark;
+            return t.adaptive ? systemDark : !!t.dark;
         }
         function applyAppTheme(id) {
             if (id === 'system') {
@@ -1809,12 +1805,15 @@
                 if (colors.tertiary) root.style.setProperty('--md-tertiary', colors.tertiary);
                 root.setAttribute('data-dynamic', 'true');
             },
-            // 系统深浅变化：以原生注入值为权威，仅“跟随系统”主题才响应，并同步安卓状态栏图标
+            // 系统深浅变化：以原生注入值为权威；“跟随系统”与 adaptive 彩色主题实时跟随，并同步状态栏图标
             setSystemDark(isDark) {
                 systemDark = !!isDark;
-                if (this._mode === 'system') {
-                    applyTheme(systemDark ? 'dark' : 'light');
-                    syncAndroidChrome(systemDark);
+                const cur = this._mode;
+                const t = APP_THEMES.find(x => x.id === cur);
+                if (cur === 'system' || (t && t.adaptive)) {
+                    const dark = themeIsDarkBg(cur);
+                    applyTheme(dark ? 'dark' : 'light');
+                    syncAndroidChrome(dark);
                     refreshThemeGrid();
                 }
             }
@@ -1822,13 +1821,17 @@
         // 初始化主题（App 端会被下方 IS_APP 块的 applyAppTheme 覆盖；此处保证非 App 端也有合理初值）
         applyTheme(systemDark ? 'dark' : 'light');
         // 兜底：部分 WebView/浏览器会在系统深色切换时触发 matchMedia 变化，作为原生桥接之外的补充
+        // “跟随系统”与 adaptive 彩色主题都会实时跟随
         if (window.matchMedia) {
             const mq = window.matchMedia('(prefers-color-scheme: dark)');
             const onMqChange = (e) => {
                 systemDark = !!e.matches;
-                if (Pass2KDBXDynamic._mode === 'system') {
-                    applyTheme(systemDark ? 'dark' : 'light');
-                    syncAndroidChrome(systemDark);
+                const cur = Pass2KDBXDynamic._mode;
+                const t = APP_THEMES.find(x => x.id === cur);
+                if (cur === 'system' || (t && t.adaptive)) {
+                    const dark = themeIsDarkBg(cur);
+                    applyTheme(dark ? 'dark' : 'light');
+                    syncAndroidChrome(dark);
                 }
             };
             if (mq.addEventListener) mq.addEventListener('change', onMqChange);
