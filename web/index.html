@@ -329,6 +329,193 @@
             --md-outline: rgba(0, 0, 0, 0.14);
             --md-outline-variant: rgba(0, 0, 0, 0.07);
         }
+        /* ---------- App 端彩色主题（深色表面 + 彩色强调色）---------- */
+        /* 蓝：经典科技蓝 */
+        html[data-app="true"][data-apptheme="blue"] {
+            --md-primary: #5a92ff;
+            --md-on-primary: #001a40;
+            --md-primary-container: #16345f;
+            --md-on-primary-container: #d2e2ff;
+            --md-secondary: #bfccdf;
+            --md-on-secondary: #10243f;
+            --md-secondary-container: #1c3454;
+            --md-on-secondary-container: #d7e3f5;
+            --md-tertiary: #bfccdf;
+            --md-on-tertiary: #10243f;
+            --md-tertiary-container: #1c3454;
+            --md-on-tertiary-container: #d7e3f5;
+            --glass-blur: 20px;
+            --glass-bg: rgba(16, 24, 44, 0.62);
+            --glass-bg-strong: rgba(22, 32, 56, 0.80);
+            --glass-border: rgba(120, 160, 255, 0.18);
+            --glass-hi: rgba(120, 160, 255, 0.06);
+            --glass-shadow: 0 8px 30px rgba(0, 20, 60, 0.45), 0 2px 8px rgba(0, 20, 60, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 20, 60, 0.40);
+            --md-surface: #0a0d16;
+            --md-surface-1: rgba(22, 30, 50, 0.70);
+            --md-surface-2: rgba(28, 38, 62, 0.70);
+            --md-surface-3: rgba(34, 46, 74, 0.75);
+            --md-surface-container-high: rgba(28, 38, 62, 0.75);
+            --md-on-surface: #eaf0ff;
+            --md-on-surface-variant: #9aa8c4;
+            --md-outline: rgba(140, 170, 255, 0.20);
+            --md-outline-variant: rgba(140, 170, 255, 0.10);
+        }
+        /* 绿：清新自然绿 */
+        html[data-app="true"][data-apptheme="green"] {
+            --md-primary: #3fd098;
+            --md-on-primary: #00271a;
+            --md-primary-container: #0f4733;
+            --md-on-primary-container: #bdf5dc;
+            --md-secondary: #b3d8c6;
+            --md-on-secondary: #0a2c20;
+            --md-secondary-container: #1b4536;
+            --md-on-secondary-container: #cdeede;
+            --md-tertiary: #b3d8c6;
+            --md-on-tertiary: #0a2c20;
+            --md-tertiary-container: #1b4536;
+            --md-on-tertiary-container: #cdeede;
+            --glass-blur: 20px;
+            --glass-bg: rgba(12, 36, 28, 0.62);
+            --glass-bg-strong: rgba(18, 46, 36, 0.80);
+            --glass-border: rgba(90, 220, 160, 0.18);
+            --glass-hi: rgba(90, 220, 160, 0.06);
+            --glass-shadow: 0 8px 30px rgba(0, 30, 20, 0.45), 0 2px 8px rgba(0, 30, 20, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 30, 20, 0.40);
+            --md-surface: #08120e;
+            --md-surface-1: rgba(18, 44, 34, 0.70);
+            --md-surface-2: rgba(24, 56, 44, 0.70);
+            --md-surface-3: rgba(30, 68, 54, 0.75);
+            --md-surface-container-high: rgba(24, 56, 44, 0.75);
+            --md-on-surface: #e4f7ee;
+            --md-on-surface-variant: #9ac2b1;
+            --md-outline: rgba(110, 220, 170, 0.20);
+            --md-outline-variant: rgba(110, 220, 170, 0.10);
+        }
+        /* 紫：神秘优雅紫 */
+        html[data-app="true"][data-apptheme="purple"] {
+            --md-primary: #b08cff;
+            --md-on-primary: #2a0f57;
+            --md-primary-container: #3f2a6b;
+            --md-on-primary-container: #e2d4ff;
+            --md-secondary: #cbb8ec;
+            --md-on-secondary: #2a1850;
+            --md-secondary-container: #3a285f;
+            --md-on-secondary-container: #e4d8f5;
+            --md-tertiary: #cbb8ec;
+            --md-on-tertiary: #2a1850;
+            --md-tertiary-container: #3a285f;
+            --md-on-tertiary-container: #e4d8f5;
+            --glass-blur: 20px;
+            --glass-bg: rgba(30, 20, 52, 0.62);
+            --glass-bg-strong: rgba(40, 28, 66, 0.80);
+            --glass-border: rgba(170, 130, 255, 0.18);
+            --glass-hi: rgba(170, 130, 255, 0.06);
+            --glass-shadow: 0 8px 30px rgba(25, 10, 50, 0.45), 0 2px 8px rgba(25, 10, 50, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(25, 10, 50, 0.40);
+            --md-surface: #120c1e;
+            --md-surface-1: rgba(38, 28, 60, 0.70);
+            --md-surface-2: rgba(48, 36, 74, 0.70);
+            --md-surface-3: rgba(58, 44, 88, 0.75);
+            --md-surface-container-high: rgba(48, 36, 74, 0.75);
+            --md-on-surface: #f1e9ff;
+            --md-on-surface-variant: #b3a3cf;
+            --md-outline: rgba(180, 140, 255, 0.20);
+            --md-outline-variant: rgba(180, 140, 255, 0.10);
+        }
+        /* 玫红：温柔活力粉 */
+        html[data-app="true"][data-apptheme="rose"] {
+            --md-primary: #ff7da8;
+            --md-on-primary: #520018;
+            --md-primary-container: #6e2542;
+            --md-on-primary-container: #ffd6e5;
+            --md-secondary: #e6b8c8;
+            --md-on-secondary: #431423;
+            --md-secondary-container: #5a2b3e;
+            --md-on-secondary-container: #f5d3df;
+            --md-tertiary: #e6b8c8;
+            --md-on-tertiary: #431423;
+            --md-tertiary-container: #5a2b3e;
+            --md-on-tertiary-container: #f5d3df;
+            --glass-blur: 20px;
+            --glass-bg: rgba(44, 18, 32, 0.62);
+            --glass-bg-strong: rgba(58, 24, 42, 0.80);
+            --glass-border: rgba(255, 130, 170, 0.18);
+            --glass-hi: rgba(255, 130, 170, 0.06);
+            --glass-shadow: 0 8px 30px rgba(45, 10, 30, 0.45), 0 2px 8px rgba(45, 10, 30, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(45, 10, 30, 0.40);
+            --md-surface: #180a12;
+            --md-surface-1: rgba(48, 24, 38, 0.70);
+            --md-surface-2: rgba(62, 30, 48, 0.70);
+            --md-surface-3: rgba(76, 38, 58, 0.75);
+            --md-surface-container-high: rgba(62, 30, 48, 0.75);
+            --md-on-surface: #ffe9f0;
+            --md-on-surface-variant: #cf9fb0;
+            --md-outline: rgba(255, 140, 175, 0.20);
+            --md-outline-variant: rgba(255, 140, 175, 0.10);
+        }
+        /* 青：清透湖青 */
+        html[data-app="true"][data-apptheme="cyan"] {
+            --md-primary: #3fdada;
+            --md-on-primary: #002c2c;
+            --md-primary-container: #0f4a4a;
+            --md-on-primary-container: #bdf5f5;
+            --md-secondary: #b6d8d8;
+            --md-on-secondary: #0a2c2c;
+            --md-secondary-container: #1b4a4a;
+            --md-on-secondary-container: #cdeeed;
+            --md-tertiary: #b6d8d8;
+            --md-on-tertiary: #0a2c2c;
+            --md-tertiary-container: #1b4a4a;
+            --md-on-tertiary-container: #cdeeed;
+            --glass-blur: 20px;
+            --glass-bg: rgba(10, 36, 40, 0.62);
+            --glass-bg-strong: rgba(16, 46, 52, 0.80);
+            --glass-border: rgba(80, 220, 220, 0.18);
+            --glass-hi: rgba(80, 220, 220, 0.06);
+            --glass-shadow: 0 8px 30px rgba(0, 30, 35, 0.45), 0 2px 8px rgba(0, 30, 35, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(0, 30, 35, 0.40);
+            --md-surface: #07141a;
+            --md-surface-1: rgba(18, 46, 52, 0.70);
+            --md-surface-2: rgba(24, 58, 66, 0.70);
+            --md-surface-3: rgba(30, 70, 80, 0.75);
+            --md-surface-container-high: rgba(24, 58, 66, 0.75);
+            --md-on-surface: #e1f7f7;
+            --md-on-surface-variant: #98c2c2;
+            --md-outline: rgba(100, 220, 220, 0.20);
+            --md-outline-variant: rgba(100, 220, 220, 0.10);
+        }
+        /* 琥珀：温暖暖橙 */
+        html[data-app="true"][data-apptheme="amber"] {
+            --md-primary: #ffba3a;
+            --md-on-primary: #3d2600;
+            --md-primary-container: #5e4200;
+            --md-on-primary-container: #ffe7b3;
+            --md-secondary: #e3cda0;
+            --md-on-secondary: #3a2c0a;
+            --md-secondary-container: #594619;
+            --md-on-secondary-container: #f3e3c2;
+            --md-tertiary: #e3cda0;
+            --md-on-tertiary: #3a2c0a;
+            --md-tertiary-container: #594619;
+            --md-on-tertiary-container: #f3e3c2;
+            --glass-blur: 20px;
+            --glass-bg: rgba(40, 30, 8, 0.62);
+            --glass-bg-strong: rgba(52, 40, 12, 0.80);
+            --glass-border: rgba(255, 190, 80, 0.18);
+            --glass-hi: rgba(255, 190, 80, 0.06);
+            --glass-shadow: 0 8px 30px rgba(35, 24, 0, 0.45), 0 2px 8px rgba(35, 24, 0, 0.35);
+            --glass-shadow-sm: 0 4px 16px rgba(35, 24, 0, 0.40);
+            --md-surface: #18120a;
+            --md-surface-1: rgba(46, 36, 18, 0.70);
+            --md-surface-2: rgba(58, 46, 24, 0.70);
+            --md-surface-3: rgba(70, 56, 30, 0.75);
+            --md-surface-container-high: rgba(58, 46, 24, 0.75);
+            --md-on-surface: #fff2db;
+            --md-on-surface-variant: #cbb491;
+            --md-outline: rgba(255, 200, 100, 0.20);
+            --md-outline-variant: rgba(255, 200, 100, 0.10);
+        }
 
         /* App 背景：干净的纯黑 / 纯白 / 灰阶 / 护眼，去掉彩色渐变与漂浮光斑 */
         html[data-app="true"] body { background: #000000; }
@@ -336,6 +523,12 @@
         html[data-app="true"][data-apptheme="gray"] body { background: #161618; }
         html[data-app="true"][data-apptheme="sepia"] body { background: #1c1813; }
         html[data-app="true"][data-apptheme="lightgray"] body { background: #f1f1f4; }
+        html[data-app="true"][data-apptheme="blue"]   body { background: #0a0d16; }
+        html[data-app="true"][data-apptheme="green"]  body { background: #08120e; }
+        html[data-app="true"][data-apptheme="purple"] body { background: #120c1e; }
+        html[data-app="true"][data-apptheme="rose"]   body { background: #180a12; }
+        html[data-app="true"][data-apptheme="cyan"]   body { background: #07141a; }
+        html[data-app="true"][data-apptheme="amber"]  body { background: #18120a; }
         html[data-app="true"] body::before,
         html[data-app="true"] body::after { display: none; }
         /* App 的品牌 logo 底：纯黑白也保持简洁（去掉彩色投影）*/
@@ -1357,21 +1550,28 @@
         function syncAndroidChrome(isDarkBg) {
             if (window.AndroidTheme) { try { window.AndroidTheme.setDark(!!isDarkBg); } catch (e) {} }
         }
-        // App 端可选主题（跟随系统 + 纯黑 / 深灰 / 护眼 / 纯白 / 浅灰）
+        // App 端可选主题（跟随系统 + 中性主题 + 彩色主题）；dark 标记用于决定状态栏图标颜色
         const APP_THEMES = [
             { id: 'system',    name: '跟随系统', bg: 'linear-gradient(135deg,#0c0c0e 0 50%,#ffffff 50% 100%)', accent: '#9a9aa0' },
             { id: 'black',     name: '纯黑',     bg: '#000000', accent: '#ffffff' },
             { id: 'gray',      name: '深灰',     bg: '#161618', accent: '#ffffff' },
             { id: 'sepia',     name: '护眼',     bg: '#1c1813', accent: '#e9dcc4' },
-            { id: 'white',     name: '纯白',     bg: '#ffffff', accent: '#000000' },
-            { id: 'lightgray', name: '浅灰',     bg: '#f1f1f4', accent: '#1a1a1c' }
+            { id: 'white',     name: '纯白',     bg: '#ffffff', accent: '#000000', dark: false },
+            { id: 'lightgray', name: '浅灰',     bg: '#f1f1f4', accent: '#1a1a1c', dark: false },
+            { id: 'blue',      name: '蓝',       bg: '#0a0d16', accent: '#5a92ff', dark: true },
+            { id: 'green',     name: '绿',       bg: '#08120e', accent: '#3fd098', dark: true },
+            { id: 'purple',    name: '紫',       bg: '#120c1e', accent: '#b08cff', dark: true },
+            { id: 'rose',      name: '玫红',     bg: '#180a12', accent: '#ff7da8', dark: true },
+            { id: 'cyan',      name: '青',       bg: '#07141a', accent: '#3fdada', dark: true },
+            { id: 'amber',     name: '琥珀',     bg: '#18120a', accent: '#ffba3a', dark: true }
         ];
         const APP_THEME_KEY = 'pass2kdbx_apptheme';
         let themeGrid = null;
-        // 固定主题是否为深色背景（决定状态栏图标）；“跟随系统”随当前系统
+        // 固定主题是否为深色背景（决定状态栏图标）；“跟随系统”随当前系统，其余读取主题 dark 标记
         function themeIsDarkBg(id) {
             if (id === 'system') return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-            return !(id === 'white' || id === 'lightgray');
+            const t = APP_THEMES.find(x => x.id === id);
+            return t ? !!t.dark : true;
         }
         function applyAppTheme(id) {
             if (id === 'system') {
