@@ -310,11 +310,25 @@ public class MainActivity extends Activity {
         if (webView == null) return;
         int top = getStatusBarHeight();
         int bottom = getNavigationBarHeight();
+        // API 28+：读取刘海/挖孔在左右的安全区，异形屏/横屏下避免内容被遮挡
+        int left = 0, right = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            try {
+                android.view.WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
+                if (insets != null) {
+                    android.view.DisplayCutout cut = insets.getDisplayCutout();
+                    if (cut != null) {
+                        left = cut.getSafeInsetLeft();
+                        right = cut.getSafeInsetRight();
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
         final String js = "try{var s=document.documentElement.style;"
                 + "s.setProperty('--app-inset-top','" + top + "px');"
                 + "s.setProperty('--app-inset-bottom','" + bottom + "px');"
-                + "s.setProperty('--app-inset-left','0px');"
-                + "s.setProperty('--app-inset-right','0px');}catch(e){}";
+                + "s.setProperty('--app-inset-left','" + left + "px');"
+                + "s.setProperty('--app-inset-right','" + right + "px');}catch(e){}";
         webView.evaluateJavascript(js, null);
     }
 

@@ -51,16 +51,16 @@
             --md-success-container: #1f5236;
             /* 形状 */
             --md-corner-full: 999px;
-            --md-corner-xl: 30px;
+            --md-corner-xl: 28px;
             --md-corner-l: 22px;
             --md-corner-m: 16px;
             --md-corner-s: 12px;
-            /* 排版 */
-            --md-title-large: 700 1.375rem/1.55 "Roboto", "Noto Sans SC", system-ui, sans-serif;
-            --md-title-medium: 600 1rem/1.5 "Roboto", "Noto Sans SC", system-ui, sans-serif;
+            /* 排版（MD3 字重规范：标题 400/500，标签 500） */
+            --md-title-large: 400 1.375rem/1.55 "Roboto", "Noto Sans SC", system-ui, sans-serif;
+            --md-title-medium: 500 1rem/1.5 "Roboto", "Noto Sans SC", system-ui, sans-serif;
             --md-body-large: 400 1rem/1.6 "Roboto", "Noto Sans SC", system-ui, sans-serif;
             --md-body-medium: 400 0.875rem/1.5 "Roboto", "Noto Sans SC", system-ui, sans-serif;
-            --md-label: 500 0.8125rem/1.3 "Roboto", "Noto Sans SC", system-ui, sans-serif;
+            --md-label: 500 0.875rem/1.3 "Roboto", "Noto Sans SC", system-ui, sans-serif;
         }
         /* 浅色主题（由 App 系统注入）*/
         [data-theme="light"] {
@@ -740,7 +740,7 @@
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            padding: var(--app-inset-top, env(safe-area-inset-top)) 0 var(--app-inset-bottom, env(safe-area-inset-bottom));
+            padding: 0 0 var(--app-inset-bottom, env(safe-area-inset-bottom));
             position: relative;
             overflow-x: hidden;
             background:
@@ -780,7 +780,9 @@
         .app-bar {
             position: sticky; top: 0; z-index: 30;
             display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.7rem 1rem;
+            /* 顶部 inset 内移至 app-bar：毛玻璃背景延伸到状态栏下，避免顶部留白 */
+            padding: var(--app-inset-top, 0px) 1rem 0.7rem 1rem;
+            min-height: 64px;
             background: color-mix(in srgb, var(--glass-bg) 70%, transparent);
             backdrop-filter: blur(var(--glass-blur)) saturate(160%);
             -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
@@ -789,13 +791,13 @@
         }
         .app-bar .brand { display: flex; align-items: center; gap: 0.65rem; flex: 1; min-width: 0; }
         .app-bar .brand .logo {
-            width: 42px; height: 42px; border-radius: 14px; flex-shrink: 0;
+            width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
             display: grid; place-items: center;
             background: var(--md-primary);
             color: var(--md-on-primary);
             box-shadow: 0 2px 10px color-mix(in srgb, var(--md-primary) 28%, transparent), 0 0 0 1px var(--glass-border) inset;
         }
-        .app-bar .brand .logo svg { width: 23px; height: 23px; }
+        .app-bar .brand .logo svg { width: 22px; height: 22px; }
         .app-bar .brand .titles { min-width: 0; }
         .app-bar .brand .title { font: var(--md-title-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .01em; }
         .app-bar .brand .subtitle { font: var(--md-label); color: var(--md-on-surface-variant); font-weight: 400; }
@@ -810,7 +812,7 @@
             transition: background .18s, transform .12s;
             -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
         }
-        .icon-btn svg { width: 21px; height: 21px; }
+        .icon-btn svg { width: 24px; height: 24px; }
         .icon-btn:active { background: color-mix(in srgb, var(--md-on-surface) 16%, transparent); transform: scale(.94); }
         .icon-btn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
         .icon-btn:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
@@ -922,12 +924,12 @@
         .file-chip .fc-name { font: var(--md-label); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-chip .fc-meta { font: var(--md-label); font-weight: 400; opacity: .8; }
         .file-chip .fc-remove {
-            width: 44px; height: 44px; flex-shrink: 0; border: none; cursor: pointer;
+            width: 48px; height: 48px; flex-shrink: 0; border: none; cursor: pointer;
             background: transparent; color: var(--md-on-surface-variant);
             border-radius: var(--md-corner-full);
             display: grid; place-items: center; border: 1px solid var(--glass-border);
         }
-        .file-chip .fc-remove svg { width: 18px; height: 18px; }
+        .file-chip .fc-remove svg { width: 24px; height: 24px; }
         .file-chip .fc-remove:active { background: color-mix(in srgb, var(--md-on-surface-variant) 20%, transparent); }
 
         .fmt-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; justify-content: center; }
@@ -973,10 +975,10 @@
         .text-field input::placeholder { color: var(--md-on-surface-variant); opacity: .7; }
         .text-field .tf-action {
             border: none; background: transparent; cursor: pointer; color: var(--md-on-surface-variant);
-            padding: 0.3rem; border-radius: 50%; display: grid; place-items: center;
+            width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
             transition: background .15s ease, color .15s ease;
         }
-        .text-field .tf-action svg { width: 19px; height: 19px; }
+        .text-field .tf-action svg { width: 24px; height: 24px; }
         .text-field .tf-action:hover { background: color-mix(in srgb, var(--md-on-surface-variant) 14%, transparent); color: var(--md-on-surface); }
         .text-field .tf-action:active { background: color-mix(in srgb, var(--md-on-surface-variant) 16%, transparent); }
         select.native-select {
@@ -993,7 +995,7 @@
         .pw-label button {
             border: none; cursor: pointer; background: color-mix(in srgb, var(--glass-bg) 60%, transparent);
             color: var(--md-primary); border: 1px solid var(--glass-border);
-            font: var(--md-label); padding: 0.4rem 0.7rem; border-radius: var(--md-corner-full);
+            font: var(--md-label); min-height: 48px; padding: 0.6rem 1rem; border-radius: var(--md-corner-full);
             display: inline-flex; align-items: center; gap: 0.35rem; transition: background .15s ease;
         }
         .pw-label button svg { width: 15px; height: 15px; }
@@ -1057,8 +1059,8 @@
 
         /* ===================== FAB / 按钮 ===================== */
         .btn {
-            border: none; cursor: pointer; font: 600 0.875rem/1 "Roboto","Noto Sans SC",system-ui,sans-serif;
-            padding: 0.8rem 1.5rem; min-height: 48px; border-radius: var(--md-corner-full);
+            border: none; cursor: pointer; font: 500 0.875rem/1 "Roboto","Noto Sans SC",system-ui,sans-serif;
+            padding: 0.8rem 1.5rem; min-height: 48px; border-radius: 20px;
             letter-spacing: .02em;
             transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, background .22s ease, color .22s ease, border-color .22s ease;
             display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
@@ -1066,7 +1068,7 @@
             -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
             border: 1px solid var(--glass-border);
         }
-        .btn svg { width: 18px; height: 18px; }
+        .btn svg { width: 24px; height: 24px; }
         .btn:active { transform: scale(.96); }
         .btn:disabled { cursor: not-allowed; }
         .btn::after {
@@ -1112,17 +1114,18 @@
 
         .fab-next {
             position: fixed; left: calc(1rem + var(--app-inset-left, env(safe-area-inset-left))); right: calc(1rem + var(--app-inset-right, env(safe-area-inset-right)));
-            bottom: calc(1.15rem + var(--app-inset-bottom, env(safe-area-inset-bottom)));
+            bottom: calc(1rem + var(--app-inset-bottom, env(safe-area-inset-bottom)));
             z-index: 25;
-            height: 56px; border-radius: var(--md-corner-xl);
+            height: 56px; border-radius: 16px;
             /* 用 primary-container 做底色 + primary 渐变叠加，动态取色下仍保持高对比 */
             background:
                 linear-gradient(135deg, color-mix(in srgb, var(--md-primary) 92%, #fff), var(--md-primary));
             color: var(--md-on-primary);
             border: none; cursor: pointer;
-            font: 600 0.9375rem/1 "Roboto","Noto Sans SC",system-ui,sans-serif;
-            font-weight: 700;
+            font: 500 0.875rem/1 "Roboto","Noto Sans SC",system-ui,sans-serif;
+            font-weight: 500;
             display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem;
+            padding: 0 1.25rem;
             box-shadow:
                 0 4px 20px color-mix(in srgb, var(--md-primary) 40%, transparent),
                 0 2px 6px rgba(0,0,0,.14),
@@ -1130,12 +1133,12 @@
             transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease;
             -webkit-tap-highlight-color: transparent;
         }
-        .fab-next svg { width: 21px; height: 21px; flex-shrink: 0; }
+        .fab-next svg { width: 24px; height: 24px; flex-shrink: 0; }
         .fab-next:hover { transform: translateY(-2px); box-shadow: 0 6px 24px color-mix(in srgb, var(--md-primary) 45%, transparent), 0 3px 8px rgba(0,0,0,.16), inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent); }
         .fab-next:active { transform: scale(.97); box-shadow: 0 2px 10px color-mix(in srgb, var(--md-primary) 30%, transparent), 0 1px 3px rgba(0,0,0,.12), inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent); }
         .fab-next.disabled { opacity: 0; pointer-events: none; }
         .fab-next:focus-visible { outline: 2px solid var(--md-on-primary); outline-offset: 3px; }
-        .spacer-bottom { height: 80px; margin-top: auto; }
+        .spacer-bottom { height: 96px; margin-top: auto; }
 
         /* ===================== 进度 ===================== */
         .progress-card { text-align: center; }
