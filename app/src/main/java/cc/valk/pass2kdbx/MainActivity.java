@@ -41,8 +41,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 沉浸式：WebView 延伸到系统栏下方，但用 padding 把内容限制在安全区域，
-        // 并通过 JS 同步主题表面色到 WebView 背景，使系统栏与页面融为一体
+        // 沉浸式：WebView 全屏延伸到系统栏下方，由前端用注入的 CSS 变量
+        // var(--app-inset-*) 自行避让状态栏/导航栏；主题表面色通过 JS 同步到系统栏背景，融为一体
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
@@ -64,8 +64,8 @@ public class MainActivity extends Activity {
         webView.setBackgroundColor(Color.TRANSPARENT);
         setContentView(webView);
 
-        // 根据状态栏/导航栏高度给 WebView 加内边距，内容不重叠到系统栏
-        applyWindowInsets();
+        // 页面加载后由 injectWindowInsets() 把系统栏高度注入 CSS 变量，前端据此避让
+        injectWindowInsets();
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -88,6 +88,8 @@ public class MainActivity extends Activity {
                 applyDynamicColor();
                 // 通知前端当前系统深浅模式，便于同步 theme-color / 状态栏
                 applySystemDarkMode(view);
+                // 注入系统栏高度，供前端用 var(--app-inset-*) 避让状态栏/导航栏
+                injectWindowInsets();
             }
         });
         webView.setWebChromeClient(new WebChromeClient() {
@@ -296,12 +298,19 @@ public class MainActivity extends Activity {
         decor.setSystemUiVisibility(flags);
     }
 
-    // 根据系统栏高度给 WebView 内容加内边距，避免内容被状态栏/导航栏遮挡
-    private void applyWindowInsets() {
+    // 把测量到的系统栏高度注入为 CSS 变量，供前端用 var(--app-inset-*) 避让状态栏/导航栏。
+    // 关键：Android WebView 的 env(safe-area-inset-*) 默认返回 0，必须用原生测量值注入，
+    // 否则顶部文案会顶到状态栏下被截断。
+    private void injectWindowInsets() {
         if (webView == null) return;
         int top = getStatusBarHeight();
         int bottom = getNavigationBarHeight();
-        webView.setPadding(0, top, 0, bottom);
+        final String js = "try{var s=document.documentElement.style;"
+                + "s.setProperty('--app-inset-top','" + top + "px');"
+                + "s.setProperty('--app-inset-bottom','" + bottom + "px');"
+                + "s.setProperty('--app-inset-left','0px');"
+                + "s.setProperty('--app-inset-right','0px');}catch(e){}";
+        webView.evaluateJavascript(js, null);
     }
 
     // 读取系统状态栏高度（像素）
@@ -403,7 +412,7 @@ public class MainActivity extends Activity {
         super.onConfigurationChanged(newConfig);
         if (webView != null) {
             applySystemDarkMode(webView);
-            applyWindowInsets();
+            injectWindowInsets();
         }
     }
 

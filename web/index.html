@@ -740,7 +740,7 @@
             min-height: 100dvh;
             display: flex;
             flex-direction: column;
-            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+            padding: var(--app-inset-top, env(safe-area-inset-top)) 0 var(--app-inset-bottom, env(safe-area-inset-bottom));
             position: relative;
             overflow-x: hidden;
             background:
@@ -1111,8 +1111,8 @@
         .btn-row .btn { flex: 1; }
 
         .fab-next {
-            position: fixed; left: calc(1rem + env(safe-area-inset-left)); right: calc(1rem + env(safe-area-inset-right));
-            bottom: calc(1.15rem + env(safe-area-inset-bottom));
+            position: fixed; left: calc(1rem + var(--app-inset-left, env(safe-area-inset-left))); right: calc(1rem + var(--app-inset-right, env(safe-area-inset-right)));
+            bottom: calc(1.15rem + var(--app-inset-bottom, env(safe-area-inset-bottom)));
             z-index: 25;
             height: 56px; border-radius: var(--md-corner-xl);
             /* 用 primary-container 做底色 + primary 渐变叠加，动态取色下仍保持高对比 */
@@ -1226,7 +1226,7 @@
         /* ===================== Snackbar（玻璃）===================== */
         .snackbar {
             position: fixed; left: 50%; transform: translateX(-50%) translateY(140%);
-            bottom: calc(1.25rem + env(safe-area-inset-bottom)); z-index: 65;
+            bottom: calc(1.25rem + var(--app-inset-bottom, env(safe-area-inset-bottom))); z-index: 65;
             background: color-mix(in srgb, var(--glass-bg-strong) 80%, transparent); color: var(--md-on-surface);
             border: 1px solid var(--glass-border); border-radius: var(--md-corner-s); padding: 0.85rem 1.1rem;
             font: var(--md-body-medium); box-shadow: var(--glass-shadow);
@@ -1252,7 +1252,7 @@
             background: color-mix(in srgb, var(--glass-bg-strong) 82%, transparent);
             border-radius: var(--md-corner-xl) var(--md-corner-xl) 0 0;
             border-top: 1px solid var(--glass-border);
-            padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom));
+            padding: 1.5rem 1.25rem calc(1.5rem + var(--app-inset-bottom, env(safe-area-inset-bottom)));
             transform: translateY(110%); transition: transform .34s cubic-bezier(.2,.8,.2,1);
             max-width: 720px; margin: 0 auto;
             box-shadow: var(--glass-shadow);
