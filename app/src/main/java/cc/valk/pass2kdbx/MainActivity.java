@@ -41,22 +41,31 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 让系统负责状态栏/导航栏内边距，WebView 内容不延伸到系统栏下方，避免被状态栏遮挡
+        // 沉浸式：WebView 延伸到系统栏下方，但用 padding 把内容限制在安全区域，
+        // 并通过 JS 同步主题表面色到 WebView 背景，使系统栏与页面融为一体
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            int uiFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            window.getDecorView().setSystemUiVisibility(uiFlags);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(true);
+            getWindow().setDecorFitsSystemWindows(false);
+            getWindow().setNavigationBarContrastEnforced(false);
         }
 
         webView = new WebView(this);
-        // 关闭 WebView 自动内边距，避免与系统已预留的 insets 重复叠加
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             webView.setFitsSystemWindows(false);
         }
+        webView.setBackgroundColor(Color.TRANSPARENT);
         setContentView(webView);
+
+        // 根据状态栏/导航栏高度给 WebView 加内边距，内容不重叠到系统栏
+        applyWindowInsets();
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -263,6 +272,8 @@ public class MainActivity extends Activity {
                         Window window = getWindow();
                         window.setStatusBarColor(c);
                         window.setNavigationBarColor(c);
+                        // 同步 WebView 背景色，使被状态栏/导航栏遮挡的 padding 区域与主题融为一体
+                        if (webView != null) webView.setBackgroundColor(c);
                     } catch (Exception e) {
                         Log.e(TAG, "ThemeBridge.setStatusBarColor error", e);
                     }
@@ -283,6 +294,26 @@ public class MainActivity extends Activity {
             flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
         decor.setSystemUiVisibility(flags);
+    }
+
+    // 根据系统栏高度给 WebView 内容加内边距，避免内容被状态栏/导航栏遮挡
+    private void applyWindowInsets() {
+        if (webView == null) return;
+        int top = getStatusBarHeight();
+        int bottom = getNavigationBarHeight();
+        webView.setPadding(0, top, 0, bottom);
+    }
+
+    // 读取系统状态栏高度（像素）
+    private int getStatusBarHeight() {
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        return resId > 0 ? getResources().getDimensionPixelSize(resId) : 0;
+    }
+
+    // 读取系统导航栏高度（像素）
+    private int getNavigationBarHeight() {
+        int resId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        return resId > 0 ? getResources().getDimensionPixelSize(resId) : 0;
     }
 
     // JavaScript 接口：处理文件下载
@@ -372,6 +403,7 @@ public class MainActivity extends Activity {
         super.onConfigurationChanged(newConfig);
         if (webView != null) {
             applySystemDarkMode(webView);
+            applyWindowInsets();
         }
     }
 
