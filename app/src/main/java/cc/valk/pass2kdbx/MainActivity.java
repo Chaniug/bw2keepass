@@ -41,26 +41,18 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 沉浸式（edge-to-edge）：状态栏与导航栏均透明，内容延伸到二者之下
+        // 让系统负责状态栏/导航栏内边距，WebView 内容不延伸到系统栏下方，避免被状态栏遮挡
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-            window.setStatusBarColor(Color.TRANSPARENT);
-            window.setNavigationBarColor(Color.TRANSPARENT);
-            int uiFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
-            window.getDecorView().setSystemUiVisibility(uiFlags);
         }
-        // Android 11+（API 30+）：用现代 edge-to-edge API，并关闭导航栏强制对比层（避免半透明遮罩）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-            getWindow().setNavigationBarContrastEnforced(false);
+            getWindow().setDecorFitsSystemWindows(true);
         }
 
         webView = new WebView(this);
-        // 让 WebView 内容绘制到状态栏之下（配合前端 safe-area 内边距）
+        // 关闭 WebView 自动内边距，避免与系统已预留的 insets 重复叠加
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             webView.setFitsSystemWindows(false);
         }
@@ -244,7 +236,7 @@ public class MainActivity extends Activity {
         decor.setSystemUiVisibility(flags);
     }
 
-    // JavaScript 接口：前端选择主题后，同步状态栏 / 导航栏图标深浅
+    // JavaScript 接口：前端选择主题后，同步状态栏 / 导航栏图标深浅与背景色
     // （深色背景 → 浅色图标；浅色背景 → 深色图标），避免浅色主题下图标不可见
     public class ThemeBridge {
         @JavascriptInterface
@@ -256,6 +248,23 @@ public class MainActivity extends Activity {
                         syncNavBarIcon(isDark);
                     } catch (Exception e) {
                         Log.e(TAG, "ThemeBridge.setDark error", e);
+                    }
+                }
+            });
+        }
+
+        // 同步状态栏 / 导航栏背景色为当前主题表面色（如 #ffffff / #161618）
+        @JavascriptInterface
+        public void setStatusBarColor(final String color) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        int c = Color.parseColor(color);
+                        Window window = getWindow();
+                        window.setStatusBarColor(c);
+                        window.setNavigationBarColor(c);
+                    } catch (Exception e) {
+                        Log.e(TAG, "ThemeBridge.setStatusBarColor error", e);
                     }
                 }
             });

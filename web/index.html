@@ -1739,8 +1739,13 @@
         let systemDark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
         function applyTheme(theme) { root.setAttribute('data-theme', theme); syncThemeColor(); }
         function syncThemeColor() {
+            const surface = getComputedStyle(root).getPropertyValue('--md-surface').trim() || '#141318';
             const meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--md-surface').trim() || '#141318');
+            if (meta) meta.setAttribute('content', surface);
+            // App 端：把主题表面色同步给 Android 状态栏 / 导航栏背景，使系统栏与界面融为一体
+            if (window.AndroidTheme && window.AndroidTheme.setStatusBarColor) {
+                try { window.AndroidTheme.setStatusBarColor(surface); } catch (e) {}
+            }
         }
         // 通知 Android 同步状态栏 / 导航栏图标颜色（深色背景用浅色图标，浅色背景用深色图标）
         function syncAndroidChrome(isDarkBg) {
