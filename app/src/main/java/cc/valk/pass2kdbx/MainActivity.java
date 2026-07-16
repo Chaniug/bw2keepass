@@ -47,6 +47,10 @@ public class MainActivity extends Activity {
             Window window = getWindow();
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            // 状态栏/导航栏透明，让页面背景（渐变/纯色）沉浸式延伸到系统栏下方；
+            // 系统栏图标的深浅由 setDark() 同步，避免透明背景下图标不可见
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
             int uiFlags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                     | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
@@ -264,7 +268,8 @@ public class MainActivity extends Activity {
             });
         }
 
-        // 同步状态栏 / 导航栏背景色为当前主题表面色（如 #ffffff / #161618）
+        // 状态栏/导航栏保持透明，让页面背景沉浸式延伸到系统栏下方；
+        // 这里的 color 仅用作 WebView 兜底底色。系统栏图标深浅由 setDark() 同步。
         @JavascriptInterface
         public void setStatusBarColor(final String color) {
             runOnUiThread(new Runnable() {
@@ -272,9 +277,9 @@ public class MainActivity extends Activity {
                     try {
                         int c = Color.parseColor(color);
                         Window window = getWindow();
-                        window.setStatusBarColor(c);
-                        window.setNavigationBarColor(c);
-                        // 同步 WebView 背景色，使被状态栏/导航栏遮挡的 padding 区域与主题融为一体
+                        window.setStatusBarColor(Color.TRANSPARENT);
+                        window.setNavigationBarColor(Color.TRANSPARENT);
+                        // 同步 WebView 背景色，作为透明系统栏下的兜底底色，避免露黑
                         if (webView != null) webView.setBackgroundColor(c);
                     } catch (Exception e) {
                         Log.e(TAG, "ThemeBridge.setStatusBarColor error", e);
